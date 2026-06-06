@@ -217,3 +217,58 @@ html, body, #root {
   padding: 40px;
   color: #999;
 }
+
+/* Tool call cards */
+.message.tool-call {
+  margin: 8px 16px;
+}
+
+.tool-card {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.tool-input {
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: #495057;
+}
+
+.tool-result {
+  border-top: 1px solid #dee2e6;
+  padding-top: 8px;
+  font-size: 13px;
+  color: #212529;
+}
+
+.tool-result pre {
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.tool-spinner {
+  animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.message.tool .message-content {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  color: #444;
+  max-width: 90%;
+}
+
+.message.tool .message-content pre {
+  max-height: 150px;
+  overflow-y: auto;
+}
