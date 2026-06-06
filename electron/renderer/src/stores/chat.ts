@@ -1,0 +1,180 @@
+/**
+ * Chat Store (Zustand)
+ */
+
+import { create } from 'zustand';
+
+declare global {
+  interface Window {
+    electronAPI: {
+      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>;
+      chat: {
+        send: (message: string, sessionId: string) => Promise<{
+          runId: string;
+          message: Message;
+        }>;
+        history: (sessionId: string) => Promise<Session>;
+      };
+      session: {
+        list: () => Promise<Session[]>;
+        create: () => Promise<Session>;
+        get: (sessionId: string) => Promise<Session>;
+      };
+      onChatStarted: (callback: (params: unknown) => void) => void;
+      onTextDelta: (callback: (params: { sessionId: string; runId: string; delta: string }) => void) => void;
+      onChatDone: (callback: (params: unknown) => void) => void;
+    };
+  }
+}
+
+export interface Message {
+  id: string;
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  timestamp: number;
+}
+
+export interface Session {
+  id: string;
+  created_at: number;
+  updated_at: number;
+  messages: Message[];
+}
+
+interface ChatState {
+  sessions: Session[];
+  activeSessionId: string | null;
+  streamingText: string;
+  isStreaming: boolean;
+  currentRunId: string | null;
+  error: string | null;
+
+  // Actions
+  loadSessions: () => Promise<void>;
+  createSession: () => Promise<void>;
+  selectSession: (sessionId: string) => Promise<void>;
+  sendMessage: (text: string) => Promise<void>;
+  handleTextDelta: (params: { sessionId: string; runId: string; delta: string }) => void;
+  handleChatDone: () => void;
+  handleChatStarted: (params: { sessionId: string; runId: string }) => void;
+  clearError: () => void;
+}
+
+export const useChatStore = create<ChatState>((set, get) => ({
+  sessions: [],
+  activeSessionId: null,
+  streamingText: '',
+  isStreaming: false,
+  currentRunId: null,
+  error: null,
+
+  loadSessions: async () => {
+    try {
+      const sessions = await window.electronAPI.session.list();
+      set({ sessions });
+
+      // Select first session if none selected
+      if (sessions.length > 0 && !get().activeSessionId) {
+        await get().selectSession(sessions[0].id);
+      }
+    } catch (error) {
+      set({ error: `Failed to load sessions: ${error}` });
+    }
+  },
+
+  createSession: async () => {
+    try {
+      const session = await window.electronAPI.session.create();
+      set((state) => ({
+        sessions: [session, ...state.sessions],
+        activeSessionId: session.id,
+      }));
+    } catch (error) {
+      set({ error: `Failed to create session: ${error}` });
+    }
+  },
+
+  selectSession: async (sessionId: string) => {
+    try {
+      const session = await window.electronAPI.session.get(sessionId);
+      set((state) => ({
+        sessions: state.sessions.map((s) =>
+          s.id === sessionId ? session : s
+        ),
+        activeSessionId: sessionId,
+        streamingText: '',
+        isStreaming: false,
+      }));
+    } catch (error) {
+      set({ error: `Failed to load session: ${error}` });
+    }
+  },
+
+  sendMessage: async (text: string) => {
+    const { activeSessionId } = get();
+    if (!activeSessionId) {
+      set({ error: 'No active session' });
+      return;
+    }
+
+    set({ isStreaming: true, error: null });
+
+    try {
+      const result = await window.electronAPI.chat.send(text, activeSessionId);
+
+      // Reload the session to get the updated messages
+      const session = await window.electronAPI.session.get(activeSessionId);
+      set((state) => ({
+        sessions: state.sessions.map((s) =>
+          s.id === activeSessionId ? session : s
+        ),
+      }));
+    } catch (error) {
+      set({ error: `Failed to send message: ${error}`, isStreaming: false });
+    }
+  },
+
+  handleTextDelta: ({ sessionId, delta }) => {
+    const { activeSessionId } = get();
+    if (sessionId !== activeSessionId) return;
+
+    set((state) => ({
+      streamingText: state.streamingText + delta,
+    }));
+  },
+
+  handleChatDone: () => {
+    set((state) => {
+      const { activeSessionId, streamingText } = state;
+      if (!activeSessionId || !streamingText) {
+        return { isStreaming: false, streamingText: '' };
+      }
+
+      // Add the streaming text as a message
+      const newMessage: Message = {
+        id: `temp-${Date.now()}`,
+        role: 'assistant',
+        content: streamingText,
+        timestamp: Date.now(),
+      };
+
+      return {
+        sessions: state.sessions.map((s) =>
+          s.id === activeSessionId
+            ? { ...s, messages: [...s.messages, newMessage] }
+            : s
+        ),
+        streamingText: '',
+        isStreaming: false,
+      };
+    });
+  },
+
+  handleChatStarted: ({ sessionId, runId }) => {
+    const { activeSessionId } = get();
+    if (sessionId !== activeSessionId) return;
+    set({ currentRunId: runId, streamingText: '' });
+  },
+
+  clearError: () => set({ error: null }),
+}));

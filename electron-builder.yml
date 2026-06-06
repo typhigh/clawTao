@@ -1,0 +1,30 @@
+appId: app.clawtao.desktop
+productName: ClawTao
+copyright: Copyright © 2026
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - "!node_modules/**/*"
+extraResources:
+  - from: ../core/target/debug/clawtao
+    to: clawtao
+    filter:
+      - "**/*"
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+    - deb
+asar: true

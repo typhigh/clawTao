@@ -1,0 +1,37 @@
+{
+  "name": "clawtao",
+  "version": "0.0.1",
+  "description": "Desktop AI agent powered by Electron + Rust",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "core:build": "cd core && cargo build --release",
+    "build": "pnpm run core:build && pnpm run build:vite && electron-builder",
+    "build:vite": "tsc && vite build"
+  },
+  "keywords": ["electron", "rust", "ai", "agent", "openai"],
+  "author": "",
+  "license": "MIT",
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron"]
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "concurrently": "^9.0.0",
+    "electron": "40.8.4",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.0",
+    "wait-on": "^8.0.0"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.0"
+  }
+}
