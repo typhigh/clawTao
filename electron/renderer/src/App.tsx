@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useChatStore, Message, ToolCall } from './stores/chat';
+import { useSettingsStore } from './stores/settings';
+import { SettingsDialog } from './components/SettingsDialog';
 
 function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
@@ -19,16 +21,26 @@ function App() {
     handleToolStarted, handleToolResult,
   } = useChatStore();
 
+  const { config, loaded, load: loadConfig } = useSettingsStore();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
 
   useEffect(() => {
     loadSessions();
+    loadConfig();
     window.electronAPI.onChatStarted(handleChatStarted as (params: unknown) => void);
     window.electronAPI.onTextDelta(handleTextDelta as (params: unknown) => void);
     window.electronAPI.onChatDone(handleChatDone as (params: unknown) => void);
     window.electronAPI.onToolStarted(handleToolStarted as (params: unknown) => void);
     window.electronAPI.onToolResult(handleToolResult as (params: unknown) => void);
   }, []);
+
+  // Auto-open settings if no API key configured
+  useEffect(() => {
+    if (loaded && config && !config.api_key) {
+      setSettingsOpen(true);
+    }
+  }, [loaded, config]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,10 +56,17 @@ function App() {
     <div className="app">
       <header className="header">
         <h1>ClawTao</h1>
-        <span style={{ fontSize: 12, opacity: 0.7 }}>
-          {isStreaming ? 'Thinking...' : 'Ready'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, opacity: 0.7 }}>
+            {isStreaming ? 'Thinking...' : 'Ready'}
+          </span>
+          <button className="btn-icon" onClick={() => setSettingsOpen(true)} title="Settings">
+            ⚙️
+          </button>
+        </div>
       </header>
+
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <div className="main-content">
         <aside className="session-list">

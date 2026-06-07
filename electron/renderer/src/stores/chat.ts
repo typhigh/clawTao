@@ -1,5 +1,9 @@
 /**
- * Chat Store (Zustand)
+ * Chat Store — central state for the chat UI.
+ *
+ * Manages sessions, messages, streaming text, and currently-running tool calls.
+ * IPC events from main (chat.text_delta, chat.tool_started, etc.) update this
+ * store reactively so the UI re-renders while the LLM is still generating.
  */
 import { create } from 'zustand';
 
@@ -16,6 +20,11 @@ declare global {
         list: () => Promise<Session[]>;
         create: () => Promise<Session>;
         get: (sessionId: string) => Promise<Session>;
+      };
+      config: {
+        get: () => Promise<{ provider: string; api_key: string; base_url: string; model: string }>;
+        set: (c: unknown) => Promise<unknown>;
+        validate: () => Promise<{ ok: boolean; error?: string }>;
       };
       onChatStarted: (callback: (params: unknown) => void) => void;
       onTextDelta: (callback: (params: { sessionId: string; runId: string; delta: string }) => void) => void;

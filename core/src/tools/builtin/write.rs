@@ -54,5 +54,5 @@ impl ToolExecutor for WriteTool {
 }
 
 #[cfg(test)]
-#[path = "write_tests.rs"]
+#[path = "tests/write_tests.rs"]
 mod tests;

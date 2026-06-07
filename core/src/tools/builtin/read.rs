@@ -37,5 +37,5 @@ impl ToolExecutor for ReadTool {
 }
 
 #[cfg(test)]
-#[path = "read_tests.rs"]
+#[path = "tests/read_tests.rs"]
 mod tests;

@@ -1,7 +1,9 @@
 use super::spec::ToolSpec;
 use std::fmt;
 
-/// Error returned when a tool execution fails.
+/// Reasons a tool call can fail.
+/// `Execution` means the tool ran but produced an error.
+/// `InvalidInput` means required parameters were missing or malformed.
 #[derive(Debug)]
 pub enum ToolError {
     Execution(String),
@@ -30,5 +32,5 @@ pub trait ToolExecutor: Send + Sync {
 }
 
 #[cfg(test)]
-#[path = "executor_tests.rs"]
+#[path = "tests/executor_tests.rs"]
 mod tests;

@@ -74,5 +74,5 @@ impl ToolExecutor for BashTool {
 }
 
 #[cfg(test)]
-#[path = "bash_tests.rs"]
+#[path = "tests/bash_tests.rs"]
 mod tests;

@@ -1,3 +1,13 @@
+/**
+ * ClawTao Electron Main Process.
+ *
+ * Spawns the Rust backend as a child process and communicates with it
+ * via JSON-RPC 2.0 over stdin/stdout. The renderer (React) talks to
+ * main through standard Electron IPC; main translates and forwards to Rust.
+ *
+ * Streaming LLM responses from Rust appear as JSON-RPC notifications
+ * on stdout, which main converts to IPC events for the renderer.
+ */
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
@@ -10,6 +20,7 @@ let requestId = 0;
 
 const isDev = process.env.NODE_ENV !== 'production' || !app.isPackaged;
 
+/** Launch the Rust backend via `cargo run`. In production, runs the bundled binary. */
 function startRust() {
   const manifestPath = path.join(__dirname, '../../core/Cargo.toml');
   const coreDir = path.dirname(manifestPath);
@@ -17,7 +28,7 @@ function startRust() {
   rustProcess = spawn('cargo', ['run', '--manifest-path', manifestPath], {
     cwd: coreDir,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, RUST_LOG: 'debug' },
+    env: { ...process.env },
   });
 
   const rl = readline.createInterface({ input: rustProcess.stdout!, crlfDelay: Infinity });
@@ -59,6 +70,9 @@ function setupIpc() {
   ipcMain.handle('session:create', () => sendRpc('session.create'));
   ipcMain.handle('session:get', (_e, p: { sessionId: string }) => sendRpc('session.get', p));
   ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string }) => sendRpc('chat.send', p));
+  ipcMain.handle('config:get', () => sendRpc('config.get'));
+  ipcMain.handle('config:set', (_e, config: unknown) => sendRpc('config.set', config as Record<string, unknown>));
+  ipcMain.handle('config:validate', () => sendRpc('config.validate'));
 }
 
 async function createWindow() {

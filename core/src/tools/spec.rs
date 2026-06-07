@@ -33,5 +33,5 @@ impl ToolSpec {
 }
 
 #[cfg(test)]
-#[path = "spec_tests.rs"]
+#[path = "tests/spec_tests.rs"]
 mod tests;

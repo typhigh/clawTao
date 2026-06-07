@@ -64,5 +64,5 @@ impl Notification {
 }
 
 #[cfg(test)]
-#[path = "jsonrpc_tests.rs"]
+#[path = "tests/jsonrpc_tests.rs"]
 mod tests;

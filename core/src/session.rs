@@ -1,4 +1,10 @@
-//! Simple session management
+//! Session and message persistence.
+//!
+//! Each session is stored as a single JSON file under
+//! `~/Library/Application Support/clawtao/sessions/{session_id}.json`.
+//! Messages include optional `tool_calls` (assistant requests a tool) and
+//! `tool_call_id` (tool result), serialized to match the OpenAI Chat
+//! Completions message format.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -7,24 +13,34 @@ use std::io;
 use std::path::PathBuf;
 use uuid::Uuid;
 
+/// A tool call the LLM asked us to execute.
+/// Serialized as part of an assistant message's `tool_calls` array.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
     pub id: String,
     #[serde(rename = "type")]
-    pub call_type: String, // "function"
+    pub call_type: String,
     pub function: ToolCallFunction,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCallFunction {
     pub name: String,
+    /// JSON-encoded arguments string (OpenAI format).
     pub arguments: String,
 }
 
+/// A single message in a conversation.
+///
+/// Matches the OpenAI Chat Completions message shape:
+///   - user:          `{"role": "user", "content": "..."}`
+///   - assistant:     `{"role": "assistant", "content": "..."}`
+///   - assistant+tool:`{"role": "assistant", "content": null, "tool_calls": [...]}`
+///   - tool result:   `{"role": "tool", "tool_call_id": "...", "content": "..."}`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub id: String,
-    pub role: String, // "user" | "assistant" | "tool"
+    pub role: String,
     pub content: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
@@ -34,7 +50,7 @@ pub struct Message {
 }
 
 impl Message {
-    /// Convert message to LLM API format (OpenAI Chat Completions)
+    /// Produce the JSON shape expected by the LLM `/v1/chat/completions` API.
     pub fn to_llm_message(&self) -> serde_json::Value {
         match self.role.as_str() {
             "tool" => serde_json::json!({
@@ -175,5 +191,5 @@ impl SessionManager {
 }
 
 #[cfg(test)]
-#[path = "session_tests.rs"]
+#[path = "tests/session_tests.rs"]
 mod tests;

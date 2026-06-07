@@ -30,6 +30,11 @@ impl ToolRegistry {
     pub fn len(&self) -> usize {
         self.tools.len()
     }
+
+    /// Tool names for logging.
+    pub fn names(&self) -> Vec<&str> {
+        self.tools.values().map(|t| t.name()).collect()
+    }
 }
 
 impl Default for ToolRegistry {
@@ -39,5 +44,5 @@ impl Default for ToolRegistry {
 }
 
 #[cfg(test)]
-#[path = "registry_tests.rs"]
+#[path = "tests/registry_tests.rs"]
 mod tests;
