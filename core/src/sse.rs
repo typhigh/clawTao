@@ -3,7 +3,7 @@
 //! Handles MiniMax-specific quirks: tool_call arguments split across chunks,
 //! continuation chunks without `id` or `name`.
 
-use crate::session::{ToolCall, ToolCallFunction};
+use crate::store::{ToolCall, ToolCallFunction};
 
 pub(crate) struct SseResult {
     pub(crate) text: String,

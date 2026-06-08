@@ -106,6 +106,7 @@ function setupIpc() {
   ipcMain.handle('session:list', () => sendRpc('session.list'));
   ipcMain.handle('session:create', () => sendRpc('session.create'));
   ipcMain.handle('session:get', (_e, p: { sessionId: string }) => sendRpc('session.get', p));
+  ipcMain.handle('session:delete', (_e, p: { sessionId: string }) => sendRpc('session.delete', p));
   ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string }) => sendRpc('chat.send', p));
 
   // config:get — returns masked config, adds has_api_key flag

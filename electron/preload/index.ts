@@ -20,6 +20,7 @@ const electronAPI = {
     list: () => ipcRenderer.invoke('session:list'),
     create: () => ipcRenderer.invoke('session:create'),
     get: (sessionId: string) => ipcRenderer.invoke('session:get', { sessionId }),
+    delete: (sessionId: string) => ipcRenderer.invoke('session:delete', { sessionId }),
   },
 
   // Event listeners for streaming

@@ -10,12 +10,12 @@
 //!
 //! The current implementation uses a blocking reqwest client and processes
 //! one request at a time (single-threaded event loop). This is deliberate:
-//! session state is mutable and not yet behind a lock.
+//! Session state is mutable and not yet behind a lock.
 
 mod chat;
 mod config;
 mod jsonrpc;
-mod session;
+mod store;
 mod sse;
 mod tools;
 
@@ -25,7 +25,7 @@ use config::LlmConfig;
 use jsonrpc::{Notification, Request, Response};
 use reqwest::blocking::Client;
 use serde_json::json;
-use session::SessionManager;
+use store::{SessionManager, json_store::JsonSessionStore, sqlite_store::SqliteSessionStore};
 use std::io::{self, BufRead, Write};
 use tools::registry::ToolRegistry;
 use tracing::{debug, error, info};
@@ -52,12 +52,18 @@ fn main() {
 
     let storage_path = dirs::data_local_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("clawtao")
-        .join("sessions");
-    let mut session_manager = SessionManager::new(storage_path);
+        .join("clawtao");
 
-    if session_manager.list_sessions().is_empty() {
-        session_manager.create_session();
+    // Default to SQLite, "json" env var for JSONL fallback
+    let store: Box<dyn crate::store::store_trait::SessionStore> = match std::env::var("SESSION_STORE").as_deref() {
+        Ok("json") => Box::new(JsonSessionStore::new(storage_path.join("sessions"))),
+        _ => Box::new(SqliteSessionStore::new(storage_path.join("sessions.db"))
+            .expect("Failed to open SQLite store")),
+    };
+    let mut session_manager: SessionManager = SessionManager::new(store);
+
+    if session_manager.list_sessions().unwrap_or_default().is_empty() {
+        session_manager.create_session().ok();
     }
 
     let mut tool_registry = ToolRegistry::new();
@@ -115,18 +121,23 @@ fn handle_request(
 
     match request.method.as_str() {
         "session.list" => {
-            let result = serde_json::to_value(session_manager.list_sessions())?;
+            let result = serde_json::to_value(session_manager.list_sessions().unwrap_or_default())?;
             write_response(&Response::success(request.id.clone(), result))?;
         }
         "session.create" => {
-            let result = serde_json::to_value(session_manager.create_session())?;
+            let result = serde_json::to_value(session_manager.create_session()?)?;
             write_response(&Response::success(request.id.clone(), result))?;
         }
         "session.get" => {
             let session_id = get_param(&request.params, "sessionId")?;
-            let session = session_manager.get_session(session_id)
+            let session = session_manager.get_session(session_id)?
                 .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
             write_response(&Response::success(request.id.clone(), serde_json::to_value(&session)?))?;
+        }
+        "session.delete" => {
+            let session_id = get_param(&request.params, "sessionId")?;
+            session_manager.delete_session(session_id)?;
+            write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
         }
 
         "config.get" => {

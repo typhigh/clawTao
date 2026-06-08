@@ -14,7 +14,7 @@ function formatDate(timestamp: number): string {
 function App() {
   const {
     sessions, activeSessionId,
-    loadSessions, createSession, selectSession,
+    loadSessions, createSession, selectSession, deleteSession,
     streamingText, isStreaming, runningTools,
     error, clearError,
     handleTextDelta, handleChatDone, handleChatStarted,
@@ -87,6 +87,11 @@ function App() {
                     : 'Empty session'}
                 </div>
                 <div className="session-item-date">{formatDate(session.updated_at)}</div>
+                <button
+                  className="session-delete-btn"
+                  onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
+                  title="Delete session"
+                >×</button>
               </div>
             ))}
           </div>

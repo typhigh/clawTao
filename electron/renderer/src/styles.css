@@ -80,6 +80,7 @@ html, body, #root {
   cursor: pointer;
   border-bottom: 1px solid #f0f0f0;
   transition: background 0.15s;
+  position: relative;
 }
 
 .session-item:hover {
@@ -98,6 +99,24 @@ html, body, #root {
 .session-item-date {
   font-size: 12px;
   color: #999;
+}
+
+.session-delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.session-delete-btn:hover {
+  color: #e53935;
+  background: rgba(229,57,53,0.1);
 }
 
 .chat-area {

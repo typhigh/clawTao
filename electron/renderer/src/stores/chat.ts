@@ -20,6 +20,7 @@ declare global {
         list: () => Promise<Session[]>;
         create: () => Promise<Session>;
         get: (sessionId: string) => Promise<Session>;
+        delete: (sessionId: string) => Promise<unknown>;
       };
       config: {
         get: () => Promise<{ provider: string; api_key: string; base_url: string; model: string; log_level: string; bash_blocked_commands: string[] }>;
@@ -97,6 +98,7 @@ interface ChatState {
   loadSessions: () => Promise<void>;
   createSession: () => Promise<void>;
   selectSession: (sessionId: string) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
   handleTextDelta: (params: { sessionId: string; delta: string }) => void;
   handleChatDone: () => void;
@@ -151,6 +153,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }));
     } catch (error) {
       set({ error: `Failed to load session: ${error}` });
+    }
+  },
+
+  deleteSession: async (sessionId: string) => {
+    try {
+      await window.electronAPI.session.delete(sessionId);
+      const state = get();
+      const sessions = state.sessions.filter(s => s.id !== sessionId);
+      const activeSessionId = state.activeSessionId === sessionId
+        ? (sessions[0]?.id || null)
+        : state.activeSessionId;
+      set({ sessions, activeSessionId, streamingText: '', isStreaming: false, runningTools: [] });
+    } catch (error) {
+      set({ error: `Failed to delete session: ${error}` });
     }
   },
 

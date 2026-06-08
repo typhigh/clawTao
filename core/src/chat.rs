@@ -3,7 +3,7 @@
 use anyhow::Result;
 use crate::config::LlmConfig;
 use crate::jsonrpc::{Notification, Response};
-use crate::session::SessionManager;
+use crate::store::SessionManager;
 use crate::sse::parse_sse_response;
 use crate::tools::registry::ToolRegistry;
 use crate::{get_param, write_notification, write_response};
@@ -23,9 +23,9 @@ pub(crate) fn handle_chat_send(
     let message_text = get_param(&request.params, "message")?;
     let session_id = get_param(&request.params, "sessionId")?;
 
-    session_manager.add_message(session_id, "user", message_text);
+    session_manager.add_message(session_id, "user", message_text)?;
 
-    let session = session_manager.get_session(session_id)
+    let session = session_manager.get_session(session_id)?
         .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
     let run_id = uuid::Uuid::new_v4().to_string();
 
@@ -98,7 +98,7 @@ pub(crate) fn handle_chat_send(
         debug!("Round {round}: executing {} tool calls", round_tool_calls.len());
 
         let tc_clone = round_tool_calls.clone();
-        session_manager.add_assistant_tool_calls(session_id, tc_clone);
+        session_manager.add_assistant_tool_calls(session_id, tc_clone)?;
 
         for tc in &round_tool_calls {
             debug!("Executing tool: {} id={} args={}", tc.function.name, tc.id, tc.function.arguments);
@@ -127,18 +127,18 @@ pub(crate) fn handle_chat_send(
                 "result": tool_result,
             }))))?;
 
-            session_manager.add_tool_result(session_id, &tc.id, &tool_result);
+            session_manager.add_tool_result(session_id, &tc.id, &tool_result)?;
         }
 
-        messages = session_manager.get_session(session_id)
+        messages = session_manager.get_session(session_id)?
             .ok_or_else(|| anyhow::anyhow!("Session not found after tool execution"))?
             .messages.clone();
     }
 
     if !final_content.is_empty() {
-        session_manager.add_message(session_id, "assistant", &final_content);
+        session_manager.add_message(session_id, "assistant", &final_content)?;
     } else {
-        session_manager.add_message(session_id, "assistant", "(no response)");
+        session_manager.add_message(session_id, "assistant", "(no response)")?;
     }
 
     write_notification(&Notification::new("chat.done", Some(json!({
