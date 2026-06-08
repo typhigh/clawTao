@@ -6,6 +6,10 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+fn serde_error(e: serde_json::Error) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidData, e)
+}
+
 const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_MODEL: &str = "gpt-4o";
 const DEFAULT_LOG_LEVEL: &str = "info";
@@ -15,12 +19,33 @@ const DEFAULT_LOG_LEVEL: &str = "info";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmConfig {
     pub provider: String,
+    #[serde(default)]
     pub api_key: String,
     pub base_url: String,
     pub model: String,
     /// Log level: "trace" | "debug" | "info" | "warn" | "error"
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    /// Commands blocked from Bash tool execution (substring match).
+    /// Default includes destructive patterns like "rm -rf /", "sudo", etc.
+    #[serde(default = "default_blocked_commands")]
+    pub bash_blocked_commands: Vec<String>,
+}
+
+fn default_blocked_commands() -> Vec<String> {
+    vec![
+        "rm -rf /".into(),
+        "rm -rf /*".into(),
+        "rm -rf ~".into(),
+        "sudo rm".into(),
+        "mkfs.".into(),
+        "dd if=".into(),
+        ":(){ :|:& };:".into(),
+        "chmod 777 /".into(),
+        "> /dev/sda".into(),
+        "> /dev/nvme".into(),
+        "format c:".into(),
+    ]
 }
 
 fn default_log_level() -> String {
@@ -28,15 +53,10 @@ fn default_log_level() -> String {
 }
 
 impl LlmConfig {
-    /// Effective log level: RUST_LOG env var wins, then persisted config, then "info".
     pub fn effective_log_level(&self) -> String {
-        std::env::var("RUST_LOG").unwrap_or_else(|_| {
-            if self.log_level.is_empty() { DEFAULT_LOG_LEVEL.into() } else { self.log_level.clone() }
-        })
+        if self.log_level.is_empty() { DEFAULT_LOG_LEVEL.into() } else { self.log_level.clone() }
     }
-}
 
-impl LlmConfig {
     /// Full path to the config file.
     fn path() -> PathBuf {
         dirs::data_local_dir()
@@ -72,29 +92,31 @@ impl LlmConfig {
             model: std::env::var("OPENAI_MODEL").unwrap_or_else(|_| DEFAULT_OPENAI_MODEL.into()),
             provider: "openai".into(),
             log_level: DEFAULT_LOG_LEVEL.into(),
+            bash_blocked_commands: default_blocked_commands(),
         }
     }
 
-    /// Write config to disk.
+    /// Write config to disk. api_key is excluded (managed by Electron safeStorage).
     pub fn save(&self) -> std::io::Result<()> {
         let path = Self::path();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let json = serde_json::to_string_pretty(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        let mut value = serde_json::to_value(self).map_err(serde_error)?;
+        value.as_object_mut().and_then(|o| o.remove("api_key"));
+        let json = serde_json::to_string_pretty(&value).map_err(serde_error)?;
         std::fs::write(&path, json)?;
         tracing::info!("Config saved to {}", path.display());
         Ok(())
     }
 
-    /// Return a copy with the API key partially masked for safe display.
+    /// Return a copy with the API key masked for safe display (e.g. "sk-1****cdef").
     pub fn masked(&self) -> Self {
         let mask = |key: &str| {
             if key.len() <= 8 {
                 "***".into()
             } else {
-                format!("{}...{}", &key[..4], &key[key.len()-4..])
+                format!("{}**{}", &key[..4], &key[key.len()-4..])
             }
         };
         Self {
@@ -105,9 +127,14 @@ impl LlmConfig {
 
     /// Validate by making a lightweight API call.
     pub fn validate(&self) -> Result<(), String> {
-        let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
+        Self::test_connection(&self.base_url, &self.model, &self.api_key)
+    }
+
+    /// Test connectivity with explicit credentials (does not modify config).
+    pub fn test_connection(base_url: &str, model: &str, api_key: &str) -> Result<(), String> {
+        let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
         let body = serde_json::json!({
-            "model": self.model,
+            "model": model,
             "messages": [{"role": "user", "content": "hi"}],
             "max_tokens": 5,
             "stream": false,
@@ -116,59 +143,34 @@ impl LlmConfig {
         let client = reqwest::blocking::Client::new();
         let resp = client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Authorization", format!("Bearer {api_key}"))
             .header("Content-Type", "application/json")
             .body(serde_json::to_string(&body).map_err(|e| e.to_string())?)
             .send()
             .map_err(|e| format!("Network error: {e}"))?;
 
         let status = resp.status();
-        if status.is_success() {
-            Ok(())
-        } else {
-            let body = resp.text().unwrap_or_default();
-            Err(format!("{}: {}", status.as_u16(), body))
+        let resp_body = resp.text().unwrap_or_default();
+
+        // Check HTTP status
+        if !status.is_success() {
+            return Err(format!("HTTP {}: {}", status.as_u16(), resp_body));
         }
+
+        // Check response body for API error (some servers return 200 with error JSON)
+        if let Ok(error) = serde_json::from_str::<serde_json::Value>(&resp_body) {
+            if error.get("error").is_some() {
+                let msg = error["error"].get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown error");
+                return Err(msg.to_string());
+            }
+        }
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_log_level_is_info() {
-        let config = LlmConfig {
-            log_level: String::new(),
-            provider: "openai".into(),
-            api_key: "sk-test".into(),
-            base_url: DEFAULT_OPENAI_BASE_URL.into(),
-            model: DEFAULT_OPENAI_MODEL.into(),
-        };
-        assert_eq!(config.effective_log_level(), "info");
-    }
-
-    #[test]
-    fn persisted_log_level_overrides_default() {
-        let config = LlmConfig {
-            log_level: "debug".into(),
-            provider: "openai".into(),
-            api_key: "sk-test".into(),
-            base_url: DEFAULT_OPENAI_BASE_URL.into(),
-            model: DEFAULT_OPENAI_MODEL.into(),
-        };
-        assert_eq!(config.effective_log_level(), "debug");
-    }
-
-    #[test]
-    fn masked_key() {
-        let config = LlmConfig {
-            log_level: "info".into(),
-            provider: "openai".into(),
-            api_key: "sk-1234567890abcdef".into(),
-            base_url: DEFAULT_OPENAI_BASE_URL.into(),
-            model: DEFAULT_OPENAI_MODEL.into(),
-        };
-        assert_eq!(config.masked().api_key, "sk-1...cdef");
-    }
-}
+#[path = "tests/config_tests.rs"]
+mod tests;

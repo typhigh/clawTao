@@ -35,6 +35,7 @@ const electronAPI = {
     get: () => ipcRenderer.invoke('config:get'),
     set: (c: unknown) => ipcRenderer.invoke('config:set', c),
     validate: () => ipcRenderer.invoke('config:validate'),
+    testKey: (p: { api_key: string; base_url: string; model: string }) => ipcRenderer.invoke('config:testKey', p),
   },
 
   // Event listeners for tool calls

@@ -9,6 +9,7 @@ export interface LlmConfig {
   base_url: string;
   model: string;
   log_level: string;
+  bash_blocked_commands: string[];
 }
 
 interface SettingsState {
@@ -17,6 +18,7 @@ interface SettingsState {
   load: () => Promise<void>;
   save: (c: LlmConfig) => Promise<void>;
   validate: () => Promise<{ ok: boolean; error?: string }>;
+  testKey: (api_key: string, base_url: string, model: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -41,6 +43,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
 
   validate: async () => {
     const result = await window.electronAPI.config.validate() as { ok: boolean; error?: string };
+    return result;
+  },
+
+  testKey: async (api_key: string, base_url: string, model: string) => {
+    const result = await window.electronAPI.config.testKey({ api_key, base_url, model }) as { ok: boolean; error?: string };
     return result;
   },
 }));

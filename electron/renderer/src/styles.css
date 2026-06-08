@@ -350,7 +350,7 @@ html, body, #root {
   cursor: pointer;
 }
 
-.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; word-break: break-all; white-space: pre-wrap; }
 .alert-success { background: #e8f5e9; color: #2e7d32; }
 .alert-error { background: #ffebee; color: #c62828; }
 

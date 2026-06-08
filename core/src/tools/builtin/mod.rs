@@ -12,9 +12,9 @@ pub use read::ReadTool;
 pub use write::WriteTool;
 
 /// Register all built-in tools.
-pub fn register_all(registry: &mut ToolRegistry) {
+pub fn register_all(registry: &mut ToolRegistry, bash_blocked_commands: Vec<String>) {
     registry.register(Arc::new(ReadTool));
     registry.register(Arc::new(WriteTool));
     registry.register(Arc::new(EditTool));
-    registry.register(Arc::new(BashTool));
+    registry.register(Arc::new(BashTool::new(bash_blocked_commands)));
 }

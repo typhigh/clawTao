@@ -44,7 +44,11 @@ fn main() {
         )
         .init();
 
-    info!("ClawTao backend starting (log_level={log_level})");
+    if std::env::var("RUST_LOG").is_ok() {
+        info!("ClawTao backend starting (log_level={log_level}, source=RUST_LOG env)");
+    } else {
+        info!("ClawTao backend starting (log_level={log_level}, source=config.json)");
+    }
 
     let storage_path = dirs::data_local_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
@@ -57,14 +61,10 @@ fn main() {
     }
 
     let mut tool_registry = ToolRegistry::new();
-    tools::builtin::register_all(&mut tool_registry);
+    tools::builtin::register_all(&mut tool_registry, llm_config.bash_blocked_commands.clone());
     info!("Registered {} tools: {:?}", tool_registry.len(), tool_registry.names());
 
     info!("LLM config: provider={} base_url={} model={}", llm_config.provider, llm_config.base_url, llm_config.model);
-    if llm_config.api_key.is_empty() {
-        error!("API key not configured — open Settings to set one");
-    }
-
     let client = Client::new();
 
     // Main event loop
@@ -133,20 +133,30 @@ fn handle_request(
             write_response(&Response::success(request.id.clone(), serde_json::to_value(llm_config.masked())?))?;
         }
         "config.set" => {
-            let mut new_config: LlmConfig = serde_json::from_value(request.params.clone().unwrap_or_default())
+            let new_config: LlmConfig = serde_json::from_value(request.params.clone().unwrap_or_default())
                 .map_err(|e| anyhow::anyhow!("Invalid config: {e}"))?;
-            // If the incoming api_key looks masked (contains "..."), keep the old key.
-            // This prevents accidentally overwriting the real key with the masked display value.
-            if new_config.api_key.contains("...") {
-                new_config.api_key = llm_config.api_key.clone();
-            }
             new_config.save()?;
             *llm_config = new_config;
             info!("Config updated: provider={} model={}", llm_config.provider, llm_config.model);
             write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
         }
+        "config.injectKey" => {
+            let api_key = get_param(&request.params, "api_key")?;
+            llm_config.api_key = api_key.to_string();
+            info!("API key injected (length={})", llm_config.api_key.len());
+            write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
+        }
         "config.validate" => {
             match llm_config.validate() {
+                Ok(()) => write_response(&Response::success(request.id.clone(), json!({"ok": true})))?,
+                Err(e) => write_response(&Response::success(request.id.clone(), json!({"ok": false, "error": e})))?,
+            }
+        }
+        "config.testKey" => {
+            let api_key = get_param(&request.params, "api_key")?;
+            let base_url = get_param(&request.params, "base_url").unwrap_or(&llm_config.base_url);
+            let model = get_param(&request.params, "model").unwrap_or(&llm_config.model);
+            match LlmConfig::test_connection(base_url, model, api_key) {
                 Ok(()) => write_response(&Response::success(request.id.clone(), json!({"ok": true})))?,
                 Err(e) => write_response(&Response::success(request.id.clone(), json!({"ok": false, "error": e})))?,
             }

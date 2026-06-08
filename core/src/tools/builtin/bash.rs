@@ -3,7 +3,15 @@ use crate::tools::spec::ToolSpec;
 use serde_json::json;
 use std::process::Command;
 
-pub struct BashTool;
+pub struct BashTool {
+    blocked_commands: Vec<String>,
+}
+
+impl BashTool {
+    pub fn new(blocked_commands: Vec<String>) -> Self {
+        Self { blocked_commands }
+    }
+}
 
 impl ToolExecutor for BashTool {
     fn name(&self) -> &str {
@@ -36,6 +44,15 @@ impl ToolExecutor for BashTool {
             .get("command")
             .and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidInput("missing or invalid 'command'".into()))?;
+
+        // Block dangerous commands
+        for blocked in &self.blocked_commands {
+            if command.contains(blocked) {
+                return Err(ToolError::Execution(format!(
+                    "Blocked: command '{command}' matches blocked pattern '{blocked}'"
+                )));
+            }
+        }
 
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = Command::new("cmd");

@@ -22,9 +22,10 @@ declare global {
         get: (sessionId: string) => Promise<Session>;
       };
       config: {
-        get: () => Promise<{ provider: string; api_key: string; base_url: string; model: string }>;
+        get: () => Promise<{ provider: string; api_key: string; base_url: string; model: string; log_level: string; bash_blocked_commands: string[] }>;
         set: (c: unknown) => Promise<unknown>;
         validate: () => Promise<{ ok: boolean; error?: string }>;
+        testKey: (p: { api_key: string; base_url: string; model: string }) => Promise<{ ok: boolean; error?: string }>;
       };
       onChatStarted: (callback: (params: unknown) => void) => void;
       onTextDelta: (callback: (params: { sessionId: string; runId: string; delta: string }) => void) => void;
