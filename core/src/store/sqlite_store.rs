@@ -20,7 +20,8 @@ impl SqliteSessionStore {
             "CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
                 created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL
+                updated_at INTEGER NOT NULL,
+                title TEXT NOT NULL DEFAULT ''
             );
             CREATE TABLE IF NOT EXISTS messages (
                 id TEXT PRIMARY KEY,
@@ -33,6 +34,8 @@ impl SqliteSessionStore {
             );
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);"
         )?;
+        // Migration: add title column if missing (v0.2.0)
+        conn.execute("ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT ''", []).ok();
         Ok(Self { conn: Mutex::new(conn) })
     }
 }
@@ -41,8 +44,8 @@ impl SessionStore for SqliteSessionStore {
     fn create(&mut self, session: &Session) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO sessions (id, created_at, updated_at) VALUES (?1, ?2, ?3)",
-            rusqlite::params![session.id, session.created_at, session.updated_at],
+            "INSERT INTO sessions (id, created_at, updated_at, title) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![session.id, session.created_at, session.updated_at, session.title],
         )?;
         for msg in &session.messages {
             add_message_inner(&conn, &session.id, msg)?;
@@ -52,9 +55,9 @@ impl SessionStore for SqliteSessionStore {
 
     fn get(&self, id: &str) -> Result<Option<Session>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id, created_at, updated_at FROM sessions WHERE id = ?1")?;
+        let mut stmt = conn.prepare("SELECT id, created_at, updated_at, title FROM sessions WHERE id = ?1")?;
         let session = stmt.query_row(rusqlite::params![id], |row| {
-            Ok(Session { id: row.get(0)?, created_at: row.get(1)?, updated_at: row.get(2)?, messages: Vec::new() })
+            Ok(Session { id: row.get(0)?, created_at: row.get(1)?, updated_at: row.get(2)?, title: row.get(3)?, messages: Vec::new() })
         }).ok();
         let Some(mut session) = session else { return Ok(None) };
         let mut msg_stmt = conn.prepare(
@@ -75,9 +78,9 @@ impl SessionStore for SqliteSessionStore {
 
     fn list(&self) -> Result<Vec<Session>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id, created_at, updated_at FROM sessions ORDER BY updated_at DESC")?;
+        let mut stmt = conn.prepare("SELECT id, created_at, updated_at, title FROM sessions ORDER BY updated_at DESC")?;
         let sessions = stmt.query_map([], |row| {
-            Ok(Session { id: row.get(0)?, created_at: row.get(1)?, updated_at: row.get(2)?, messages: Vec::new() })
+            Ok(Session { id: row.get(0)?, created_at: row.get(1)?, updated_at: row.get(2)?, title: row.get(3)?, messages: Vec::new() })
         })?;
         let mut result = Vec::new();
         for s in sessions { result.push(s?); }
@@ -99,6 +102,11 @@ impl SessionStore for SqliteSessionStore {
 
 fn add_message_inner(conn: &Connection, session_id: &str, msg: &Message) -> Result<()> {
     let tool_calls_json = msg.tool_calls.as_ref().and_then(|tc| serde_json::to_string(tc).ok());
+    // Set title from first message content
+    conn.execute(
+        "UPDATE sessions SET title = CASE WHEN title = '' THEN ?2 ELSE title END WHERE id = ?1",
+        rusqlite::params![session_id, &msg.content[..msg.content.len().min(50)]],
+    )?;
     conn.execute(
         "INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, timestamp)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",

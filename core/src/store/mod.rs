@@ -40,28 +40,14 @@ pub struct Message {
     pub timestamp: i64,
 }
 
-impl Message {
-    pub fn to_llm_message(&self) -> serde_json::Value {
-        match self.role.as_str() {
-            "tool" => serde_json::json!({
-                "role": "tool", "tool_call_id": self.tool_call_id, "content": self.content,
-            }),
-            "assistant" if self.tool_calls.is_some() => serde_json::json!({
-                "role": "assistant", "content": null, "tool_calls": self.tool_calls,
-            }),
-            _ => serde_json::json!({
-                "role": self.role, "content": self.content,
-            }),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     pub id: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub messages: Vec<Message>,
+    #[serde(default)]
+    pub title: String,
 }
 
 pub struct SessionManager {
@@ -75,7 +61,7 @@ impl SessionManager {
 
     pub fn create_session(&mut self) -> Result<Session> {
         let now = chrono::Utc::now().timestamp_millis();
-        let session = Session { id: Uuid::new_v4().to_string(), created_at: now, updated_at: now, messages: vec![] };
+        let session = Session { id: Uuid::new_v4().to_string(), created_at: now, updated_at: now, messages: vec![], title: "".into() };
         self.store.create(&session)?;
         Ok(session)
     }

@@ -3,15 +3,13 @@
 use anyhow::Result;
 use crate::config::LlmConfig;
 use crate::jsonrpc::{Notification, Response};
+use crate::llm::{ApiAdapter, AnthropicAdapter, LlmMessage, LlmRequest, OpenAiAdapter, UnifiedTool};
 use crate::store::SessionManager;
-use crate::sse::parse_sse_response;
 use crate::tools::registry::ToolRegistry;
 use crate::{get_param, write_notification, write_response};
 use reqwest::blocking::Client;
 use serde_json::json;
 use tracing::{debug, trace};
-
-const MAX_TOOL_ROUNDS: usize = 10;
 
 pub(crate) fn handle_chat_send(
     request: &crate::jsonrpc::Request,
@@ -36,40 +34,51 @@ pub(crate) fn handle_chat_send(
     if llm_config.api_key.is_empty() {
         return Err(anyhow::anyhow!("API key not configured"));
     }
-    let api_url = format!("{}/chat/completions", llm_config.base_url.trim_end_matches('/'));
+
+    let adapter: &dyn ApiAdapter = match llm_config.api_protocol.as_str() {
+        "anthropic" => &AnthropicAdapter,
+        _ => &OpenAiAdapter,
+    };
 
     let mut messages = session.messages.clone();
-    let mut final_content = String::new();
 
-    for round in 0..MAX_TOOL_ROUNDS {
-        let mut api_messages: Vec<serde_json::Value> = messages.iter().map(|m| m.to_llm_message()).collect();
-        api_messages.insert(0, json!({
-            "role": "system",
-            "content": "You are ClawTao, a helpful AI assistant with tool calling capabilities."
-        }));
+    let unified_tools: Vec<UnifiedTool> = tool_registry.list_specs().iter().map(|s| {
+        let f = serde_json::to_value(s).unwrap_or_default();
+        let func = &f["function"];
+        UnifiedTool {
+            name: func["name"].as_str().unwrap_or("").into(),
+            description: func["description"].as_str().unwrap_or("").into(),
+            parameters: func["parameters"].clone(),
+        }
+    }).collect();
 
-        let tools_specs: Vec<serde_json::Value> = tool_registry.list_specs()
-            .iter()
-            .filter_map(|s| serde_json::to_value(s).ok())
-            .collect();
+    let final_content = loop {
+        let llm_msgs: Vec<LlmMessage> = messages.iter().map(|m| LlmMessage {
+            role: m.role.clone(),
+            content: m.content.clone(),
+            tool_calls: m.tool_calls.clone(),
+            tool_call_id: m.tool_call_id.clone(),
+        }).collect();
 
-        let body = json!({
-            "model": llm_config.model,
-            "messages": api_messages,
-            "stream": true,
-            "tools": tools_specs,
-        });
+        let llm_req = LlmRequest {
+            system: "You are ClawTao, a helpful AI assistant with tool calling capabilities.".into(),
+            model: llm_config.model.clone(),
+            messages: llm_msgs,
+            tools: unified_tools.clone(),
+        };
 
-        debug!("LLM round {round}: url={api_url} model={} msgs={} tools={}", llm_config.model, api_messages.len(), tools_specs.len());
-        trace!("LLM request body: {}", serde_json::to_string_pretty(&body).unwrap_or_default());
+        let http = adapter.build(&llm_req, &llm_config.api_key, &llm_config.base_url)?;
 
-        let mut resp = client.post(&api_url)
-            .header("Authorization", format!("Bearer {}", llm_config.api_key))
-            .header("Content-Type", "application/json")
-            .body(serde_json::to_string(&body)?)
-            .send()?;
+        debug!("LLM call: url={} model={}", http.url, llm_config.model);
+        trace!("LLM request body: {}", http.body);
 
-        debug!("LLM response: status={} bytes={}", resp.status(), resp.content_length().unwrap_or(0));
+        let mut resp = client.post(&http.url);
+        for (k, v) in &http.headers {
+            resp = resp.header(k.as_str(), v.as_str());
+        }
+        let mut resp = resp.body(http.body.clone()).send()?;
+
+        debug!("LLM response: status={}", resp.status());
 
         use std::io::Read;
         let mut body_bytes = Vec::new();
@@ -79,7 +88,7 @@ pub(crate) fn handle_chat_send(
         debug!("LLM response body: {} bytes", body_bytes.len());
         trace!("LLM response body: {}", body_str);
 
-        let result = parse_sse_response(&body_str);
+        let result = adapter.parse_stream(&body_str)?;
 
         if !result.text.is_empty() {
             write_notification(&Notification::new("chat.text_delta", Some(json!({
@@ -87,20 +96,15 @@ pub(crate) fn handle_chat_send(
             }))))?;
         }
 
-        let round_text = result.text;
-        let round_tool_calls = result.tool_calls;
-
-        if round_tool_calls.is_empty() {
-            final_content = round_text;
-            break;
+        if result.tool_calls.is_empty() {
+            break result.text;
         }
 
-        debug!("Round {round}: executing {} tool calls", round_tool_calls.len());
+        debug!("Executing {} tool calls", result.tool_calls.len());
 
-        let tc_clone = round_tool_calls.clone();
-        session_manager.add_assistant_tool_calls(session_id, tc_clone)?;
+        session_manager.add_assistant_tool_calls(session_id, result.tool_calls.clone())?;
 
-        for tc in &round_tool_calls {
+        for tc in &result.tool_calls {
             debug!("Executing tool: {} id={} args={}", tc.function.name, tc.id, tc.function.arguments);
 
             let args_val: serde_json::Value = serde_json::from_str(&tc.function.arguments).unwrap_or(serde_json::Value::Null);
@@ -133,12 +137,12 @@ pub(crate) fn handle_chat_send(
         messages = session_manager.get_session(session_id)?
             .ok_or_else(|| anyhow::anyhow!("Session not found after tool execution"))?
             .messages.clone();
-    }
+    };
 
-    if !final_content.is_empty() {
-        session_manager.add_message(session_id, "assistant", &final_content)?;
-    } else {
+    if final_content.is_empty() {
         session_manager.add_message(session_id, "assistant", "(no response)")?;
+    } else {
+        session_manager.add_message(session_id, "assistant", &final_content)?;
     }
 
     write_notification(&Notification::new("chat.done", Some(json!({

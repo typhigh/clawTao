@@ -121,7 +121,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const sessions = await window.electronAPI.session.list();
       set({ sessions });
-      if (sessions.length > 0 && !get().activeSessionId) {
+      if (sessions.length === 0) {
+        await get().createSession();
+      } else if (!get().activeSessionId) {
         await get().selectSession(sessions[0].id);
       }
     } catch (error) {

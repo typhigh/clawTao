@@ -3,7 +3,6 @@ use anyhow::Result;
 
 /// Storage abstraction for session persistence.
 /// Implementations: JsonSessionStore (JSONL append), SqliteSessionStore.
-#[allow(dead_code)]
 pub trait SessionStore: Send + Sync {
     fn create(&mut self, session: &Session) -> Result<()>;
     fn get(&self, id: &str) -> Result<Option<Session>>;

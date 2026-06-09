@@ -31,7 +31,7 @@ impl JsonSessionStore {
                 if path.extension().is_none_or(|e| e != "jsonl") { continue; }
                 let id = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
                 let session = self.replay_session(&id).unwrap_or_else(|| Session {
-                    id: id.clone(), created_at: 0, updated_at: 0, messages: Vec::new(),
+                    id: id.clone(), created_at: 0, updated_at: 0, messages: Vec::new(), title: String::new(),
                 });
                 self.cache.insert(id, session);
             }
@@ -46,7 +46,7 @@ impl JsonSessionStore {
             if line.trim().is_empty() { continue; }
             if let Ok(msg) = serde_json::from_str::<Message>(&line) {
                 let s = session.get_or_insert_with(|| Session {
-                    id: id.to_string(), created_at: msg.timestamp, updated_at: msg.timestamp, messages: Vec::new(),
+                    id: id.to_string(), created_at: msg.timestamp, updated_at: msg.timestamp, messages: Vec::new(), title: String::new(),
                 });
                 s.updated_at = s.updated_at.max(msg.timestamp);
                 s.messages.push(msg);
@@ -87,6 +87,9 @@ impl SessionStore for JsonSessionStore {
         let line = serde_json::to_string(msg)?;
         writeln!(file, "{line}")?;
         if let Some(s) = self.cache.get_mut(session_id) {
+            if s.title.is_empty() && !msg.content.is_empty() {
+                s.title = msg.content.chars().take(50).collect();
+            }
             s.messages.push(msg.clone());
             s.updated_at = s.updated_at.max(msg.timestamp);
         }

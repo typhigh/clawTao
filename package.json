@@ -8,6 +8,7 @@
     "core:build": "cd core && cargo build --release",
     "build": "pnpm run core:build && pnpm run build:vite && electron-builder",
     "build:vite": "tsc && vite build",
+    "postinstall": "npx playwright install chromium",
     "test:all": "pnpm run test:ui && pnpm run test:core",
     "test:ui": "vitest run",
     "test:core": "cd core && cargo test"
@@ -23,7 +24,8 @@
   "license": "MIT",
   "pnpm": {
     "onlyBuiltDependencies": [
-      "electron"
+      "electron",
+      "playwright"
     ]
   },
   "devDependencies": {
@@ -36,6 +38,7 @@
     "electron": "40.8.4",
     "electron-builder": "^26.0.0",
     "jsdom": "^29.1.1",
+    "playwright": "^1.60.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0",
     "vite-plugin-electron": "^0.29.0",

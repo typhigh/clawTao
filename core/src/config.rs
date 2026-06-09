@@ -27,9 +27,15 @@ pub struct LlmConfig {
     #[serde(default = "default_log_level")]
     pub log_level: String,
     /// Commands blocked from Bash tool execution (substring match).
-    /// Default includes destructive patterns like "rm -rf /", "sudo", etc.
     #[serde(default = "default_blocked_commands")]
     pub bash_blocked_commands: Vec<String>,
+    /// LLM API protocol: "openai" or "anthropic"
+    #[serde(default = "default_api_protocol")]
+    pub api_protocol: String,
+}
+
+fn default_api_protocol() -> String {
+    "openai".into()
 }
 
 fn default_blocked_commands() -> Vec<String> {
@@ -93,6 +99,7 @@ impl LlmConfig {
             provider: "openai".into(),
             log_level: DEFAULT_LOG_LEVEL.into(),
             bash_blocked_commands: default_blocked_commands(),
+            api_protocol: default_api_protocol(),
         }
     }
 

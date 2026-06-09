@@ -81,11 +81,7 @@ function App() {
                 className={`session-item ${session.id === activeSessionId ? 'active' : ''}`}
                 onClick={() => selectSession(session.id)}
               >
-                <div className="session-item-title">
-                  {session.messages.length > 0
-                    ? session.messages[0].content.slice(0, 30) + (session.messages[0].content.length > 30 ? '...' : '')
-                    : 'Empty session'}
-                </div>
+                <div className="session-item-title">{(session as any).title || 'Empty session'}</div>
                 <div className="session-item-date">{formatDate(session.updated_at)}</div>
                 <button
                   className="session-delete-btn"

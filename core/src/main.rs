@@ -15,6 +15,7 @@
 mod chat;
 mod config;
 mod jsonrpc;
+mod llm;
 mod store;
 mod sse;
 mod tools;

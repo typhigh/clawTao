@@ -7,7 +7,7 @@ fn make_config(key: &str) -> LlmConfig {
         api_key: key.into(),
         base_url: DEFAULT_OPENAI_BASE_URL.into(),
         model: DEFAULT_OPENAI_MODEL.into(),
-        bash_blocked_commands: vec![],
+        bash_blocked_commands: vec![], api_protocol: "openai".into(),
     }
 }
 

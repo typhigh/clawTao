@@ -57,9 +57,19 @@ async function injectKeyIntoRust(key: string): Promise<void> {
   await sendRpc('config.injectKey', { api_key: key });
 }
 
+// -- Browser server --
+
+function startBrowserServer() {
+  const script = path.join(__dirname, '../../core/scripts/browser-server.mjs');
+  const proc = spawn('node', [script], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env } });
+  proc.stdout.on('data', (d: Buffer) => console.log(`[browser] ${d}`.trim()));
+  proc.stderr.on('data', (d: Buffer) => console.error(`[browser] ${d}`.trim()));
+  proc.on('exit', (code) => console.log(`Browser server exited: ${code}`));
+  console.log('Browser server starting...');
+}
+
 // -- Rust process management --
 
-/** Launch the Rust backend via `cargo run`. In production, runs the bundled binary. */
 function startRust() {
   const manifestPath = path.join(__dirname, '../../core/Cargo.toml');
   const coreDir = path.dirname(manifestPath);
@@ -163,6 +173,7 @@ setupIpc();
 
 app.whenReady().then(async () => {
   console.log('ClawTao starting...');
+  startBrowserServer();
   startRust();
   await waitForRustReady();
 

@@ -49,44 +49,6 @@ fn add_tool_result() {
 }
 
 #[test]
-fn message_to_llm_format_user() {
-    let msg = Message {
-        id: "1".into(), role: "user".into(), content: "hi".into(),
-        tool_calls: None, tool_call_id: None, timestamp: 0,
-    };
-    let json = msg.to_llm_message();
-    assert_eq!(json["role"], "user");
-    assert_eq!(json["content"], "hi");
-}
-
-#[test]
-fn message_to_llm_format_tool_result() {
-    let msg = Message {
-        id: "1".into(), role: "tool".into(), content: "result".into(),
-        tool_calls: None, tool_call_id: Some("call_1".into()), timestamp: 0,
-    };
-    let json = msg.to_llm_message();
-    assert_eq!(json["role"], "tool");
-    assert_eq!(json["tool_call_id"], "call_1");
-}
-
-#[test]
-fn message_to_llm_format_assistant_with_tool_calls() {
-    let msg = Message {
-        id: "1".into(), role: "assistant".into(), content: "".into(),
-        tool_calls: Some(vec![ToolCall {
-            id: "call_1".into(), call_type: "function".into(),
-            function: ToolCallFunction { name: "Read".into(), arguments: "{}".into() },
-        }]),
-        tool_call_id: None, timestamp: 0,
-    };
-    let json = msg.to_llm_message();
-    assert_eq!(json["role"], "assistant");
-    assert!(json["content"].is_null());
-    assert!(json.get("tool_calls").is_some());
-}
-
-#[test]
 fn session_list_empty() {
     let mgr = make_session_manager();
     assert!(mgr.list_sessions().unwrap().is_empty());
