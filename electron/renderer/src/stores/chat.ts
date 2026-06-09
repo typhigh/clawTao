@@ -177,7 +177,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return;
     }
 
-    set({ isStreaming: true, error: null, runningTools: [] });
+    // Optimistically add user message to UI immediately
+    const userMsg: Message = {
+      id: `tmp-${Date.now()}`,
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
+    };
+    set((state) => ({
+      isStreaming: true, error: null, runningTools: [],
+      sessions: state.sessions.map((s) =>
+        s.id === activeSessionId ? { ...s, messages: [...s.messages, userMsg] } : s
+      ),
+    }));
 
     try {
       await window.electronAPI.chat.send(text, activeSessionId);
