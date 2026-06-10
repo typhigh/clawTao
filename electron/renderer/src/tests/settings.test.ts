@@ -1,3 +1,4 @@
+import { DEFAULT_BASH_TIMEOUT_SECS } from '../stores/settings';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock electronAPI before importing the store
@@ -42,7 +43,7 @@ describe('settings store', () => {
       base_url: 'https://api.openai.com/v1',
       model: 'gpt-4o',
       log_level: 'info',
-      bash_blocked_commands: ['rm -rf /'],
+      bash_blocked_commands: ['rm -rf /'], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
     };
     mockConfigApi.get.mockResolvedValueOnce(mockConfig);
 
@@ -70,7 +71,7 @@ describe('settings store', () => {
       base_url: 'https://api.minimaxi.com/v1',
       model: 'MiniMax-M3',
       log_level: 'debug',
-      bash_blocked_commands: ['rm -rf /'],
+      bash_blocked_commands: ['rm -rf /'], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
     };
     const maskedConfig = { ...newConfig, api_key: 'sk-r****real' };
 

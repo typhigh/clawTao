@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSettingsStore, LlmConfig } from '../stores/settings';
+import { useSettingsStore, LlmConfig, DEFAULT_BASH_TIMEOUT_SECS } from '../stores/settings';
 
 interface Props {
   open: boolean;
@@ -16,11 +16,11 @@ const PROVIDER_DEFAULTS: Record<string, { base_url: string }> = {
 };
 
 function emptyConfig(): LlmConfig {
-  return { provider: 'openai', api_key: '', base_url: '', model: '', log_level: 'info', bash_blocked_commands: [] };
+  return { provider: 'openai', api_key: '', base_url: '', model: '', log_level: 'info', bash_blocked_commands: [], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS as any };
 }
 
 export function SettingsDialog({ open, onClose }: Props) {
-  const { config, loaded, load, save, validate, testKey } = useSettingsStore();
+  const { config, load, save, validate, testKey } = useSettingsStore();
 
   // tmpConfig is the editing copy. Initialize once when dialog opens.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48,6 +48,7 @@ export function SettingsDialog({ open, onClose }: Props) {
         model: config.model || 'gpt-4o',
         log_level: config.log_level || 'info',
         bash_blocked_commands: config.bash_blocked_commands || [],
+        bash_timeout_secs: (config as any).bash_timeout_secs || DEFAULT_BASH_TIMEOUT_SECS,
       });
     }
   }, [open, config]);
@@ -178,6 +179,29 @@ export function SettingsDialog({ open, onClose }: Props) {
               onChange={(e) => setTmpField('bash_blocked_commands', e.target.value.split('\n').map(s => s.trim()).filter(Boolean))}
               style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }}
             />
+          </div>
+
+          <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ margin: 0 }}>Bash Timeout</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer', margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={tmp.bash_timeout_secs !== null}
+                onChange={(e) => setTmpField('bash_timeout_secs' as any, e.target.checked ? DEFAULT_BASH_TIMEOUT_SECS : null)}
+              />
+              Enable
+            </label>
+            {tmp.bash_timeout_secs !== null && (
+              <>
+                <input
+                  type="number"
+                  value={tmp.bash_timeout_secs}
+                  onChange={(e) => setTmpField('bash_timeout_secs' as any, parseInt(e.target.value) || DEFAULT_BASH_TIMEOUT_SECS)}
+                  style={{ width: 80, padding: '4px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 }}
+                />
+                <span style={{ fontSize: 12, color: '#999' }}>seconds</span>
+              </>
+            )}
           </div>
 
           {testResult === 'ok' && <div className="alert alert-success">✅ Connection successful</div>}

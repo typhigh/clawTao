@@ -32,6 +32,15 @@ pub struct LlmConfig {
     /// LLM API protocol: "openai" or "anthropic"
     #[serde(default = "default_api_protocol")]
     pub api_protocol: String,
+    /// Bash command timeout in seconds. None = unlimited.
+    #[serde(default = "default_bash_timeout")]
+    pub bash_timeout_secs: Option<u64>,
+}
+
+pub const DEFAULT_BASH_TIMEOUT_SECS: u64 = 600;
+
+fn default_bash_timeout() -> Option<u64> {
+    Some(DEFAULT_BASH_TIMEOUT_SECS)
 }
 
 fn default_api_protocol() -> String {
@@ -100,6 +109,7 @@ impl LlmConfig {
             log_level: DEFAULT_LOG_LEVEL.into(),
             bash_blocked_commands: default_blocked_commands(),
             api_protocol: default_api_protocol(),
+            bash_timeout_secs: default_bash_timeout(),
         }
     }
 

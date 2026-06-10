@@ -43,12 +43,10 @@ pub(crate) fn handle_chat_send(
     let mut messages = session.messages.clone();
 
     let unified_tools: Vec<UnifiedTool> = tool_registry.list_specs().iter().map(|s| {
-        let f = serde_json::to_value(s).unwrap_or_default();
-        let func = &f["function"];
         UnifiedTool {
-            name: func["name"].as_str().unwrap_or("").into(),
-            description: func["description"].as_str().unwrap_or("").into(),
-            parameters: func["parameters"].clone(),
+            name: s.function.name.clone(),
+            description: s.function.description.clone(),
+            parameters: s.function.parameters.clone(),
         }
     }).collect();
 

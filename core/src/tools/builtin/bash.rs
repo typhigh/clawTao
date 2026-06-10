@@ -2,14 +2,16 @@ use crate::tools::executor::{ToolError, ToolExecutor};
 use crate::tools::spec::ToolSpec;
 use serde_json::json;
 use std::process::Command;
+use std::time::Duration;
 
 pub struct BashTool {
     blocked_commands: Vec<String>,
+    timeout: Option<Duration>,
 }
 
 impl BashTool {
-    pub fn new(blocked_commands: Vec<String>) -> Self {
-        Self { blocked_commands }
+    pub fn new(blocked_commands: Vec<String>, timeout_secs: Option<u64>) -> Self {
+        Self { blocked_commands, timeout: timeout_secs.map(Duration::from_secs) }
     }
 }
 
@@ -25,14 +27,8 @@ impl ToolExecutor for BashTool {
             json!({
                 "type": "object",
                 "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The shell command to execute"
-                    },
-                    "cwd": {
-                        "type": "string",
-                        "description": "Working directory for the command (optional)"
-                    }
+                    "command": { "type": "string", "description": "The shell command to execute" },
+                    "cwd": { "type": "string", "description": "Working directory for the command (optional)" }
                 },
                 "required": ["command"]
             }),
@@ -40,16 +36,13 @@ impl ToolExecutor for BashTool {
     }
 
     fn execute(&self, input: serde_json::Value) -> Result<String, ToolError> {
-        let command = input
-            .get("command")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidInput("missing or invalid 'command'".into()))?;
+        let command = input.get("command").and_then(|v| v.as_str())
+            .ok_or_else(|| ToolError::InvalidInput("missing 'command'".into()))?;
 
-        // Block dangerous commands
         for blocked in &self.blocked_commands {
             if command.contains(blocked) {
                 return Err(ToolError::Execution(format!(
-                    "Blocked: command '{command}' matches blocked pattern '{blocked}'"
+                    "Blocked: '{command}' matches blocked pattern '{blocked}'"
                 )));
             }
         }
@@ -68,26 +61,39 @@ impl ToolExecutor for BashTool {
             cmd.current_dir(cwd);
         }
 
-        let output = cmd
-            .output()
-            .map_err(|e| ToolError::Execution(format!("Bash: failed to execute: {e}")))?;
-
-        let mut result = String::new();
-        if !output.stdout.is_empty() {
-            result.push_str(&format!("stdout:\n{}", String::from_utf8_lossy(&output.stdout)));
-        }
-        if !output.stderr.is_empty() {
-            if !result.is_empty() {
-                result.push('\n');
+        let Some(timeout) = self.timeout else {
+            return format_output(cmd.output().map_err(|e| ToolError::Execution(format!("Bash: {e}")))?);
+        };
+        let mut child = cmd.stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| ToolError::Execution(format!("Bash: {e}")))?;
+        let start = std::time::Instant::now();
+        let output = loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break child.wait_with_output().map_err(|e| ToolError::Execution(format!("Bash: {e}")))?,
+                Ok(None) if start.elapsed() > timeout => {
+                    let _ = child.kill(); let _ = child.wait();
+                    return Err(ToolError::Execution(format!("Timed out after {}s", timeout.as_secs())));
+                }
+                Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+                Err(e) => return Err(ToolError::Execution(format!("Bash: {e}"))),
             }
-            result.push_str(&format!("stderr:\n{}", String::from_utf8_lossy(&output.stderr)));
-        }
-        if result.is_empty() {
-            result.push_str(&format!("(exit code: {})", output.status.code().unwrap_or(-1)));
-        }
+        };
 
-        Ok(result)
+        format_output(output)
     }
+}
+
+fn format_output(output: std::process::Output) -> Result<String, ToolError> {
+    let mut result = String::new();
+    if !output.stdout.is_empty() { result.push_str(&format!("stdout:\n{}", String::from_utf8_lossy(&output.stdout))); }
+    if !output.stderr.is_empty() {
+        if !result.is_empty() { result.push('\n'); }
+        result.push_str(&format!("stderr:\n{}", String::from_utf8_lossy(&output.stderr)));
+    }
+    if result.is_empty() { result.push_str(&format!("(exit code: {})", output.status.code().unwrap_or(-1))); }
+    Ok(result)
 }
 
 #[cfg(test)]

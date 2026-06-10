@@ -61,11 +61,19 @@ async function injectKeyIntoRust(key: string): Promise<void> {
 
 function startBrowserServer() {
   const script = path.join(__dirname, '../../core/scripts/browser-server.mjs');
-  const proc = spawn('node', [script], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env } });
-  proc.stdout.on('data', (d: Buffer) => console.log(`[browser] ${d}`.trim()));
-  proc.stderr.on('data', (d: Buffer) => console.error(`[browser] ${d}`.trim()));
-  proc.on('exit', (code) => console.log(`Browser server exited: ${code}`));
-  console.log('Browser server starting...');
+  try {
+    const proc = spawn('node', [script], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env } });
+    proc.stdout.on('data', (d: Buffer) => console.log(`[browser] ${d}`.trim()));
+    proc.stderr.on('data', (d: Buffer) => console.error(`[browser] ${d}`.trim()));
+    proc.on('error', (err) => console.error('Browser server error:', err.message));
+    proc.on('exit', (code) => {
+      console.log(`Browser server exited: ${code}`);
+      if (code !== 0) setTimeout(startBrowserServer, 3000);
+    });
+    console.log('Browser server starting...');
+  } catch (e) {
+    console.error('Failed to start browser server:', e);
+  }
 }
 
 // -- Rust process management --

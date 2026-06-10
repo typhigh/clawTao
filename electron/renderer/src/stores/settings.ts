@@ -3,6 +3,8 @@
  */
 import { create } from 'zustand';
 
+export const DEFAULT_BASH_TIMEOUT_SECS = 600;
+
 export interface LlmConfig {
   provider: string;
   api_key: string;
@@ -10,6 +12,7 @@ export interface LlmConfig {
   model: string;
   log_level: string;
   bash_blocked_commands: string[];
+  bash_timeout_secs: number | null;
 }
 
 interface SettingsState {

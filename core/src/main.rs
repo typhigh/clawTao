@@ -68,7 +68,7 @@ fn main() {
     }
 
     let mut tool_registry = ToolRegistry::new();
-    tools::builtin::register_all(&mut tool_registry, llm_config.bash_blocked_commands.clone());
+    tools::builtin::register_all(&mut tool_registry, llm_config.bash_blocked_commands.clone(), llm_config.bash_timeout_secs);
     info!("Registered {} tools: {:?}", tool_registry.len(), tool_registry.names());
 
     info!("LLM config: provider={} base_url={} model={}", llm_config.provider, llm_config.base_url, llm_config.model);
