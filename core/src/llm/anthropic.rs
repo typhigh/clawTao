@@ -96,7 +96,13 @@ impl ApiAdapter for AnthropicAdapter {
                     if block["type"] == "tool_use" {
                         let id = block["id"].as_str().unwrap_or("").to_string();
                         let name = block["name"].as_str().unwrap_or("").to_string();
-                        let args = block["input"].to_string(); // full input from start event
+                        // If input is empty `{}`, don't use it — wait for partial_json deltas
+                        let input_val = &block["input"];
+                        let args = if input_val.as_object().is_none_or(|o| o.is_empty()) {
+                            String::new()
+                        } else {
+                            input_val.to_string()
+                        };
                         if !id.is_empty() {
                             // Finalize previous tool if any
                             if let Some((prev_id, prev_name, prev_args)) = current_tool.take() {
