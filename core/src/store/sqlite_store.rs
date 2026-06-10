@@ -34,13 +34,6 @@ impl SqliteSessionStore {
             );
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);"
         )?;
-        // Migration: add title column if missing (v0.2.0)
-        if let Err(e) = conn.execute("ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT ''", []) {
-            let msg = e.to_string();
-            if !msg.contains("duplicate column") {
-                tracing::warn!("SQLite migration: {msg}");
-            }
-        }
         Ok(Self { conn: Mutex::new(conn) })
     }
 }
