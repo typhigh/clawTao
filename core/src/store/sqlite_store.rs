@@ -100,10 +100,11 @@ impl SessionStore for SqliteSessionStore {
 
 fn add_message_inner(conn: &Connection, session_id: &str, msg: &Message) -> Result<()> {
     let tool_calls_json = msg.tool_calls.as_ref().and_then(|tc| serde_json::to_string(tc).ok());
-    // Set title from first message content
+    // Set title from first message content (chars for UTF-8 safety)
+    let title_preview: String = msg.content.chars().take(50).collect();
     conn.execute(
         "UPDATE sessions SET title = CASE WHEN title = '' THEN ?2 ELSE title END WHERE id = ?1",
-        rusqlite::params![session_id, &msg.content[..msg.content.len().min(50)]],
+        rusqlite::params![session_id, title_preview],
     )?;
     conn.execute(
         "INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, timestamp)

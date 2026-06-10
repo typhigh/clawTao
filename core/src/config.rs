@@ -23,6 +23,9 @@ pub struct LlmConfig {
     pub api_key: String,
     pub base_url: String,
     pub model: String,
+    /// Configured model list (first = active). Backward compat with single `model`.
+    #[serde(default)]
+    pub models: Vec<String>,
     /// Log level: "trace" | "debug" | "info" | "warn" | "error"
     #[serde(default = "default_log_level")]
     pub log_level: String,
@@ -38,6 +41,7 @@ pub struct LlmConfig {
 }
 
 pub const DEFAULT_BASH_TIMEOUT_SECS: u64 = 600;
+
 
 fn default_bash_timeout() -> Option<u64> {
     Some(DEFAULT_BASH_TIMEOUT_SECS)
@@ -110,6 +114,7 @@ impl LlmConfig {
             bash_blocked_commands: default_blocked_commands(),
             api_protocol: default_api_protocol(),
             bash_timeout_secs: default_bash_timeout(),
+            models: vec![],
         }
     }
 
@@ -142,48 +147,95 @@ impl LlmConfig {
         }
     }
 
-    /// Validate by making a lightweight API call.
     pub fn validate(&self) -> Result<(), String> {
-        Self::test_connection(&self.base_url, &self.model, &self.api_key)
+        match self.api_protocol.as_str() {
+            "anthropic" => Self::validate_anthropic(&self.base_url, &self.model, &self.api_key),
+            _ => Self::validate_openai(&self.base_url, &self.model, &self.api_key),
+        }
     }
 
-    /// Test connectivity with explicit credentials (does not modify config).
-    pub fn test_connection(base_url: &str, model: &str, api_key: &str) -> Result<(), String> {
-        let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-        let body = serde_json::json!({
-            "model": model,
-            "messages": [{"role": "user", "content": "hi"}],
-            "max_tokens": 5,
-            "stream": false,
-        });
+    /// Test connectivity with explicit credentials.
+    pub fn test_connection(base_url: &str, model: &str, api_key: &str, api_protocol: &str) -> Result<(), String> {
+        match api_protocol {
+            "anthropic" => Self::validate_anthropic(base_url, model, api_key),
+            _ => Self::validate_openai(base_url, model, api_key),
+        }
+    }
 
+    fn validate_openai(base_url: &str, model: &str, api_key: &str) -> Result<(), String> {
         let client = reqwest::blocking::Client::new();
-        let resp = client
-            .post(&url)
+        let base = base_url.trim_end_matches('/');
+        let models_url = format!("{base}/models");
+
+        tracing::debug!("validate_openai: GET {models_url}");
+        if let Ok(resp) = client.get(&models_url)
             .header("Authorization", format!("Bearer {api_key}"))
-            .header("Content-Type", "application/json")
-            .body(serde_json::to_string(&body).map_err(|e| e.to_string())?)
             .send()
-            .map_err(|e| format!("Network error: {e}"))?;
-
-        let status = resp.status();
-        let resp_body = resp.text().unwrap_or_default();
-
-        // Check HTTP status
-        if !status.is_success() {
-            return Err(format!("HTTP {}: {}", status.as_u16(), resp_body));
+        {
+            let s = resp.status();
+            tracing::debug!("validate_openai /models: status={s}");
+            if s.is_success() || s.as_u16() == 429 { return Ok(()); }
+            if s.as_u16() == 401 || s.as_u16() == 403 { return Err("Invalid API key".into()); }
         }
 
-        // Check response body for API error (some servers return 200 with error JSON)
-        if let Ok(error) = serde_json::from_str::<serde_json::Value>(&resp_body) {
-            if error.get("error").is_some() {
-                let msg = error["error"].get("message")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown error");
+        let probe_url = format!("{base}/chat/completions");
+        tracing::debug!("validate_openai probe: POST {probe_url}");
+        let resp = client.post(&probe_url)
+            .header("Authorization", format!("Bearer {api_key}"))
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&serde_json::json!({
+                "model": model, "messages": [{"role": "user", "content": "hi"}],
+                "max_tokens": 1, "stream": false,
+            })).map_err(|e| e.to_string())?)
+            .send()
+            .map_err(|e| format!("Network error: {e}"))?;
+        tracing::debug!("validate_openai probe: status={}", resp.status());
+        Self::check_probe_response(resp)
+    }
+
+    fn validate_anthropic(base_url: &str, model: &str, api_key: &str) -> Result<(), String> {
+        let client = reqwest::blocking::Client::new();
+        let base = base_url.trim_end_matches('/');
+        let headers = |r: reqwest::blocking::RequestBuilder| {
+            r.header("x-api-key", api_key).header("anthropic-version", "2023-06-01")
+        };
+        let models_url = format!("{base}/v1/models?limit=1");
+
+        tracing::debug!("validate_anthropic: GET {models_url}");
+        if let Ok(resp) = headers(client.get(&models_url)).send() {
+            let s = resp.status();
+            tracing::debug!("validate_anthropic /models: status={s}");
+            if s.is_success() || s.as_u16() == 429 { return Ok(()); }
+            if s.as_u16() == 401 || s.as_u16() == 403 { return Err("Invalid API key".into()); }
+        }
+
+        let probe_url = format!("{base}/v1/messages");
+        tracing::debug!("validate_anthropic probe: POST {probe_url}");
+        let resp = headers(client.post(&probe_url)
+            .header("Content-Type", "application/json"))
+            .body(serde_json::to_string(&serde_json::json!({
+                "model": model, "messages": [{"role": "user", "content": "hi"}],
+                "max_tokens": 1, "stream": false,
+            })).map_err(|e| e.to_string())?)
+            .send()
+            .map_err(|e| format!("Network error: {e}"))?;
+        tracing::debug!("validate_anthropic probe: status={}", resp.status());
+        Self::check_probe_response(resp)
+    }
+
+    fn check_probe_response(resp: reqwest::blocking::Response) -> Result<(), String> {
+        let status = resp.status();
+        if status.as_u16() == 429 { return Ok(()); }
+        let body = resp.text().unwrap_or_default();
+        tracing::debug!("check_probe_response: status={status} body={:.200}", body);
+        if !status.is_success() {
+            return Err(format!("HTTP {}: {}", status.as_u16(), body));
+        }
+        if let Ok(error) = serde_json::from_str::<serde_json::Value>(&body) {
+            if let Some(msg) = error["error"]["message"].as_str() {
                 return Err(msg.to_string());
             }
         }
-
         Ok(())
     }
 }

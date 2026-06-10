@@ -43,6 +43,7 @@ describe('settings store', () => {
       base_url: 'https://api.openai.com/v1',
       model: 'gpt-4o',
       log_level: 'info',
+      api_protocol: 'openai', models: [],
       bash_blocked_commands: ['rm -rf /'], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
     };
     mockConfigApi.get.mockResolvedValueOnce(mockConfig);
@@ -71,6 +72,7 @@ describe('settings store', () => {
       base_url: 'https://api.minimaxi.com/v1',
       model: 'MiniMax-M3',
       log_level: 'debug',
+      api_protocol: 'openai', models: [],
       bash_blocked_commands: ['rm -rf /'], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
     };
     const maskedConfig = { ...newConfig, api_key: 'sk-r****real' };
@@ -102,7 +104,7 @@ describe('settings store', () => {
   it('testKey sends credentials and returns result', async () => {
     mockConfigApi.testKey.mockResolvedValueOnce({ ok: true });
 
-    const result = await useSettingsStore.getState().testKey('sk-test', 'https://api.test.com/v1', 'gpt-4o');
+    const result = await useSettingsStore.getState().testKey('sk-test', 'https://api.test.com/v1', 'gpt-4o', 'openai');
     expect(mockConfigApi.testKey).toHaveBeenCalledWith({
       api_key: 'sk-test',
       base_url: 'https://api.test.com/v1',

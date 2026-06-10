@@ -165,10 +165,13 @@ fn handle_request(
             }
         }
         "config.testKey" => {
-            let api_key = get_param(&request.params, "api_key")?;
+            let api_key = request.params.as_ref()
+                .and_then(|p| p.get("api_key")).and_then(|v| v.as_str()).filter(|s| !s.is_empty())
+                .unwrap_or(&llm_config.api_key);
             let base_url = get_param(&request.params, "base_url").unwrap_or(&llm_config.base_url);
             let model = get_param(&request.params, "model").unwrap_or(&llm_config.model);
-            match LlmConfig::test_connection(base_url, model, api_key) {
+            let api_protocol = get_param(&request.params, "api_protocol").unwrap_or(&llm_config.api_protocol);
+            match LlmConfig::test_connection(base_url, model, api_key, api_protocol) {
                 Ok(()) => write_response(&Response::success(request.id.clone(), json!({"ok": true})))?,
                 Err(e) => write_response(&Response::success(request.id.clone(), json!({"ok": false, "error": e})))?,
             }
