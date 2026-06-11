@@ -42,11 +42,11 @@ pub(crate) fn handle_chat_send(
 
     let mut messages = session.messages.clone();
 
-    let unified_tools: Vec<UnifiedTool> = tool_registry.list_specs().iter().map(|s| {
+    let unified_tools: Vec<UnifiedTool> = tool_registry.list_specs().iter().map(|spec| {
         UnifiedTool {
-            name: s.function.name.clone(),
-            description: s.function.description.clone(),
-            parameters: s.function.parameters.clone(),
+            name: spec.function.name.clone(),
+            description: spec.function.description.clone(),
+            parameters: spec.function.parameters.clone(),
         }
     }).collect();
 
@@ -74,25 +74,52 @@ pub(crate) fn handle_chat_send(
         for (k, v) in &http.headers {
             resp = resp.header(k.as_str(), v.as_str());
         }
-        let mut resp = resp.body(http.body.clone()).send()?;
+        let resp = resp.body(http.body.clone()).send()?;
 
         debug!("LLM response: status={}", resp.status());
 
-        use std::io::Read;
+        // Stream SSE line by line, send text deltas immediately
+        use std::io::{BufRead, BufReader};
+        let mut reader = BufReader::new(resp);
+        let mut line = String::new();
         let mut body_bytes = Vec::new();
-        resp.read_to_end(&mut body_bytes)?;
-        let body_str = String::from_utf8_lossy(&body_bytes);
+        let protocol = &llm_config.api_protocol;
 
+        while reader.read_line(&mut line)? > 0 {
+            body_bytes.extend_from_slice(line.as_bytes());
+            let trimmed = line.trim();
+
+            if let Some(data) = trimmed.strip_prefix("data: ") {
+                if data == "[DONE]" { line.clear(); continue; }
+                if let Ok(event) = serde_json::from_str::<serde_json::Value>(data) {
+                    let text = if protocol != "anthropic" {
+                        event["choices"][0]["delta"]["content"].as_str()
+                    } else {
+                        // Anthropic: text_delta or input_json_delta
+                        let delta = &event["delta"];
+                        if delta["type"] == "text_delta" {
+                            delta["text"].as_str()
+                        } else {
+                            event["content_block"]["text"].as_str()
+                        }
+                    };
+                    if let Some(t) = text {
+                        if !t.is_empty() {
+                            write_notification(&Notification::new("chat.text_delta", Some(json!({
+                                "sessionId": session_id, "runId": run_id, "delta": t
+                            }))))?;
+                        }
+                    }
+                }
+            }
+            line.clear();
+        }
+
+        let body_str = String::from_utf8_lossy(&body_bytes);
         debug!("LLM response body: {} bytes", body_bytes.len());
         trace!("LLM response body: {}", body_str);
 
         let result = adapter.parse_stream(&body_str)?;
-
-        if !result.text.is_empty() {
-            write_notification(&Notification::new("chat.text_delta", Some(json!({
-                "sessionId": session_id, "runId": run_id, "delta": result.text
-            }))))?;
-        }
 
         if result.tool_calls.is_empty() {
             break result.text;

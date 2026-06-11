@@ -31,13 +31,13 @@ pub(crate) fn parse_sse_response(body_str: &str) -> SseResult {
                 text.push_str(content);
             }
 
-            if let Some(tcs) = delta.and_then(|d| d.get("tool_calls")).and_then(|tc| tc.as_array()) {
-                for tc in tcs {
-                    let idx = tc.get("index").and_then(|v| v.as_u64()).unwrap_or(pending_tools.len() as u64) as usize;
-                    let id = tc.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                    let f = tc.get("function");
-                    let name = f.and_then(|v| v.get("name")).and_then(|v| v.as_str()).unwrap_or("");
-                    let args = f.and_then(|v| v.get("arguments")).and_then(|v| v.as_str()).unwrap_or("");
+            if let Some(tool_calls) = delta.and_then(|d| d.get("tool_calls")).and_then(|tc| tc.as_array()) {
+                for tool in tool_calls {
+                    let idx = tool.get("index").and_then(|v| v.as_u64()).unwrap_or(pending_tools.len() as u64) as usize;
+                    let id = tool.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                    let func = tool.get("function");
+                    let name = func.and_then(|v| v.get("name")).and_then(|v| v.as_str()).unwrap_or("");
+                    let args = func.and_then(|v| v.get("arguments")).and_then(|v| v.as_str()).unwrap_or("");
 
                     while pending_tools.len() <= idx {
                         pending_tools.push((String::new(), String::new(), String::new()));

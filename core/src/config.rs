@@ -172,10 +172,10 @@ impl LlmConfig {
             .header("Authorization", format!("Bearer {api_key}"))
             .send()
         {
-            let s = resp.status();
-            tracing::debug!("validate_openai /models: status={s}");
-            if s.is_success() || s.as_u16() == 429 { return Ok(()); }
-            if s.as_u16() == 401 || s.as_u16() == 403 { return Err("Invalid API key".into()); }
+            let status = resp.status();
+            tracing::debug!("validate_openai /models: status={status}");
+            if status.is_success() || status.as_u16() == 429 { return Ok(()); }
+            if status.as_u16() == 401 || status.as_u16() == 403 { return Err("Invalid API key".into()); }
         }
 
         let probe_url = format!("{base}/chat/completions");
@@ -203,10 +203,10 @@ impl LlmConfig {
 
         tracing::debug!("validate_anthropic: GET {models_url}");
         if let Ok(resp) = headers(client.get(&models_url)).send() {
-            let s = resp.status();
-            tracing::debug!("validate_anthropic /models: status={s}");
-            if s.is_success() || s.as_u16() == 429 { return Ok(()); }
-            if s.as_u16() == 401 || s.as_u16() == 403 { return Err("Invalid API key".into()); }
+            let status = resp.status();
+            tracing::debug!("validate_anthropic /models: status={status}");
+            if status.is_success() || status.as_u16() == 429 { return Ok(()); }
+            if status.as_u16() == 401 || status.as_u16() == 403 { return Err("Invalid API key".into()); }
         }
 
         let probe_url = format!("{base}/v1/messages");

@@ -193,7 +193,7 @@ fn handle_request(
 
 pub(crate) fn get_param<'a>(params: &'a Option<serde_json::Value>, key: &str) -> Result<&'a str> {
     params.as_ref()
-        .and_then(|p| p.get(key))
+        .and_then(|obj| obj.get(key))
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("Missing parameter: {key}"))
 }
