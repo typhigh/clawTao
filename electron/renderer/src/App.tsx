@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChatStore, Message, ToolCall } from './stores/chat';
 import { useSettingsStore } from './stores/settings';
 import { SettingsDialog } from './components/SettingsDialog';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
+import type { TFunction } from 'i18next';
 
-function formatRelative(timestamp: number): string {
+function formatRelative(t: TFunction, timestamp: number): string {
   const diffMs = Date.now() - timestamp;
   const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return '刚刚';
+  if (sec < 60) return t('time.justNow');
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}分钟前`;
+  if (min < 60) return t('time.minutesAgo', { n: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}小时前`;
+  if (hr < 24) return t('time.hoursAgo', { n: hr });
   const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}天前`;
+  if (day < 30) return t('time.daysAgo', { n: day });
   const date = new Date(timestamp);
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function App() {
+  const { t } = useTranslation();
   const {
     sessions, activeSessionId,
     loadSessions, createSession, selectSession, deleteSession,
@@ -67,10 +71,13 @@ function App() {
           {/* ── Config header ── */}
           <div className="sidebar-section config-section">
             <div className="sidebar-section-header">
-              <h2>⚙️ Configuration</h2>
-              <button className="btn-icon" onClick={() => setSettingsOpen(true)} title="Settings">
-                ⚙️
-              </button>
+              <h2>{t('sidebar.configuration')}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <LanguageSwitcher />
+                <button className="btn-icon" onClick={() => setSettingsOpen(true)} title={t('sidebar.configuration')}>
+                  ⚙️
+                </button>
+              </div>
             </div>
           </div>
 
@@ -80,12 +87,12 @@ function App() {
           {/* ── Sessions section ── */}
           <div className="sidebar-section sessions-section">
             <div className="sidebar-section-header">
-              <h2>Sessions</h2>
-              <button onClick={createSession} title="New session">+</button>
+              <h2>{t('sidebar.sessions')}</h2>
+              <button onClick={createSession} title={t('sidebar.newSession')}>+</button>
             </div>
             <div className="session-items">
               {sessions.length === 0 ? (
-                <div className="session-empty">No sessions yet</div>
+                <div className="session-empty">{t('sidebar.noSessions')}</div>
               ) : (
                 sessions.map((session) => {
                   const isActive = session.id === activeSessionId;
@@ -99,12 +106,12 @@ function App() {
                       <span className={`session-item-status ${isRunning ? 'running' : 'done'}`}>
                         {isRunning ? <SpinnerIcon /> : <CheckIcon />}
                       </span>
-                      <div className="session-item-title">{(session as any).title || 'Empty session'}</div>
-                      <div className="session-item-time">{formatRelative(session.updated_at)}</div>
+                      <div className="session-item-title">{(session as any).title || t('sidebar.emptySession')}</div>
+                      <div className="session-item-time">{formatRelative(t, session.updated_at)}</div>
                       <button
                         className="session-delete-btn"
                         onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
-                        title="Delete session"
+                        title={t('sidebar.deleteSession')}
                       >×</button>
                     </div>
                   );
@@ -137,7 +144,7 @@ function App() {
                 {/* Streaming text */}
                 {isStreaming && streamingText && (
                   <div className="message assistant streaming">
-                    <div className="message-role">Assistant</div>
+                    <div className="message-role">{t('role.assistant')}</div>
                     <div className="message-content">{streamingText}</div>
                   </div>
                 )}
@@ -146,18 +153,18 @@ function App() {
               <form className="input-area" onSubmit={handleSubmit}>
                 <input
                   type="text"
-                  placeholder="Type your message..."
+                  placeholder={t('chat.placeholder')}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   disabled={isStreaming}
                 />
-                <button type="submit" disabled={!inputValue.trim() || isStreaming}>Send</button>
+                <button type="submit" disabled={!inputValue.trim() || isStreaming}>{t('chat.send')}</button>
               </form>
             </>
           ) : (
             <div className="empty-state">
-              <p>No session selected</p>
-              <button onClick={createSession}>Create a session</button>
+              <p>{t('chat.noSession')}</p>
+              <button onClick={createSession}>{t('chat.createSession')}</button>
             </div>
           )}
         </main>
@@ -167,13 +174,14 @@ function App() {
 }
 
 function MessageView({ message }: { message: Message }) {
-  const roleLabel = message.role === 'user' ? 'You' :
-                     message.role === 'tool' ? 'Tool' : 'Assistant';
+  const { t } = useTranslation();
+  const roleLabel = message.role === 'user' ? t('role.you') :
+                     message.role === 'tool' ? t('role.tool') : t('role.assistant');
 
   if (message.role === 'tool') {
     return (
       <div className="message tool">
-        <div className="message-role">Tool result ({message.tool_call_id?.slice(0, 8)}...)</div>
+        <div className="message-role">{t('role.toolResult')} ({message.tool_call_id?.slice(0, 8)}...)</div>
         <div className="message-content">
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{message.content}</pre>
         </div>
@@ -184,7 +192,7 @@ function MessageView({ message }: { message: Message }) {
   if (message.role === 'assistant' && message.tool_calls) {
     return (
       <div className="message assistant">
-        <div className="message-role">Assistant</div>
+        <div className="message-role">{t('role.assistant')}</div>
         <div className="message-content">
           <div className="tool-calls">
             {message.tool_calls.map((tc: ToolCall) => (
@@ -209,6 +217,7 @@ function ToolCallView({ toolName, toolInput, result }: {
   toolInput: unknown;
   result?: string | null;
 }) {
+  const { t } = useTranslation();
   return (
     <div className={`message tool-call ${result ? 'done' : 'pending'}`}>
       <div className="message-role">
@@ -216,11 +225,11 @@ function ToolCallView({ toolName, toolInput, result }: {
       </div>
       <div className="message-content tool-card">
         <div className="tool-input">
-          <strong>Input:</strong> {safeStringify(toolInput)}
+          <strong>{t('tool.input')}:</strong> {safeStringify(toolInput)}
         </div>
         {result && (
           <div className="tool-result">
-            <strong>Result:</strong>
+            <strong>{t('tool.result')}:</strong>
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, marginTop: 4 }}>{result}</pre>
           </div>
         )}

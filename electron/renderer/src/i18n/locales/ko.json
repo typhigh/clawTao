@@ -1,0 +1,58 @@
+{
+  "sidebar": {
+    "configuration": "⚙️ 설정",
+    "sessions": "세션",
+    "newSession": "새 세션",
+    "noSessions": "세션 없음",
+    "emptySession": "빈 세션",
+    "deleteSession": "세션 삭제"
+  },
+  "chat": {
+    "placeholder": "메시지 입력...",
+    "send": "보내기",
+    "noSession": "선택된 세션 없음",
+    "createSession": "세션 만들기"
+  },
+  "role": {
+    "you": "사용자",
+    "assistant": "어시스턴트",
+    "tool": "도구",
+    "toolResult": "도구 결과"
+  },
+  "tool": {
+    "input": "입력",
+    "result": "결과"
+  },
+  "time": {
+    "justNow": "방금",
+    "minutesAgo": "{{n}}분 전",
+    "hoursAgo": "{{n}}시간 전",
+    "daysAgo": "{{n}}일 전"
+  },
+  "settings": {
+    "title": "⚙️ LLM 공급자 설정",
+    "provider": "공급자",
+    "apiKey": "API 키",
+    "baseUrl": "기본 URL",
+    "apiProtocol": "API 프로토콜",
+    "model": "모델",
+    "logLevel": "로그 레벨",
+    "bashBlockedCommands": "Bash 차단 명령어 (한 줄씩)",
+    "bashTimeout": "Bash 타임아웃",
+    "enable": "활성화",
+    "seconds": "초",
+    "change": "변경",
+    "cancel": "취소",
+    "testConnection": "연결 테스트",
+    "save": "저장",
+    "connectionSuccess": "✅ 연결 성공",
+    "suggested": "추천",
+    "enterNewKey": "새 API 키 입력...",
+    "enterModelId": "모델 ID 입력"
+  },
+  "common": {
+    "auto": "(자동)",
+    "error": "오류",
+    "loading": "로딩 중..."
+  }
+}

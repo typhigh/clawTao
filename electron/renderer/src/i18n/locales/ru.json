@@ -1,0 +1,58 @@
+{
+  "sidebar": {
+    "configuration": "⚙️ Конфигурация",
+    "sessions": "Сессии",
+    "newSession": "Новая сессия",
+    "noSessions": "Нет сессий",
+    "emptySession": "Пустая сессия",
+    "deleteSession": "Удалить сессию"
+  },
+  "chat": {
+    "placeholder": "Введите сообщение...",
+    "send": "Отправить",
+    "noSession": "Сессия не выбрана",
+    "createSession": "Создать сессию"
+  },
+  "role": {
+    "you": "Вы",
+    "assistant": "Ассистент",
+    "tool": "Инструмент",
+    "toolResult": "Результат"
+  },
+  "tool": {
+    "input": "Ввод",
+    "result": "Результат"
+  },
+  "time": {
+    "justNow": "Только что",
+    "minutesAgo": "{{n}} мин. назад",
+    "hoursAgo": "{{n}} ч. назад",
+    "daysAgo": "{{n}} дн. назад"
+  },
+  "settings": {
+    "title": "⚙️ Настройки LLM провайдера",
+    "provider": "Провайдер",
+    "apiKey": "API ключ",
+    "baseUrl": "Базовый URL",
+    "apiProtocol": "API протокол",
+    "model": "Модель",
+    "logLevel": "Уровень логирования",
+    "bashBlockedCommands": "Запрещённые Bash команды (по одной на строку)",
+    "bashTimeout": "Таймаут Bash",
+    "enable": "Включить",
+    "seconds": "сек.",
+    "change": "Изменить",
+    "cancel": "Отмена",
+    "testConnection": "Проверить соединение",
+    "save": "Сохранить",
+    "connectionSuccess": "✅ Соединение успешно",
+    "suggested": "Рекомендуемые",
+    "enterNewKey": "Введите новый API ключ...",
+    "enterModelId": "Введите ID модели"
+  },
+  "common": {
+    "auto": "(авто)",
+    "error": "Ошибка",
+    "loading": "Загрузка..."
+  }
+}

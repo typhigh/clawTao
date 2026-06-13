@@ -1,0 +1,58 @@
+{
+  "sidebar": {
+    "configuration": "⚙️ 配置",
+    "sessions": "会话",
+    "newSession": "新建会话",
+    "noSessions": "暂无会话",
+    "emptySession": "空会话",
+    "deleteSession": "删除会话"
+  },
+  "chat": {
+    "placeholder": "输入消息...",
+    "send": "发送",
+    "noSession": "未选中会话",
+    "createSession": "创建会话"
+  },
+  "role": {
+    "you": "你",
+    "assistant": "助手",
+    "tool": "工具",
+    "toolResult": "工具结果"
+  },
+  "tool": {
+    "input": "输入",
+    "result": "结果"
+  },
+  "time": {
+    "justNow": "刚刚",
+    "minutesAgo": "{{n}}分钟前",
+    "hoursAgo": "{{n}}小时前",
+    "daysAgo": "{{n}}天前"
+  },
+  "settings": {
+    "title": "⚙️ LLM 供应商设置",
+    "provider": "供应商",
+    "apiKey": "API Key",
+    "baseUrl": "Base URL",
+    "apiProtocol": "API 协议",
+    "model": "模型",
+    "logLevel": "日志级别",
+    "bashBlockedCommands": "Bash 禁用命令（每行一个）",
+    "bashTimeout": "Bash 超时",
+    "enable": "启用",
+    "seconds": "秒",
+    "change": "更改",
+    "cancel": "取消",
+    "testConnection": "测试连接",
+    "save": "保存",
+    "connectionSuccess": "✅ 连接成功",
+    "suggested": "推荐",
+    "enterNewKey": "输入新 API Key...",
+    "enterModelId": "输入模型 ID"
+  },
+  "common": {
+    "auto": "（自动）",
+    "error": "错误",
+    "loading": "加载中..."
+  }
+}

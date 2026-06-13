@@ -1,0 +1,58 @@
+{
+  "sidebar": {
+    "configuration": "⚙️ Configuration",
+    "sessions": "Sessions",
+    "newSession": "Nouvelle session",
+    "noSessions": "Aucune session",
+    "emptySession": "Session vide",
+    "deleteSession": "Supprimer la session"
+  },
+  "chat": {
+    "placeholder": "Saisissez votre message...",
+    "send": "Envoyer",
+    "noSession": "Aucune session sélectionnée",
+    "createSession": "Créer une session"
+  },
+  "role": {
+    "you": "Vous",
+    "assistant": "Assistant",
+    "tool": "Outil",
+    "toolResult": "Résultat de l'outil"
+  },
+  "tool": {
+    "input": "Entrée",
+    "result": "Résultat"
+  },
+  "time": {
+    "justNow": "À l'instant",
+    "minutesAgo": "Il y a {{n}} min",
+    "hoursAgo": "Il y a {{n}} h",
+    "daysAgo": "Il y a {{n}} j"
+  },
+  "settings": {
+    "title": "⚙️ Paramètres du fournisseur LLM",
+    "provider": "Fournisseur",
+    "apiKey": "Clé API",
+    "baseUrl": "URL de base",
+    "apiProtocol": "Protocole API",
+    "model": "Modèle",
+    "logLevel": "Niveau de log",
+    "bashBlockedCommands": "Commandes Bash bloquées (une par ligne)",
+    "bashTimeout": "Délai d'expiration Bash",
+    "enable": "Activer",
+    "seconds": "secondes",
+    "change": "Modifier",
+    "cancel": "Annuler",
+    "testConnection": "Tester la connexion",
+    "save": "Enregistrer",
+    "connectionSuccess": "✅ Connexion réussie",
+    "suggested": "Suggestions",
+    "enterNewKey": "Saisir une nouvelle clé API...",
+    "enterModelId": "Saisir l'ID du modèle"
+  },
+  "common": {
+    "auto": "(auto)",
+    "error": "Erreur",
+    "loading": "Chargement..."
+  }
+}

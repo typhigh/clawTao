@@ -1,0 +1,58 @@
+{
+  "sidebar": {
+    "configuration": "⚙️ 設定",
+    "sessions": "セッション",
+    "newSession": "新規セッション",
+    "noSessions": "セッションなし",
+    "emptySession": "空のセッション",
+    "deleteSession": "セッションを削除"
+  },
+  "chat": {
+    "placeholder": "メッセージを入力...",
+    "send": "送信",
+    "noSession": "セッションが選択されていません",
+    "createSession": "セッションを作成"
+  },
+  "role": {
+    "you": "あなた",
+    "assistant": "アシスタント",
+    "tool": "ツール",
+    "toolResult": "ツール結果"
+  },
+  "tool": {
+    "input": "入力",
+    "result": "結果"
+  },
+  "time": {
+    "justNow": "たった今",
+    "minutesAgo": "{{n}}分前",
+    "hoursAgo": "{{n}}時間前",
+    "daysAgo": "{{n}}日前"
+  },
+  "settings": {
+    "title": "⚙️ LLM プロバイダー設定",
+    "provider": "プロバイダー",
+    "apiKey": "APIキー",
+    "baseUrl": "ベースURL",
+    "apiProtocol": "APIプロトコル",
+    "model": "モデル",
+    "logLevel": "ログレベル",
+    "bashBlockedCommands": "Bash禁止コマンド（1行ずつ）",
+    "bashTimeout": "Bashタイムアウト",
+    "enable": "有効",
+    "seconds": "秒",
+    "change": "変更",
+    "cancel": "キャンセル",
+    "testConnection": "接続テスト",
+    "save": "保存",
+    "connectionSuccess": "✅ 接続成功",
+    "suggested": "推奨",
+    "enterNewKey": "新しいAPIキーを入力...",
+    "enterModelId": "モデルIDを入力"
+  },
+  "common": {
+    "auto": "（自動）",
+    "error": "エラー",
+    "loading": "読み込み中..."
+  }
+}

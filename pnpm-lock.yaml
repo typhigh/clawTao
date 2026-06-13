@@ -8,15 +8,21 @@ importers:
 
   .:
     dependencies:
+      i18next:
+        specifier: ^25.0.0
+        version: 25.10.10(typescript@5.9.3)
       react:
         specifier: ^19.0.0
         version: 19.2.7
       react-dom:
         specifier: ^19.0.0
         version: 19.2.7(react@19.2.7)
+      react-i18next:
+        specifier: ^16.0.0
+        version: 16.6.6(i18next@25.10.10(typescript@5.9.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
       zustand:
         specifier: ^5.0.0
-        version: 5.0.14(@types/react@19.2.17)(react@19.2.7)
+        version: 5.0.14(@types/react@19.2.17)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     devDependencies:
       '@testing-library/react':
         specifier: ^16.3.2
@@ -1276,6 +1282,9 @@ packages:
     resolution: {integrity: sha512-CV9TW3Y3f8/wT0BRFc1/KAVQ3TUHiXmaAb6VW9vtiMFf7SLoMd1PdAc4W3KFOFETBJUb90KatHqlsZMWV+R9Gg==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
 
+  html-parse-stringify@3.0.1:
+    resolution: {integrity: sha512-KknJ50kTInJ7qIScF3jeaFRpMpE8/lfiTdzf/twXyPBLAGrLRTmkz3AdTnKeh40X8k9L2fdYwEp/42WGXIRGcg==}
+
   http-cache-semantics@4.2.0:
     resolution: {integrity: sha512-dTxcvPXqPvXBQpq5dUr6mEMJX4oIEFv6bwom3FDwKRDsuIjjJGANqhBuoAn9c1RQJIdAKav33ED65E2ys+87QQ==}
 
@@ -1294,6 +1303,14 @@ packages:
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
+
+  i18next@25.10.10:
+    resolution: {integrity: sha512-cqUW2Z3EkRx7NqSyywjkgCLK7KLCL6IFVFcONG7nVYIJ3ekZ1/N5jUsihHV6Bq37NfhgtczxJcxduELtjTwkuQ==}
+    peerDependencies:
+      typescript: ^5 || ^6
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   inflight@1.0.6:
     resolution: {integrity: sha512-k92I/b08q4wvFscXCLvqfsHCrjrF7yiXsQuIVvVE7N82W3+aqpzuUdBbfhWcy/FZR3/4IgflMgKLOsvPDrGCJA==}
@@ -1634,6 +1651,22 @@ packages:
     peerDependencies:
       react: ^19.2.7
 
+  react-i18next@16.6.6:
+    resolution: {integrity: sha512-ZgL2HUoW34UKUkOV7uSQFE1CDnRPD+tCR3ywSuWH7u2iapnz86U8Bi3Vrs620qNDzCf1F47NxglCEkchCTDOHw==}
+    peerDependencies:
+      i18next: '>= 25.10.9'
+      react: '>= 16.8.0'
+      react-dom: '*'
+      react-native: '*'
+      typescript: ^5 || ^6
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+      react-native:
+        optional: true
+      typescript:
+        optional: true
+
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
 
@@ -1906,6 +1939,11 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
+  use-sync-external-store@1.6.0:
+    resolution: {integrity: sha512-Pp6GSwGP/NrPIrxVFAIkOQeyw8lFenOHijQWkUTrDvrF4ALqylP2C/KCkeS9dpUM3KvYRQhna5vt7IL95+ZQ9w==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   utf8-byte-length@1.0.5:
     resolution: {integrity: sha512-Xn0w3MtiQ6zoz2vFyUVruaCL53O/DwUvkEeOvj+uulMm0BkUGYWmBYVyElqZaSLhY6ZD0ulfU3aBra2aVT4xfA==}
 
@@ -2003,6 +2041,10 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  void-elements@3.1.0:
+    resolution: {integrity: sha512-Dhxzh5HZuiHQhbvTW9AMetFfBHDMYpo23Uo9btPXgdYP+3T5S+p+jgNy7spra+veYhBP2dCSgxR/i2Y02h5/6w==}
+    engines: {node: '>=0.10.0'}
 
   w3c-xmlserializer@5.0.0:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
@@ -3404,6 +3446,10 @@ snapshots:
     transitivePeerDependencies:
       - '@noble/hashes'
 
+  html-parse-stringify@3.0.1:
+    dependencies:
+      void-elements: 3.1.0
+
   http-cache-semantics@4.2.0: {}
 
   http-proxy-agent@7.0.2:
@@ -3431,6 +3477,12 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+
+  i18next@25.10.10(typescript@5.9.3):
+    dependencies:
+      '@babel/runtime': 7.29.7
+    optionalDependencies:
+      typescript: 5.9.3
 
   inflight@1.0.6:
     dependencies:
@@ -3746,6 +3798,17 @@ snapshots:
       react: 19.2.7
       scheduler: 0.27.0
 
+  react-i18next@16.6.6(i18next@25.10.10(typescript@5.9.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3):
+    dependencies:
+      '@babel/runtime': 7.29.7
+      html-parse-stringify: 3.0.1
+      i18next: 25.10.10(typescript@5.9.3)
+      react: 19.2.7
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    optionalDependencies:
+      react-dom: 19.2.7(react@19.2.7)
+      typescript: 5.9.3
+
   react-is@17.0.2: {}
 
   react-refresh@0.17.0: {}
@@ -4019,6 +4082,10 @@ snapshots:
       escalade: 3.2.0
       picocolors: 1.1.1
 
+  use-sync-external-store@1.6.0(react@19.2.7):
+    dependencies:
+      react: 19.2.7
+
   utf8-byte-length@1.0.5: {}
 
   util-deprecate@1.0.2: {}
@@ -4069,6 +4136,8 @@ snapshots:
       jsdom: 29.1.1(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - msw
+
+  void-elements@3.1.0: {}
 
   w3c-xmlserializer@5.0.0:
     dependencies:
@@ -4158,7 +4227,8 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zustand@5.0.14(@types/react@19.2.17)(react@19.2.7):
+  zustand@5.0.14(@types/react@19.2.17)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7)):
     optionalDependencies:
       '@types/react': 19.2.17
       react: 19.2.7
+      use-sync-external-store: 1.6.0(react@19.2.7)

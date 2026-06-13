@@ -1,0 +1,58 @@
+{
+  "sidebar": {
+    "configuration": "⚙️ Configuration",
+    "sessions": "Sessions",
+    "newSession": "New session",
+    "noSessions": "No sessions yet",
+    "emptySession": "Empty session",
+    "deleteSession": "Delete session"
+  },
+  "chat": {
+    "placeholder": "Type your message...",
+    "send": "Send",
+    "noSession": "No session selected",
+    "createSession": "Create a session"
+  },
+  "role": {
+    "you": "You",
+    "assistant": "Assistant",
+    "tool": "Tool",
+    "toolResult": "Tool result"
+  },
+  "tool": {
+    "input": "Input",
+    "result": "Result"
+  },
+  "time": {
+    "justNow": "Just now",
+    "minutesAgo": "{{n}} min ago",
+    "hoursAgo": "{{n}} hr ago",
+    "daysAgo": "{{n}} day(s) ago"
+  },
+  "settings": {
+    "title": "⚙️ LLM Provider Settings",
+    "provider": "Provider",
+    "apiKey": "API Key",
+    "baseUrl": "Base URL",
+    "apiProtocol": "API Protocol",
+    "model": "Model",
+    "logLevel": "Log Level",
+    "bashBlockedCommands": "Bash Blocked Commands (one per line)",
+    "bashTimeout": "Bash Timeout",
+    "enable": "Enable",
+    "seconds": "seconds",
+    "change": "Change",
+    "cancel": "Cancel",
+    "testConnection": "Test Connection",
+    "save": "Save",
+    "connectionSuccess": "✅ Connection successful",
+    "suggested": "Suggested",
+    "enterNewKey": "Enter new API key...",
+    "enterModelId": "Enter model ID"
+  },
+  "common": {
+    "auto": "(auto)",
+    "error": "Error",
+    "loading": "Loading..."
+  }
+}
