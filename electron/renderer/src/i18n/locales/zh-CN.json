@@ -13,12 +13,6 @@
     "noSession": "未选中会话",
     "createSession": "创建会话"
   },
-  "role": {
-    "you": "你",
-    "assistant": "助手",
-    "tool": "工具",
-    "toolResult": "工具结果"
-  },
   "tool": {
     "input": "输入",
     "result": "结果"

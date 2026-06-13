@@ -13,12 +13,6 @@
     "noSession": "Aucune session sélectionnée",
     "createSession": "Créer une session"
   },
-  "role": {
-    "you": "Vous",
-    "assistant": "Assistant",
-    "tool": "Outil",
-    "toolResult": "Résultat de l'outil"
-  },
   "tool": {
     "input": "Entrée",
     "result": "Résultat"

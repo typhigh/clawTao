@@ -13,12 +13,6 @@
     "noSession": "선택된 세션 없음",
     "createSession": "세션 만들기"
   },
-  "role": {
-    "you": "사용자",
-    "assistant": "어시스턴트",
-    "tool": "도구",
-    "toolResult": "도구 결과"
-  },
   "tool": {
     "input": "입력",
     "result": "결과"

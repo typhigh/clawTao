@@ -13,12 +13,6 @@
     "noSession": "Сессия не выбрана",
     "createSession": "Создать сессию"
   },
-  "role": {
-    "you": "Вы",
-    "assistant": "Ассистент",
-    "tool": "Инструмент",
-    "toolResult": "Результат"
-  },
   "tool": {
     "input": "Ввод",
     "result": "Результат"

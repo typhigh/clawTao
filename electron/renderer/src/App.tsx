@@ -144,7 +144,6 @@ function App() {
                 {/* Streaming text */}
                 {isStreaming && streamingText && (
                   <div className="message assistant streaming">
-                    <div className="message-role">{t('role.assistant')}</div>
                     <div className="message-content">{streamingText}</div>
                   </div>
                 )}
@@ -174,14 +173,9 @@ function App() {
 }
 
 function MessageView({ message }: { message: Message }) {
-  const { t } = useTranslation();
-  const roleLabel = message.role === 'user' ? t('role.you') :
-                     message.role === 'tool' ? t('role.tool') : t('role.assistant');
-
   if (message.role === 'tool') {
     return (
       <div className="message tool">
-        <div className="message-role">{t('role.toolResult')} ({message.tool_call_id?.slice(0, 8)}...)</div>
         <div className="message-content">
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{message.content}</pre>
         </div>
@@ -192,7 +186,6 @@ function MessageView({ message }: { message: Message }) {
   if (message.role === 'assistant' && message.tool_calls) {
     return (
       <div className="message assistant">
-        <div className="message-role">{t('role.assistant')}</div>
         <div className="message-content">
           <div className="tool-calls">
             {message.tool_calls.map((tc: ToolCall) => (
@@ -206,7 +199,6 @@ function MessageView({ message }: { message: Message }) {
 
   return (
     <div className={`message ${message.role}`}>
-      <div className="message-role">{roleLabel}</div>
       <div className="message-content">{message.content}</div>
     </div>
   );

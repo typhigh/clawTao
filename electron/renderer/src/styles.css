@@ -278,12 +278,6 @@ html, body, #root {
   margin-right: auto;
 }
 
-.message-role {
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 4px;
-}
-
 .message-content {
   padding: 10px 14px;
   border-radius: 12px;

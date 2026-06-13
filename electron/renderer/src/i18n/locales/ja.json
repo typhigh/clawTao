@@ -13,12 +13,6 @@
     "noSession": "セッションが選択されていません",
     "createSession": "セッションを作成"
   },
-  "role": {
-    "you": "あなた",
-    "assistant": "アシスタント",
-    "tool": "ツール",
-    "toolResult": "ツール結果"
-  },
   "tool": {
     "input": "入力",
     "result": "結果"
