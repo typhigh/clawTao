@@ -3,12 +3,18 @@ import { useChatStore, Message, ToolCall } from './stores/chat';
 import { useSettingsStore } from './stores/settings';
 import { SettingsDialog } from './components/SettingsDialog';
 
-function formatDate(timestamp: number): string {
+function formatRelative(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return '刚刚';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}小时前`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}天前`;
   const date = new Date(timestamp);
-  return date.toLocaleDateString(undefined, {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function App() {
@@ -54,42 +60,57 @@ function App() {
 
   return (
     <div className="app">
-      <header className="header">
-        <h1>ClawTao</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, opacity: 0.7 }}>
-            {isStreaming ? 'Thinking...' : 'Ready'}
-          </span>
-          <button className="btn-icon" onClick={() => setSettingsOpen(true)} title="Settings">
-            ⚙️
-          </button>
-        </div>
-      </header>
-
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <div className="main-content">
-        <aside className="session-list">
-          <div className="session-list-header">
-            <h2>Sessions</h2>
-            <button onClick={createSession} title="New session">+</button>
+        <aside className="sidebar">
+          {/* ── Config header ── */}
+          <div className="sidebar-section config-section">
+            <div className="sidebar-section-header">
+              <h2>⚙️ Configuration</h2>
+              <button className="btn-icon" onClick={() => setSettingsOpen(true)} title="Settings">
+                ⚙️
+              </button>
+            </div>
           </div>
-          <div className="session-items">
-            {sessions.map((session) => (
-              <div
-                key={session.id}
-                className={`session-item ${session.id === activeSessionId ? 'active' : ''}`}
-                onClick={() => selectSession(session.id)}
-              >
-                <div className="session-item-title">{(session as any).title || 'Empty session'}</div>
-                <div className="session-item-date">{formatDate(session.updated_at)}</div>
-                <button
-                  className="session-delete-btn"
-                  onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
-                  title="Delete session"
-                >×</button>
-              </div>
-            ))}
+
+          {/* ── Spacer: pushes sessions to the middle ── */}
+          <div className="sidebar-spacer" />
+
+          {/* ── Sessions section ── */}
+          <div className="sidebar-section sessions-section">
+            <div className="sidebar-section-header">
+              <h2>Sessions</h2>
+              <button onClick={createSession} title="New session">+</button>
+            </div>
+            <div className="session-items">
+              {sessions.length === 0 ? (
+                <div className="session-empty">No sessions yet</div>
+              ) : (
+                sessions.map((session) => {
+                  const isActive = session.id === activeSessionId;
+                  const isRunning = isActive && isStreaming;
+                  return (
+                    <div
+                      key={session.id}
+                      className={`session-item ${isActive ? 'active' : ''}`}
+                      onClick={() => selectSession(session.id)}
+                    >
+                      <span className={`session-item-status ${isRunning ? 'running' : 'done'}`}>
+                        {isRunning ? <SpinnerIcon /> : <CheckIcon />}
+                      </span>
+                      <div className="session-item-title">{(session as any).title || 'Empty session'}</div>
+                      <div className="session-item-time">{formatRelative(session.updated_at)}</div>
+                      <button
+                        className="session-delete-btn"
+                        onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
+                        title="Delete session"
+                      >×</button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </aside>
 
@@ -210,6 +231,22 @@ function ToolCallView({ toolName, toolInput, result }: {
 
 function parseArgs(args: string): unknown {
   try { return JSON.parse(args); } catch { return args; }
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg className="session-spinner" width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="28" strokeDashoffset="20" />
+    </svg>
+  );
 }
 
 function safeStringify(v: unknown): string {
