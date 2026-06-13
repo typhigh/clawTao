@@ -1,12 +1,12 @@
 import { chromium } from 'playwright';
 import { homedir } from 'os';
 import { join } from 'path';
-import { mkdirSync, unlinkSync, existsSync } from 'fs';
+import { mkdirSync, unlinkSync, existsSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import http from 'http';
 
 const USER_DIR = join(homedir(), 'Library', 'Application Support', 'clawtao', 'browser-profile');
-const HTTP_PORT = 19223;
+const PORT_FILE = join(homedir(), 'Library', 'Application Support', 'clawtao', 'browser-port');
 mkdirSync(USER_DIR, { recursive: true });
 
 // Kill stale Chrome using our profile
@@ -99,7 +99,11 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(HTTP_PORT, '127.0.0.1', () => console.log(`BROWSER_READY:${HTTP_PORT}`));
+server.listen(0, '127.0.0.1', () => {
+  const port = server.address().port;
+  writeFileSync(PORT_FILE, String(port));
+  console.log(`BROWSER_READY:${port}`);
+});
 
 process.on('exit', () => { try { execSync(`pkill -f "${USER_DIR}" 2>/dev/null || true`); } catch {} });
 process.on('SIGINT', () => process.exit());

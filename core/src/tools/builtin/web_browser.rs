@@ -2,7 +2,20 @@ use crate::tools::executor::{ToolError, ToolExecutor};
 use crate::tools::spec::ToolSpec;
 use serde_json::json;
 
-const BROWSER_SERVER: &str = "http://127.0.0.1:19223";
+fn browser_server_url() -> Result<String, ToolError> {
+    let port_file = dirs::data_local_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("clawtao")
+        .join("browser-port");
+    let port = std::fs::read_to_string(&port_file)
+        .map_err(|e| ToolError::Execution(format!("Cannot read browser port file ({port_file:?}): {e}. Start the browser server with: node core/scripts/browser-server.mjs")))?
+        .trim()
+        .to_string();
+    if port.is_empty() {
+        return Err(ToolError::Execution("Browser port file is empty. Start the browser server with: node core/scripts/browser-server.mjs".into()));
+    }
+    Ok(format!("http://127.0.0.1:{port}"))
+}
 
 pub struct WebBrowserTool;
 
@@ -29,7 +42,7 @@ impl ToolExecutor for WebBrowserTool {
 
     fn execute(&self, input: serde_json::Value) -> Result<String, ToolError> {
         let client = reqwest::blocking::Client::new();
-        let resp = client.post(BROWSER_SERVER)
+        let resp = client.post(browser_server_url()?)
             .json(&input)
             .timeout(std::time::Duration::from_secs(30))
             .send()
