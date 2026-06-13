@@ -56,9 +56,13 @@ fn strip_html(html: &str) -> String {
     let mut in_style = false;
     let mut last_was_newline = false;
 
-    // Simple state machine: strip tags, normalize whitespace, keep text
+    // Iterate the lowercased copy to get byte indices that are valid for
+    // slicing into `lower`. Track the original chars in parallel so we
+    // output the real casing of the page text.
     let lower = html.to_lowercase();
-    for (i, ch) in html.char_indices() {
+    let mut html_chars = html.chars();
+    for (i, lo_ch) in lower.char_indices() {
+        let ch = html_chars.next().unwrap_or(lo_ch);
         if ch == '<' {
             in_tag = true;
             // Check if this is a <script> or <style> tag

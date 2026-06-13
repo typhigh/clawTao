@@ -27,8 +27,8 @@ pub(crate) fn handle_chat_send(
         .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
     let run_id = uuid::Uuid::new_v4().to_string();
 
-    write_notification(&Notification::new("chat.started", Some(json!({
-        "sessionId": session_id, "runId": run_id
+    write_notification(&Notification::new("chat.stream", Some(json!({
+        "sessionId": session_id, "runId": run_id, "kind": "started"
     }))))?;
 
     if llm_config.api_key.is_empty() {
@@ -105,8 +105,9 @@ pub(crate) fn handle_chat_send(
                     };
                     if let Some(t) = text {
                         if !t.is_empty() {
-                            write_notification(&Notification::new("chat.text_delta", Some(json!({
-                                "sessionId": session_id, "runId": run_id, "delta": t
+                            write_notification(&Notification::new("chat.stream", Some(json!({
+                                "sessionId": session_id, "runId": run_id,
+                                "kind": "text", "delta": t
                             }))))?;
                         }
                     }
@@ -127,17 +128,18 @@ pub(crate) fn handle_chat_send(
 
         debug!("Executing {} tool calls", result.tool_calls.len());
 
-        session_manager.add_assistant_tool_calls(session_id, result.tool_calls.clone())?;
+        session_manager.add_assistant_tool_calls(session_id, result.tool_calls.clone(), &result.text)?;
 
         for tc in &result.tool_calls {
             debug!("Executing tool: {} id={} args={}", tc.function.name, tc.id, tc.function.arguments);
 
             let args_val: serde_json::Value = serde_json::from_str(&tc.function.arguments).unwrap_or(serde_json::Value::Null);
 
-            write_notification(&Notification::new("chat.tool_started", Some(json!({
+            write_notification(&Notification::new("chat.stream", Some(json!({
                 "sessionId": session_id, "runId": run_id,
+                "kind": "tool_call",
                 "toolCallId": tc.id, "toolName": tc.function.name,
-                "toolInput": args_val,
+                "input": args_val,
             }))))?;
 
             let tool_result = match tool_registry.get(&tc.function.name) {
@@ -150,10 +152,11 @@ pub(crate) fn handle_chat_send(
 
             debug!("Tool result for {}: {:.200}", tc.function.name, tool_result);
 
-            write_notification(&Notification::new("chat.tool_result", Some(json!({
+            write_notification(&Notification::new("chat.stream", Some(json!({
                 "sessionId": session_id, "runId": run_id,
+                "kind": "tool_result",
                 "toolCallId": tc.id, "toolName": tc.function.name,
-                "result": tool_result,
+                "output": tool_result,
             }))))?;
 
             session_manager.add_tool_result(session_id, &tc.id, &tool_result)?;
@@ -170,8 +173,9 @@ pub(crate) fn handle_chat_send(
         session_manager.add_message(session_id, "assistant", &final_content)?;
     }
 
-    write_notification(&Notification::new("chat.done", Some(json!({
-        "sessionId": session_id, "runId": run_id
+    write_notification(&Notification::new("chat.stream", Some(json!({
+        "sessionId": session_id, "runId": run_id,
+        "kind": "done"
     }))))?;
 
     let response = json!({

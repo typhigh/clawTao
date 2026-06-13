@@ -17,6 +17,10 @@
     "input": "入力",
     "result": "結果"
   },
+  "turn": {
+    "running": "実行中",
+    "summary": "ツール呼び出し {{tools}} · プロセス メッセージ {{messages}}"
+  },
   "time": {
     "justNow": "たった今",
     "minutesAgo": "{{n}}分前",

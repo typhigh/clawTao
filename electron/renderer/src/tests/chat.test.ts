@@ -5,6 +5,7 @@ const mockSession = {
   list: vi.fn(),
   create: vi.fn(),
   get: vi.fn(),
+  delete: vi.fn(),
 };
 
 vi.stubGlobal('window', {
@@ -12,15 +13,11 @@ vi.stubGlobal('window', {
     chat: { send: vi.fn() },
     session: mockSession,
     config: { get: vi.fn(), set: vi.fn(), validate: vi.fn(), testKey: vi.fn() },
-    onChatStarted: vi.fn(),
-    onTextDelta: vi.fn(),
-    onChatDone: vi.fn(),
-    onToolStarted: vi.fn(),
-    onToolResult: vi.fn(),
+    onStreamEvent: vi.fn(),
   },
 });
 
-import { useChatStore } from '../stores/chat';
+import { useChatStore, StreamEvent } from '../stores/chat';
 
 const mockSession1 = {
   id: 's1',
@@ -38,16 +35,24 @@ const mockSession2 = {
   messages: [],
 };
 
+function makeEvent(overrides: Partial<StreamEvent> = {}): StreamEvent {
+  return {
+    sessionId: 's1',
+    runId: 'r1',
+    kind: 'started',
+    ...overrides,
+  };
+}
+
 describe('chat store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useChatStore.setState({
       sessions: [],
       activeSessionId: null,
-      streamingText: '',
+      currentTurn: [],
       isStreaming: false,
       currentRunId: null,
-      runningTools: [],
       error: null,
     });
   });
@@ -57,6 +62,7 @@ describe('chat store', () => {
     expect(state.sessions).toEqual([]);
     expect(state.activeSessionId).toBeNull();
     expect(state.isStreaming).toBe(false);
+    expect(state.currentTurn).toEqual([]);
   });
 
   it('loads sessions and selects first', async () => {
@@ -89,73 +95,82 @@ describe('chat store', () => {
     expect(state.activeSessionId).toBe('s1');
   });
 
-  it('handleTextDelta accumulates text for active session', () => {
-    useChatStore.setState({ activeSessionId: 's1', streamingText: '' });
+  it('handleStreamEvent "started" sets streaming and clears currentTurn', () => {
+    useChatStore.setState({ activeSessionId: 's1', currentTurn: [{ kind: 'text', sessionId: 's1', runId: 'old', delta: 'old' }] });
 
-    useChatStore.getState().handleTextDelta({ sessionId: 's1', delta: 'Hello' });
-    expect(useChatStore.getState().streamingText).toBe('Hello');
+    useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'started', runId: 'r99' }));
 
-    useChatStore.getState().handleTextDelta({ sessionId: 's1', delta: ' World' });
-    expect(useChatStore.getState().streamingText).toBe('Hello World');
+    const state = useChatStore.getState();
+    expect(state.isStreaming).toBe(true);
+    expect(state.currentRunId).toBe('r99');
+    expect(state.currentTurn).toHaveLength(1);
+    expect(state.currentTurn[0].kind).toBe('started');
   });
 
-  it('handleTextDelta ignores non-active session', () => {
-    useChatStore.setState({ activeSessionId: 's2', streamingText: 'before' });
+  it('handleStreamEvent "text" appends to currentTurn', () => {
+    useChatStore.setState({ activeSessionId: 's1', isStreaming: true, currentTurn: [makeEvent({ kind: 'started' })] });
 
-    useChatStore.getState().handleTextDelta({ sessionId: 's1', delta: 'nope' });
-    expect(useChatStore.getState().streamingText).toBe('before');
+    useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'text', delta: 'Hello' }));
+    useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'text', delta: ' World' }));
+
+    const state = useChatStore.getState();
+    expect(state.currentTurn).toHaveLength(3);
+    expect(state.currentTurn[1].delta).toBe('Hello');
+    expect(state.currentTurn[2].delta).toBe(' World');
   });
 
-  it('handleChatStarted clears streaming text and sets runId', () => {
-    useChatStore.setState({ activeSessionId: 's1', streamingText: 'old' });
+  it('handleStreamEvent ignores non-active session', () => {
+    useChatStore.setState({ activeSessionId: 's2', currentTurn: [] });
 
-    useChatStore.getState().handleChatStarted({ sessionId: 's1', runId: 'r99' });
-    expect(useChatStore.getState().streamingText).toBe('');
-    expect(useChatStore.getState().currentRunId).toBe('r99');
+    useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'text', delta: 'nope' }));
+
+    expect(useChatStore.getState().currentTurn).toHaveLength(0);
   });
 
-  it('handleChatDone adds streaming text as message and clears state', () => {
+  it('handleStreamEvent "tool_call" and "tool_result" are ordered in currentTurn', () => {
+    useChatStore.setState({ activeSessionId: 's1', isStreaming: true, currentTurn: [makeEvent({ kind: 'started' })] });
+
+    useChatStore.getState().handleStreamEvent(makeEvent({
+      kind: 'tool_call', toolCallId: 'tc1', toolName: 'Bash', input: { command: 'ls' },
+    }));
+    useChatStore.getState().handleStreamEvent(makeEvent({
+      kind: 'tool_result', toolCallId: 'tc1', toolName: 'Bash', output: 'stdout:\nfile.txt',
+    }));
+
+    const turn = useChatStore.getState().currentTurn;
+    expect(turn).toHaveLength(3);
+    expect(turn[1].kind).toBe('tool_call');
+    expect(turn[1].toolName).toBe('Bash');
+    expect(turn[2].kind).toBe('tool_result');
+    expect(turn[2].output).toBe('stdout:\nfile.txt');
+  });
+
+  it('handleStreamEvent "done" reloads session and clears streaming', async () => {
+    const doneSession = {
+      ...mockSession1,
+      messages: [
+        ...mockSession1.messages,
+        { id: 'm2', role: 'assistant' as const, content: 'Hi!', timestamp: 3000 },
+      ],
+    };
+    mockSession.get.mockResolvedValueOnce(doneSession);
+
     useChatStore.setState({
       activeSessionId: 's1',
-      streamingText: 'Done!',
       isStreaming: true,
+      currentTurn: [makeEvent({ kind: 'started' }), makeEvent({ kind: 'text', delta: 'Hi!' })],
       sessions: [mockSession1],
     });
 
-    useChatStore.getState().handleChatDone();
+    useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'done' }));
 
-    const state = useChatStore.getState();
-    expect(state.isStreaming).toBe(false);
-    expect(state.streamingText).toBe('');
-    expect(state.sessions.find(s => s.id === 's1')!.messages.length).toBe(2);
-    expect(state.sessions.find(s => s.id === 's1')!.messages[1].content).toBe('Done!');
-  });
-
-  it('handleToolStarted adds running tool', () => {
-    useChatStore.getState().handleToolStarted({
-      sessionId: 's1',
-      runId: 'r1',
-      toolCallId: 'tc1',
-      toolName: 'Bash',
-      toolInput: { command: 'ls' },
+    // isStreaming cleared immediately on done
+    // Wait for async reload
+    await vi.waitFor(() => {
+      const state = useChatStore.getState();
+      expect(state.isStreaming).toBe(false);
+      expect(state.currentTurn).toHaveLength(0);
+      expect(state.sessions[0].messages).toHaveLength(2);
     });
-
-    expect(useChatStore.getState().runningTools).toHaveLength(1);
-    expect(useChatStore.getState().runningTools[0].toolName).toBe('Bash');
-    expect(useChatStore.getState().runningTools[0].result).toBeNull();
-  });
-
-  it('handleToolResult updates tool result', () => {
-    useChatStore.getState().handleToolStarted({
-      sessionId: 's1', runId: 'r1', toolCallId: 'tc1',
-      toolName: 'Bash', toolInput: { command: 'ls' },
-    });
-    useChatStore.getState().handleToolResult({
-      sessionId: 's1', runId: 'r1', toolCallId: 'tc1',
-      toolName: 'Bash', result: 'stdout:\nfile.txt',
-    });
-
-    const tool = useChatStore.getState().runningTools[0];
-    expect(tool.result).toBe('stdout:\nfile.txt');
   });
 });

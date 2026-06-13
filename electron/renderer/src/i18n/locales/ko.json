@@ -17,6 +17,10 @@
     "input": "입력",
     "result": "결과"
   },
+  "turn": {
+    "running": "실행 중",
+    "summary": "도구 호출 {{tools}} · 프로세스 메시지 {{messages}}"
+  },
   "time": {
     "justNow": "방금",
     "minutesAgo": "{{n}}분 전",

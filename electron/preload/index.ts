@@ -23,13 +23,9 @@ const electronAPI = {
     delete: (sessionId: string) => ipcRenderer.invoke('session:delete', { sessionId }),
   },
 
-  // Event listeners for streaming
-  onChatStarted: (callback: (params: unknown) => void) =>
-    ipcRenderer.on('chat:started', (_event, params) => callback(params)),
-  onTextDelta: (callback: (params: unknown) => void) =>
-    ipcRenderer.on('chat:text_delta', (_event, params) => callback(params)),
-  onChatDone: (callback: (params: unknown) => void) =>
-    ipcRenderer.on('chat:done', (_event, params) => callback(params)),
+  // Unified stream event listener (replaces chat:started / text_delta / tool_started / tool_result / done)
+  onStreamEvent: (callback: (params: unknown) => void) =>
+    ipcRenderer.on('chat:stream', (_event, params) => callback(params)),
 
   // Config operations
   config: {
@@ -39,11 +35,6 @@ const electronAPI = {
     testKey: (p: { api_key: string; base_url: string; model: string }) => ipcRenderer.invoke('config:testKey', p),
   },
 
-  // Event listeners for tool calls
-  onToolStarted: (callback: (params: unknown) => void) =>
-    ipcRenderer.on('chat:tool_started', (_event, params) => callback(params)),
-  onToolResult: (callback: (params: unknown) => void) =>
-    ipcRenderer.on('chat:tool_result', (_event, params) => callback(params)),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

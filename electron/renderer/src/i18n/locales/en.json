@@ -17,6 +17,10 @@
     "input": "Input",
     "result": "Result"
   },
+  "turn": {
+    "running": "Running",
+    "summary": "Tool calls {{tools}} · Process messages {{messages}}"
+  },
   "time": {
     "justNow": "Just now",
     "minutesAgo": "{{n}} min ago",

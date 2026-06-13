@@ -107,6 +107,7 @@ describe('settings store', () => {
     const result = await useSettingsStore.getState().testKey('sk-test', 'https://api.test.com/v1', 'gpt-4o', 'openai');
     expect(mockConfigApi.testKey).toHaveBeenCalledWith({
       api_key: 'sk-test',
+      api_protocol: 'openai',
       base_url: 'https://api.test.com/v1',
       model: 'gpt-4o',
     });

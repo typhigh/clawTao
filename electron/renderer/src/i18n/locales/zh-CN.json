@@ -17,6 +17,10 @@
     "input": "输入",
     "result": "结果"
   },
+  "turn": {
+    "running": "执行中",
+    "summary": "工具调用 {{tools}} · 过程消息 {{messages}}"
+  },
   "time": {
     "justNow": "刚刚",
     "minutesAgo": "{{n}}分钟前",

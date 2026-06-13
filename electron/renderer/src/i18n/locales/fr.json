@@ -17,6 +17,10 @@
     "input": "Entrée",
     "result": "Résultat"
   },
+  "turn": {
+    "running": "En cours",
+    "summary": "Appels d'outils {{tools}} · Messages de processus {{messages}}"
+  },
   "time": {
     "justNow": "À l'instant",
     "minutesAgo": "Il y a {{n}} min",

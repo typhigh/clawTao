@@ -92,8 +92,8 @@ impl SessionManager {
         Ok(msg)
     }
 
-    pub fn add_assistant_tool_calls(&mut self, session_id: &str, tool_calls: Vec<ToolCall>) -> Result<()> {
-        let mut msg = Self::new_msg("assistant", "");
+    pub fn add_assistant_tool_calls(&mut self, session_id: &str, tool_calls: Vec<ToolCall>, content: &str) -> Result<()> {
+        let mut msg = Self::new_msg("assistant", content);
         msg.tool_calls = Some(tool_calls);
         self.store.add_message(session_id, &msg)?;
         Ok(())

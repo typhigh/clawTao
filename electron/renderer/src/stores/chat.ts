@@ -1,9 +1,10 @@
 /**
  * Chat Store — central state for the chat UI.
  *
- * Manages sessions, messages, streaming text, and currently-running tool calls.
- * IPC events from main (chat.text_delta, chat.tool_started, etc.) update this
- * store reactively so the UI re-renders while the LLM is still generating.
+ * All streaming events arrive through a single `chat.stream` IPC channel.
+ * The unified `StreamEvent` type carries a `kind` discriminator so the
+ * frontend receives a time-ordered stream that mirrors the backend's
+ * execution order — no stitching or guessing required.
  */
 import { create } from 'zustand';
 
@@ -28,14 +29,13 @@ declare global {
         validate: () => Promise<{ ok: boolean; error?: string }>;
         testKey: (p: { api_key: string; base_url: string; model: string; api_protocol: string }) => Promise<{ ok: boolean; error?: string }>;
       };
-      onChatStarted: (callback: (params: unknown) => void) => void;
-      onTextDelta: (callback: (params: { sessionId: string; runId: string; delta: string }) => void) => void;
-      onChatDone: (callback: (params: unknown) => void) => void;
-      onToolStarted: (callback: (params: ToolCallEvent) => void) => void;
-      onToolResult: (callback: (params: ToolResultEvent) => void) => void;
+      /** Unified stream listener — all turn events arrive through this single channel. */
+      onStreamEvent: (callback: (params: StreamEvent) => void) => void;
     };
   }
 }
+
+// ── Data types ────────────────────────────────────────────────────────
 
 export interface Message {
   id: string;
@@ -62,36 +62,40 @@ export interface Session {
   messages: Message[];
 }
 
-export interface ToolCallEvent {
+// ── Unified stream event ──────────────────────────────────────────────
+
+/**
+ * Every event in a single agent turn is delivered through `chat.stream`
+ * with a `kind` field. The stream is strictly ordered by the backend:
+ *
+ *   started → (text | tool_call → tool_result)* → done
+ *
+ * The frontend only needs to append events to an array and render them
+ * in sequence — no timeline reconstruction, no stitching of runningTools.
+ */
+export type StreamEvent = {
   sessionId: string;
   runId: string;
-  toolCallId: string;
-  toolName: string;
-  toolInput: unknown;
-}
+  kind: 'started' | 'text' | 'tool_call' | 'tool_result' | 'done';
+  // text
+  delta?: string;
+  // tool_call
+  toolCallId?: string;
+  toolName?: string;
+  input?: unknown;
+  // tool_result
+  output?: string;
+};
 
-export interface ToolResultEvent {
-  sessionId: string;
-  runId: string;
-  toolCallId: string;
-  toolName: string;
-  result: string;
-}
-
-interface RunningTool {
-  toolCallId: string;
-  toolName: string;
-  toolInput: unknown;
-  result: string | null;
-}
+// ── Store ─────────────────────────────────────────────────────────────
 
 interface ChatState {
   sessions: Session[];
   activeSessionId: string | null;
-  streamingText: string;
+  /** Ordered stream events for the currently-executing turn. Emptied on done. */
+  currentTurn: StreamEvent[];
   isStreaming: boolean;
   currentRunId: string | null;
-  runningTools: RunningTool[];
   error: string | null;
 
   // Actions
@@ -100,21 +104,17 @@ interface ChatState {
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
-  handleTextDelta: (params: { sessionId: string; delta: string }) => void;
-  handleChatDone: () => void;
-  handleChatStarted: (params: { sessionId: string; runId: string }) => void;
-  handleToolStarted: (params: ToolCallEvent) => void;
-  handleToolResult: (params: ToolResultEvent) => void;
+  /** Single handler for all stream events — dispatches on `kind`. */
+  handleStreamEvent: (ev: StreamEvent) => void;
   clearError: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions: [],
   activeSessionId: null,
-  streamingText: '',
+  currentTurn: [],
   isStreaming: false,
   currentRunId: null,
-  runningTools: [],
   error: null,
 
   loadSessions: async () => {
@@ -149,9 +149,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((state) => ({
         sessions: state.sessions.map((s) => (s.id === sessionId ? session : s)),
         activeSessionId: sessionId,
-        streamingText: '',
+        currentTurn: [],
         isStreaming: false,
-        runningTools: [],
       }));
     } catch (error) {
       set({ error: `Failed to load session: ${error}` });
@@ -166,7 +165,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const activeSessionId = state.activeSessionId === sessionId
         ? (sessions[0]?.id || null)
         : state.activeSessionId;
-      set({ sessions, activeSessionId, streamingText: '', isStreaming: false, runningTools: [] });
+      set({ sessions, activeSessionId, currentTurn: [], isStreaming: false });
     } catch (error) {
       set({ error: `Failed to delete session: ${error}` });
     }
@@ -187,7 +186,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       timestamp: Date.now(),
     };
     set((state) => ({
-      isStreaming: true, error: null, runningTools: [],
+      isStreaming: true,
+      currentTurn: [],
+      error: null,
       sessions: state.sessions.map((s) =>
         s.id === activeSessionId ? { ...s, messages: [...s.messages, userMsg] } : s
       ),
@@ -195,71 +196,56 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       await window.electronAPI.chat.send(text, activeSessionId);
+      // Reload session from Rust to get the authoritative persisted state.
+      // The stream events (including 'done') have already been processed
+      // by handleStreamEvent; this reload ensures consistency.
       const session = await window.electronAPI.session.get(activeSessionId);
       set((state) => ({
         sessions: state.sessions.map((s) => (s.id === activeSessionId ? session : s)),
+        isStreaming: false,
+        currentTurn: [],
       }));
     } catch (error) {
-      set({ error: `Failed to send message: ${error}`, isStreaming: false });
+      set({ error: `Failed to send message: ${error}`, isStreaming: false, currentTurn: [] });
     }
   },
 
-  handleTextDelta: ({ sessionId, delta }) => {
+  handleStreamEvent: (ev: StreamEvent) => {
     const { activeSessionId } = get();
-    if (sessionId !== activeSessionId) return;
-    set((state) => ({
-      streamingText: state.streamingText + delta,
-    }));
-  },
+    if (ev.sessionId !== activeSessionId) return;
 
-  handleChatDone: () => {
-    set((state) => {
-      const { activeSessionId, streamingText } = state;
-      if (!activeSessionId) return { isStreaming: false, streamingText: '', runningTools: [] };
+    switch (ev.kind) {
+      case 'started':
+        set({ isStreaming: true, currentTurn: [ev], currentRunId: ev.runId });
+        break;
 
-      // Only add streaming text if there is any (tool-only responses may have none)
-      if (streamingText) {
-        const newMessage: Message = {
-          id: `temp-${Date.now()}`,
-          role: 'assistant',
-          content: streamingText,
-          timestamp: Date.now(),
-        };
-        return {
-          sessions: state.sessions.map((s) =>
-            s.id === activeSessionId ? { ...s, messages: [...s.messages, newMessage] } : s
-          ),
-          streamingText: '',
-          isStreaming: false,
-          runningTools: [],
-        };
-      }
+      case 'text':
+      case 'tool_call':
+      case 'tool_result':
+        set((state) => ({
+          currentTurn: [...state.currentTurn, ev],
+        }));
+        break;
 
-      return { streamingText: '', isStreaming: false, runningTools: [] };
-    });
-  },
-
-  handleChatStarted: ({ sessionId, runId }) => {
-    const { activeSessionId } = get();
-    if (sessionId !== activeSessionId) return;
-    set({ currentRunId: runId, streamingText: '', runningTools: [] });
-  },
-
-  handleToolStarted: ({ toolCallId, toolName, toolInput }) => {
-    set((state) => ({
-      runningTools: [
-        ...state.runningTools,
-        { toolCallId, toolName, toolInput, result: null },
-      ],
-    }));
-  },
-
-  handleToolResult: ({ toolCallId, result }) => {
-    set((state) => ({
-      runningTools: state.runningTools.map((t) =>
-        t.toolCallId === toolCallId ? { ...t, result } : t
-      ),
-    }));
+      case 'done':
+        // Mark turn complete, then reload the session from Rust to get
+        // the persisted messages. The stream events are ephemeral — the
+        // authoritative state lives in the Rust session store.
+        set((state) => ({ currentTurn: [...state.currentTurn, ev] }));
+        {
+          const sid = activeSessionId;
+          window.electronAPI.session.get(sid).then((session) => {
+            set((state) => ({
+              sessions: state.sessions.map((s) => (s.id === sid ? session : s)),
+              isStreaming: false,
+              currentTurn: [],
+            }));
+          }).catch(() => {
+            set({ isStreaming: false, currentTurn: [] });
+          });
+        }
+        break;
+    }
   },
 
   clearError: () => set({ error: null }),
