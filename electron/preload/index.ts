@@ -24,8 +24,10 @@ const electronAPI = {
   },
 
   // Unified stream event listener (replaces chat:started / text_delta / tool_started / tool_result / done)
-  onStreamEvent: (callback: (params: unknown) => void) =>
-    ipcRenderer.on('chat:stream', (_event, params) => callback(params)),
+  onStreamEvent: (callback: (params: unknown) => void) => {
+    ipcRenderer.removeAllListeners('chat:stream');
+    ipcRenderer.on('chat:stream', (_event, params) => callback(params));
+  },
 
   // Config operations
   config: {

@@ -184,31 +184,31 @@ function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegment[]; is
 
 function pairToolWithResults(segments: AssistantSegment[]): AssistantSegment[] {
   const out: AssistantSegment[] = [];
-  let lastTool: Extract<AssistantSegment, { kind: 'tool' }> | null = null;
+  // Use a Map keyed by toolCallId — a single assistant message can contain
+  // multiple parallel tool_calls, so a single lastTool variable isn't enough.
+  const pending = new Map<string, Extract<AssistantSegment, { kind: 'tool' }>>();
+
   for (const s of segments) {
     if (s.kind === 'tool') {
-      if (lastTool) {
-        out.push({ kind: 'toolPair', id: lastTool.id, toolName: lastTool.toolName, toolInput: lastTool.toolInput, result: null, pending: true });
-      }
-      lastTool = s;
+      pending.set(s.id, s);
     } else if (s.kind === 'toolResult') {
-      if (lastTool && lastTool.id === s.toolCallId) {
-        out.push({ kind: 'toolPair', id: lastTool.id, toolName: lastTool.toolName, toolInput: lastTool.toolInput, result: s.content, pending: false });
-        lastTool = null;
+      const matched = s.toolCallId ? pending.get(s.toolCallId) : undefined;
+      if (matched) {
+        pending.delete(s.toolCallId!);
+        out.push({ kind: 'toolPair', id: matched.id, toolName: matched.toolName, toolInput: matched.toolInput, result: s.content, pending: false });
       } else {
         out.push(s);
       }
     } else {
-      if (lastTool) {
-        out.push({ kind: 'toolPair', id: lastTool.id, toolName: lastTool.toolName, toolInput: lastTool.toolInput, result: null, pending: true });
-        lastTool = null;
-      }
       out.push(s);
     }
   }
-  if (lastTool) {
-    out.push({ kind: 'toolPair', id: lastTool.id, toolName: lastTool.toolName, toolInput: lastTool.toolInput, result: null, pending: true });
+
+  // Any tools that never received a result
+  for (const tool of pending.values()) {
+    out.push({ kind: 'toolPair', id: tool.id, toolName: tool.toolName, toolInput: tool.toolInput, result: null, pending: true });
   }
+
   return out;
 }
 
@@ -264,6 +264,9 @@ function App() {
     loadSessions();
     loadConfig();
     window.electronAPI.onStreamEvent(handleStreamEvent);
+    return () => {
+      window.electronAPI.onStreamEvent(() => {});
+    };
   }, []);
 
   useEffect(() => {
