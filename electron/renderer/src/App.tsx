@@ -452,7 +452,7 @@ function AgentTurnView({ segments, conclusion }: { segments: AssistantSegment[];
     <div className="agent-turn">
       {hasProcessContent && (
         <button type="button" className="agent-turn-header" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-          <span className={`agent-turn-caret ${open ? 'open' : ''}`}>▸</span>
+          <span className={`agent-turn-caret ${open ? 'open' : ''}`}>›</span>
           <span className="agent-turn-title">
             {t('turn.summary', { tools: toolCount, messages: processCount })}
           </span>
@@ -470,31 +470,42 @@ function AgentTurnView({ segments, conclusion }: { segments: AssistantSegment[];
   );
 }
 
-function SegmentView({ segment }: { segment: AssistantSegment }) {
+function ToolCard({ toolName, toolInput, result, pending }: { toolName: string; toolInput: unknown; result: string | null; pending: boolean }) {
   const { t } = useTranslation();
-  if (segment.kind === 'toolPair') {
-    return (
-      <div className={`turn-segment tool-pair ${segment.pending ? 'pending' : 'done'}`}>
-        <div className="turn-segment-label">
-          🔧 {segment.toolName}
-          {segment.pending && <span className="turn-segment-spinner" />}
-        </div>
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`turn-segment tool-pair ${pending ? 'pending' : 'done'}`}>
+      <button type="button" className="tool-label-btn" onClick={() => setOpen((o) => !o)}>
+        <span className="tool-label-icon"><WrenchIcon /></span> {toolName}
+        <span className={`tool-label-arrow ${open ? 'open' : ''}`}>›</span>
+        {pending && <span className="turn-segment-spinner" />}
+      </button>
+      {open && (
         <div className="turn-segment-body tool-card">
-          <div className="tool-input">
-            <strong>{t('tool.input')}:</strong> {safeStringify(segment.toolInput)}
-          </div>
-          {segment.result !== null && (
+          {toolInput !== null && (
+            <div className="tool-input">
+              <strong>{t('tool.input')}:</strong>
+              <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, marginTop: 4 }}>{safeStringify(toolInput)}</pre>
+            </div>
+          )}
+          {result !== null && (
             <>
-              <div className="tool-result-divider" />
+              {toolInput !== null && <div className="tool-result-divider" />}
               <div className="tool-result">
                 <strong>{t('tool.result')}:</strong>
-                <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, marginTop: 4 }}>{segment.result}</pre>
+                <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, marginTop: 4 }}>{result}</pre>
               </div>
             </>
           )}
         </div>
-      </div>
-    );
+      )}
+    </div>
+  );
+}
+
+function SegmentView({ segment }: { segment: AssistantSegment }) {
+  if (segment.kind === 'toolPair') {
+    return <ToolCard toolName={segment.toolName} toolInput={segment.toolInput} result={segment.result} pending={segment.pending} />;
   }
   if (segment.kind === 'toolResult') {
     return (
@@ -513,31 +524,7 @@ function SegmentView({ segment }: { segment: AssistantSegment }) {
 
 /** Tool card used in the live turn (receives TurnSegment, already paired). */
 function ToolPairView({ segment }: { segment: Extract<TurnSegment, { kind: 'toolPair' }> }) {
-  const { t } = useTranslation();
-  return (
-    <div className={`turn-segment tool-pair ${segment.pending ? 'pending' : 'done'}`}>
-      <div className="turn-segment-label">
-        🔧 {segment.toolName}
-        {segment.pending && <span className="turn-segment-spinner" />}
-      </div>
-      <div className="turn-segment-body tool-card">
-        {segment.toolInput !== null && (
-          <div className="tool-input">
-            <strong>{t('tool.input')}:</strong> {safeStringify(segment.toolInput)}
-          </div>
-        )}
-        {segment.result !== null && (
-          <>
-            {segment.toolInput !== null && <div className="tool-result-divider" />}
-            <div className="tool-result">
-              <strong>{t('tool.result')}:</strong>
-              <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, marginTop: 4 }}>{segment.result}</pre>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
+  return <ToolCard toolName={segment.toolName} toolInput={segment.toolInput} result={segment.result} pending={segment.pending} />;
 }
 
 function CheckIcon() {
@@ -552,6 +539,15 @@ function SpinnerIcon() {
   return (
     <svg className="session-spinner" width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="28" strokeDashoffset="20" />
+    </svg>
+  );
+}
+
+/** Wrench / spanner — tool icon used in tool-call rows. (Lucide) */
+function WrenchIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" />
     </svg>
   );
 }
