@@ -425,19 +425,115 @@ html, body, #root {
 
 .agent-turn-conclusion {
   margin-top: 8px;
-  padding: 10px 14px;
-  background: #f0f0f0;
   color: #1a1a1a;
-  border-radius: 12px;
-  border-bottom-left-radius: 4px;
-  line-height: 1.6;
-  white-space: pre-wrap;
+  line-height: 1;
+  white-space: pre-line;
   word-break: break-word;
   font-size: 14px;
 }
 
+.turn-text {
+  white-space: pre-line;
+}
+
 .agent-turn-conclusion.streaming {
   border: 1px solid #007aff;
+}
+
+/* ── Markdown content ─────────────────────────────────────────────────── */
+
+.agent-turn-conclusion p,
+.turn-text p {
+  margin: 0;
+}
+.agent-turn-conclusion pre,
+.turn-text pre {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 6px 0;
+}
+
+.agent-turn-conclusion code,
+.turn-text code {
+  background: #e8e8e8;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-family: 'SF Mono', Menlo, Monaco, monospace;
+}
+.agent-turn-conclusion pre code,
+.turn-text pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.agent-turn-conclusion ul,
+.agent-turn-conclusion ol,
+.turn-text ul,
+.turn-text ol {
+  padding-left: 18px;
+  margin: 2px 0 4px;
+}
+
+.agent-turn-conclusion li,
+.turn-text li {
+  margin-bottom: 1px;
+}
+
+.agent-turn-conclusion h1,
+.agent-turn-conclusion h2,
+.agent-turn-conclusion h3,
+.turn-text h1,
+.turn-text h2,
+.turn-text h3 {
+  margin: 8px 0 2px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.agent-turn-conclusion h1 { font-size: 17px; }
+.agent-turn-conclusion h2 { font-size: 15px; }
+.agent-turn-conclusion h3 { font-size: 14px; }
+.turn-text h1 { font-size: 16px; }
+.turn-text h2 { font-size: 15px; }
+.turn-text h3 { font-size: 14px; }
+
+.agent-turn-conclusion blockquote,
+.turn-text blockquote {
+  border-left: 3px solid #007aff;
+  margin: 4px 0;
+  padding: 2px 0 2px 10px;
+  color: #555;
+}
+
+.agent-turn-conclusion a,
+.turn-text a {
+  color: #007aff;
+}
+
+.agent-turn-conclusion table,
+.turn-text table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 13px;
+}
+.agent-turn-conclusion th,
+.agent-turn-conclusion td,
+.turn-text th,
+.turn-text td {
+  border: 1px solid #d0d0d0;
+  padding: 3px 7px;
+  text-align: left;
+}
+.agent-turn-conclusion th,
+.turn-text th {
+  background: #f5f5f5;
 }
 
 .input-area {

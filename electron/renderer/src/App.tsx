@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useChatStore, Message, StreamEvent } from './stores/chat';
 import { useSettingsStore } from './stores/settings';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -217,7 +219,7 @@ function countTurnSegments(segments: AssistantSegment[]): { toolCount: number; p
   let processCount = 0;
   for (const s of segments) {
     if (s.kind === 'tool' || s.kind === 'toolPair') toolCount++;
-    else if (s.kind === 'toolResult') processCount++;
+    else if (s.kind === 'text') processCount++;
   }
   return { toolCount, processCount };
 }
@@ -241,6 +243,16 @@ function formatRelative(t: TFunction, timestamp: number): string {
 function safeStringify(v: unknown): string {
   if (typeof v === 'string') return v;
   try { return JSON.stringify(v); } catch { return String(v); }
+}
+
+// ── Markdown helpers ────────────────────────────────────────────────────
+
+/**
+ * Collapse sequences of 3+ newlines into a single blank line (2 newlines).
+ * This keeps intentional paragraph breaks while removing excessive spacing.
+ */
+function normalizeMd(text: string): string {
+  return text.replace(/\n{3,}/g, '\n\n');
 }
 
 // ── App ───────────────────────────────────────────────────────────────
@@ -418,7 +430,7 @@ function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[]; isSt
     <div className={`agent-turn live ${isStreaming ? 'streaming' : ''}`}>
       {segments.map((seg, i) =>
         seg.kind === 'text' ? (
-          <div key={i} className="turn-text">{seg.content}</div>
+          <div key={i} className="turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(seg.content)}</ReactMarkdown></div>
         ) : (
           <ToolPairView key={seg.id} segment={seg} />
         ),
@@ -453,7 +465,7 @@ function AgentTurnView({ segments, conclusion }: { segments: AssistantSegment[];
           ))}
         </div>
       )}
-      {conclusion && <div className="agent-turn-conclusion">{conclusion}</div>}
+      {conclusion && <div className="agent-turn-conclusion"><ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(conclusion)}</ReactMarkdown></div>}
     </div>
   );
 }
@@ -494,7 +506,7 @@ function SegmentView({ segment }: { segment: AssistantSegment }) {
     );
   }
   if (segment.kind === 'text') {
-    return <div className="turn-segment turn-text">{segment.content}</div>;
+    return <div className="turn-segment turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(segment.content)}</ReactMarkdown></div>;
   }
   return null;
 }
