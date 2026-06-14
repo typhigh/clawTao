@@ -1,7 +1,12 @@
-//! Minimal JSON-RPC 2.0 types
+//! JSON-RPC 2.0 types and communication primitives.
+//!
+//! All stdin/stdout I/O helpers live here so every handler can import them
+//! from one place without depending on `main.rs`.
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::io::{self, Write};
 
 /// JSON-RPC 2.0 Request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +66,33 @@ impl Notification {
     pub fn new(method: impl Into<String>, params: Option<Value>) -> Self {
         Self { jsonrpc: "2.0".to_string(), method: method.into(), params }
     }
+}
+
+// ── I/O helpers ──────────────────────────────────────────────────────────
+
+/// Extract a string parameter from a JSON-RPC params object.
+pub fn get_param<'a>(params: &'a Option<Value>, key: &str) -> Result<&'a str> {
+    params
+        .as_ref()
+        .and_then(|obj| obj.get(key))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing parameter: {key}"))
+}
+
+/// Write a JSON-RPC response to stdout (one line, flushed).
+pub fn write_response(response: &Response) -> io::Result<()> {
+    let json =
+        serde_json::to_string(response).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    println!("{json}");
+    io::stdout().flush()
+}
+
+/// Write a JSON-RPC notification to stdout (one line, flushed).
+pub fn write_notification(notification: &Notification) -> io::Result<()> {
+    let json = serde_json::to_string(notification)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    println!("{json}");
+    io::stdout().flush()
 }
 
 #[cfg(test)]

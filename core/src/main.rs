@@ -14,22 +14,20 @@
 
 mod chat;
 mod config;
+mod handlers;
 mod jsonrpc;
 mod llm;
 mod store;
 mod sse;
 mod tools;
 
-use anyhow::Result;
-use chat::handle_chat_send;
 use config::LlmConfig;
-use jsonrpc::{Notification, Request, Response};
+use jsonrpc::{Request, Response};
 use reqwest::blocking::Client;
-use serde_json::json;
-use store::{SessionManager, json_store::JsonSessionStore, sqlite_store::SqliteSessionStore};
-use std::io::{self, BufRead, Write};
+use store::{json_store::JsonSessionStore, sqlite_store::SqliteSessionStore, SessionManager};
+use std::io::{self, BufRead};
 use tools::registry::ToolRegistry;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
 fn main() {
@@ -88,7 +86,7 @@ fn main() {
 
                 match serde_json::from_str::<Request>(trimmed) {
                     Ok(request) => {
-                        if let Err(e) = handle_request(
+                        if let Err(e) = route(
                             &request,
                             &mut session_manager,
                             &tool_registry,
@@ -96,13 +94,19 @@ fn main() {
                             &client,
                         ) {
                             error!("Error handling request: {}", e);
-                            let _ = write_response(&Response::error(request.id, -32603, format!("Internal error: {e}")));
+                            let _ = jsonrpc::write_response(&Response::error(
+                                request.id,
+                                -32603,
+                                format!("Internal error: {e}"),
+                            ));
                         }
                     }
                     Err(e) => {
                         error!("Failed to parse request: {e}");
-                        if serde_json::from_str::<Notification>(trimmed).is_ok() { continue; }
-                        let _ = write_response(&Response::error(None, -32700, "Parse error"));
+                        if serde_json::from_str::<jsonrpc::Notification>(trimmed).is_ok() {
+                            continue;
+                        }
+                        let _ = jsonrpc::write_response(&Response::error(None, -32700, "Parse error"));
                     }
                 }
             }
@@ -111,101 +115,38 @@ fn main() {
     }
 }
 
-fn handle_request(
+use handlers::{
+    chat_send, config_get, config_inject_key, config_set, config_test_key, config_validate,
+    not_found, ping, session_create, session_delete, session_get, session_list,
+};
+
+/// Route a parsed JSON-RPC request to the appropriate handler.
+///
+/// Each handler function declares exactly the state it needs in its
+/// signature — see [`handlers`] for the full list of supported methods.
+fn route(
     request: &Request,
     session_manager: &mut SessionManager,
     tool_registry: &ToolRegistry,
     llm_config: &mut LlmConfig,
     client: &Client,
-) -> Result<()> {
-    debug!("{}", request.method);
-
+) -> anyhow::Result<()> {
     match request.method.as_str() {
-        "session.list" => {
-            let result = serde_json::to_value(session_manager.list_sessions().unwrap_or_default())?;
-            write_response(&Response::success(request.id.clone(), result))?;
-        }
-        "session.create" => {
-            let result = serde_json::to_value(session_manager.create_session()?)?;
-            write_response(&Response::success(request.id.clone(), result))?;
-        }
-        "session.get" => {
-            let session_id = get_param(&request.params, "sessionId")?;
-            let session = session_manager.get_session(session_id)?
-                .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
-            write_response(&Response::success(request.id.clone(), serde_json::to_value(&session)?))?;
-        }
-        "session.delete" => {
-            let session_id = get_param(&request.params, "sessionId")?;
-            session_manager.delete_session(session_id)?;
-            write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
-        }
+        "session.list" => session_list(request, session_manager),
+        "session.create" => session_create(request, session_manager),
+        "session.get" => session_get(request, session_manager),
+        "session.delete" => session_delete(request, session_manager),
 
-        "config.get" => {
-            write_response(&Response::success(request.id.clone(), serde_json::to_value(llm_config.masked())?))?;
-        }
-        "config.set" => {
-            let new_config: LlmConfig = serde_json::from_value(request.params.clone().unwrap_or_default())
-                .map_err(|e| anyhow::anyhow!("Invalid config: {e}"))?;
-            new_config.save()?;
-            *llm_config = new_config;
-            info!("Config updated: provider={} model={}", llm_config.provider, llm_config.model);
-            write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
-        }
-        "config.injectKey" => {
-            let api_key = get_param(&request.params, "api_key")?;
-            llm_config.api_key = api_key.to_string();
-            info!("API key injected (length={})", llm_config.api_key.len());
-            write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
-        }
-        "config.validate" => {
-            match llm_config.validate() {
-                Ok(()) => write_response(&Response::success(request.id.clone(), json!({"ok": true})))?,
-                Err(e) => write_response(&Response::success(request.id.clone(), json!({"ok": false, "error": e})))?,
-            }
-        }
-        "config.testKey" => {
-            let api_key = request.params.as_ref()
-                .and_then(|p| p.get("api_key")).and_then(|v| v.as_str()).filter(|s| !s.is_empty())
-                .unwrap_or(&llm_config.api_key);
-            let base_url = get_param(&request.params, "base_url").unwrap_or(&llm_config.base_url);
-            let model = get_param(&request.params, "model").unwrap_or(&llm_config.model);
-            let api_protocol = get_param(&request.params, "api_protocol").unwrap_or(&llm_config.api_protocol);
-            match LlmConfig::test_connection(base_url, model, api_key, api_protocol) {
-                Ok(()) => write_response(&Response::success(request.id.clone(), json!({"ok": true})))?,
-                Err(e) => write_response(&Response::success(request.id.clone(), json!({"ok": false, "error": e})))?,
-            }
-        }
+        "config.get" => config_get(request, llm_config),
+        "config.set" => config_set(request, llm_config),
+        "config.injectKey" => config_inject_key(request, llm_config),
+        "config.validate" => config_validate(request, llm_config),
+        "config.testKey" => config_test_key(request, llm_config),
 
-        "chat.send" => handle_chat_send(request, session_manager, tool_registry, llm_config, client)?,
+        "chat.send" => chat_send(request, session_manager, tool_registry, llm_config, client),
 
-        "ping" => {
-            write_response(&Response::success(request.id.clone(), json!({"status":"ok"})))?;
-        }
+        "ping" => ping(request),
 
-        _ => {
-            write_response(&Response::error(request.id.clone(), -32601, format!("Method not found: {}", request.method)))?;
-        }
+        _ => not_found(request),
     }
-
-    Ok(())
-}
-
-pub(crate) fn get_param<'a>(params: &'a Option<serde_json::Value>, key: &str) -> Result<&'a str> {
-    params.as_ref()
-        .and_then(|obj| obj.get(key))
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Missing parameter: {key}"))
-}
-
-pub(crate) fn write_response(response: &Response) -> io::Result<()> {
-    let json = serde_json::to_string(response).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    println!("{json}");
-    io::stdout().flush()
-}
-
-pub(crate) fn write_notification(notification: &Notification) -> io::Result<()> {
-    let json = serde_json::to_string(notification).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    println!("{json}");
-    io::stdout().flush()
 }

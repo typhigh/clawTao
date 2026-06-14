@@ -6,7 +6,7 @@ use crate::jsonrpc::{Notification, Response};
 use crate::llm::{ApiAdapter, AnthropicAdapter, LlmMessage, LlmRequest, OpenAiAdapter, UnifiedTool};
 use crate::store::SessionManager;
 use crate::tools::registry::ToolRegistry;
-use crate::{get_param, write_notification, write_response};
+use crate::jsonrpc::{get_param, write_notification, write_response};
 use reqwest::blocking::Client;
 use serde_json::json;
 use tracing::{debug, trace};
