@@ -42,3 +42,7 @@ impl ApiAdapter for OpenAiAdapter {
         Ok(LlmResponse { text: result.text, tool_calls: result.tool_calls })
     }
 }
+
+#[cfg(test)]
+#[path = "tests/openai_tests.rs"]
+mod tests;

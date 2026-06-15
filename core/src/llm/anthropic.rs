@@ -148,3 +148,7 @@ impl ApiAdapter for AnthropicAdapter {
         Ok(LlmResponse { text, tool_calls })
     }
 }
+
+#[cfg(test)]
+#[path = "tests/anthropic_tests.rs"]
+mod tests;
