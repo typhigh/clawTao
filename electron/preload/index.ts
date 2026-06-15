@@ -37,6 +37,11 @@ const electronAPI = {
     testKey: (p: { api_key: string; base_url: string; model: string }) => ipcRenderer.invoke('config:testKey', p),
   },
 
+  // Shell helpers (open URL in system default browser)
+  shell: {
+    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
+  },
+
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

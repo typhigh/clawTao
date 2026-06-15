@@ -262,6 +262,8 @@ html, body, #root {
 
 .messages {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   padding: 16px;
   min-width: 0;
@@ -269,15 +271,17 @@ html, body, #root {
 
 .message {
   margin-bottom: 16px;
-  max-width: 80%;
+  max-width: 100%;
 }
 
 .message.user {
-  margin-left: auto;
+  align-self: flex-end;
+  max-width: fit-content;
 }
 
 .message.assistant {
-  margin-right: auto;
+  align-self: flex-start;
+  max-width: fit-content;
 }
 
 .message-content {
@@ -289,8 +293,8 @@ html, body, #root {
 }
 
 .message.user .message-content {
-  background: #007aff;
-  color: white;
+  background: #f0f0f0;
+  color: #1a1a1a;
   border-bottom-right-radius: 4px;
 }
 
@@ -375,11 +379,16 @@ html, body, #root {
   line-height: 1.55;
 }
 
-.tool-label-btn {
+.tool-label-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 100%;
+}
+
+.tool-label-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: none;
   background: none;
   padding: 4px 0;
@@ -392,6 +401,24 @@ html, body, #root {
 
 .tool-label-btn:hover {
   color: #333;
+}
+
+.tool-label-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  text-decoration: none;
+  color: #8ec5ff;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: opacity 0.12s;
+}
+.tool-label-link:hover {
+  opacity: 0.7;
+}
+.tool-label-link svg {
+  display: block;
 }
 
 .tool-label-arrow {

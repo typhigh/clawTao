@@ -158,7 +158,7 @@ export function SettingsDialog({ open, onClose }: Props) {
 
           <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label style={{ margin: 0 }}>{t('settings.bashTimeout')}</label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer', margin: 0 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer', margin: 0, whiteSpace: 'nowrap' }}>
               <input type="checkbox" checked={tmp.bash_timeout_secs !== null} onChange={(e) => setTmpField('bash_timeout_secs' as any, e.target.checked ? DEFAULT_BASH_TIMEOUT_SECS : null)} />
               {t('settings.enable')}
             </label>

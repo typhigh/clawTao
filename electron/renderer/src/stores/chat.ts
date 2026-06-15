@@ -31,6 +31,10 @@ declare global {
       };
       /** Unified stream listener — all turn events arrive through this single channel. */
       onStreamEvent: (callback: (params: StreamEvent) => void) => void;
+      /** Open URL in system default browser (not Electron's built-in one). */
+      shell: {
+        openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>;
+      };
     };
   }
 }

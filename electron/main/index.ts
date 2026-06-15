@@ -12,7 +12,7 @@
  * Rust never sees the encrypted form — main decrypts and injects the plaintext
  * key into Rust at startup and on config changes.
  */
-import { app, BrowserWindow, ipcMain, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
 import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import * as readline from 'readline';
@@ -150,6 +150,16 @@ function setupIpc() {
 
   ipcMain.handle('config:validate', () => sendRpc('config.validate'));
   ipcMain.handle('config:testKey', (_e, p: { api_key: string; base_url: string; model: string }) => sendRpc('config.testKey', p));
+
+  // Open external URL in the system default browser (not Electron's built-in one).
+  // See https://www.electronjs.org/docs/latest/api/shell#shellopenexternalurl-options
+  ipcMain.handle('shell:open-external', async (_e, url: string) => {
+    if (typeof url !== 'string') return { ok: false, error: 'invalid url' };
+    // Only allow http(s) — never let a tool-attacker call file:// or shell-protocol.
+    if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'only http(s) allowed' };
+    await shell.openExternal(url);
+    return { ok: true };
+  });
 }
 
 async function createWindow() {

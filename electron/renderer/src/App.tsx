@@ -473,13 +473,33 @@ function AgentTurnView({ segments, conclusion }: { segments: AssistantSegment[];
 function ToolCard({ toolName, toolInput, result, pending }: { toolName: string; toolInput: unknown; result: string | null; pending: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const linkUrl = (toolName === 'WebFetch' || toolName === 'WebBrowser') && toolInput && typeof toolInput === 'object'
+    ? (toolInput as any).url
+    : null;
+  const hasLink = typeof linkUrl === 'string' && linkUrl.length > 0;
   return (
     <div className={`turn-segment tool-pair ${pending ? 'pending' : 'done'}`}>
-      <button type="button" className="tool-label-btn" onClick={() => setOpen((o) => !o)}>
-        <span className="tool-label-icon"><WrenchIcon /></span> {toolName}
-        <span className={`tool-label-arrow ${open ? 'open' : ''}`}>›</span>
-        {pending && <span className="turn-segment-spinner" />}
-      </button>
+      <div className="tool-label-row">
+        <button type="button" className="tool-label-btn" onClick={() => setOpen((o) => !o)}>
+          <span className="tool-label-icon"><WrenchIcon /></span> {toolName}
+          <span className={`tool-label-arrow ${open ? 'open' : ''}`}>›</span>
+          {pending && <span className="turn-segment-spinner" />}
+        </button>
+        {hasLink && (
+          <a
+            className="tool-label-link"
+            href={linkUrl}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.electronAPI?.shell.openExternal(linkUrl);
+            }}
+            title={linkUrl}
+          >
+            <PaperclipIcon />
+          </a>
+        )}
+      </div>
       {open && (
         <div className="turn-segment-body tool-card">
           {toolInput !== null && (
@@ -548,6 +568,15 @@ function WrenchIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" />
+    </svg>
+  );
+}
+
+/** Paperclip icon — shown next to WebFetch / WebBrowser tool labels. (Lucide) */
+function PaperclipIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" />
     </svg>
   );
 }
