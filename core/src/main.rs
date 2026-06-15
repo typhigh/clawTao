@@ -94,11 +94,11 @@ fn main() {
                             &mut llm_config,
                             &client,
                         ) {
-                            error!("Error handling request: {}", e);
+                            error!("Error handling request: {:#}", e);
                             let _ = jsonrpc::write_response(&Response::error(
                                 request.id,
                                 -32603,
-                                format!("Internal error: {e}"),
+                                format!("Internal error: {:#}", e),
                             ));
                         }
                     }

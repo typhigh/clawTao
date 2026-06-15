@@ -1,6 +1,6 @@
 //! chat.send handler — the core LLM interaction loop.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crate::config::LlmConfig;
 use crate::jsonrpc::{Notification, Response};
 use crate::llm::{ApiAdapter, AnthropicAdapter, LlmMessage, LlmRequest, OpenAiAdapter, UnifiedTool};
@@ -74,7 +74,8 @@ pub(crate) fn handle_chat_send(
         for (k, v) in &http.headers {
             resp = resp.header(k.as_str(), v.as_str());
         }
-        let resp = resp.body(http.body.clone()).send()?;
+        let resp = resp.body(http.body.clone()).send()
+            .with_context(|| format!("Failed to reach {}", http.url))?;
 
         debug!("LLM response: status={}", resp.status());
 
