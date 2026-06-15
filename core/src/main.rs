@@ -20,6 +20,7 @@ mod llm;
 mod store;
 mod sse;
 mod tools;
+mod system_prompt;
 
 use config::LlmConfig;
 use jsonrpc::{Request, Response};

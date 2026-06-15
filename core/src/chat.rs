@@ -59,7 +59,7 @@ pub(crate) fn handle_chat_send(
         }).collect();
 
         let llm_req = LlmRequest {
-            system: "You are ClawTao, a helpful AI assistant with tool calling capabilities.".into(),
+            system: crate::system_prompt::build(tool_registry),
             model: llm_config.model.clone(),
             messages: llm_msgs,
             tools: unified_tools.clone(),
