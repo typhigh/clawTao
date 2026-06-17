@@ -270,6 +270,7 @@ function App() {
   const { config, loaded, load: loadConfig } = useSettingsStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   // const initRef = useRef(false);
 
   useEffect(() => {
@@ -292,7 +293,31 @@ function App() {
     if (!inputValue.trim() || isStreaming) return;
     const text = inputValue;
     setInputValue('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      // Re-apply the 2-line minimum so the box doesn't snap back to 1 line.
+      textareaRef.current.style.height = `${2 * 24}px`;
+    }
     await useChatStore.getState().sendMessage(text);
+  };
+
+  // Auto-grow the textarea as the user types, up to a max of ~6 lines.
+  // Starts at 2 lines tall so the user has visible room to compose.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    const minHeight = 2 * 24; // 2 lines baseline
+    const maxHeight = 6 * 24; // ~6 lines cap before scroll
+    const target = Math.max(minHeight, Math.min(ta.scrollHeight, maxHeight));
+    ta.style.height = `${target}px`;
+  }, [inputValue]);
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      handleSubmit(e as unknown as React.FormEvent);
+    }
   };
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
@@ -392,11 +417,13 @@ function App() {
               </div>
 
               <form className="input-area" onSubmit={handleSubmit}>
-                <input
-                  type="text"
+                <textarea
+                  ref={textareaRef}
+                  rows={2}
                   placeholder={t('chat.placeholder')}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
                   disabled={isStreaming}
                 />
                 <button type="submit" disabled={!inputValue.trim() || isStreaming}>{t('chat.send')}</button>
