@@ -506,6 +506,7 @@ html, body, #root {
 .agent-turn-conclusion p,
 .turn-text p {
   margin: 16px 0 6px;
+  line-height: 1.65;
 }
 .agent-turn-conclusion pre,
 .turn-text pre {
