@@ -85,7 +85,7 @@ function startRust() {
   rustProcess = spawn('cargo', ['run', '--manifest-path', manifestPath], {
     cwd: coreDir,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env },
+    env: { ...process.env, RUST_BACKTRACE: '1' },
   });
 
   const rl = readline.createInterface({ input: rustProcess.stdout!, crlfDelay: Infinity });
@@ -106,8 +106,21 @@ function startRust() {
     } catch {}
   });
 
-  rustProcess.stderr?.on('data', (d: Buffer) => console.error(`[rust] ${d}`));
-  rustProcess.on('exit', (code) => console.log(`Rust exited: ${code}`));
+  // Keep the last ~4 KiB of stderr so we can dump it on crash.
+  let stderrTail = '';
+  rustProcess.stderr?.on('data', (d: Buffer) => {
+    const text = d.toString();
+    stderrTail = (stderrTail + text).slice(-4096);
+    console.error(`[rust] ${text}`);
+  });
+  rustProcess.on('exit', (code, signal) => {
+    const reason = signal ? `signal=${signal}` : `code=${code}`;
+    if (code === 0 || signal) {
+      console.error(`Rust crashed (${reason}). stderr tail:\n${stderrTail}`);
+    } else {
+      console.log(`Rust exited (${reason})`);
+    }
+  });
 }
 
 function sendRpc(method: string, params?: Record<string, unknown>): Promise<unknown> {

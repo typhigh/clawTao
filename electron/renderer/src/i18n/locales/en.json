@@ -36,6 +36,7 @@
     "model": "Model",
     "logLevel": "Log Level",
     "bashBlockedCommands": "Bash Blocked Commands (one per line)",
+    "thinkingEnabled": "Show thinking (blue text)",
     "bashTimeout": "Bash Timeout",
     "enable": "Enable",
     "seconds": "seconds",

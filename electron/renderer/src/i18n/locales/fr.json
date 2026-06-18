@@ -36,6 +36,7 @@
     "model": "Modèle",
     "logLevel": "Niveau de log",
     "bashBlockedCommands": "Commandes Bash bloquées (une par ligne)",
+    "thinkingEnabled": "Afficher la réflexion (texte bleu)",
     "bashTimeout": "Délai d'expiration Bash",
     "enable": "Activer",
     "seconds": "secondes",

@@ -22,8 +22,10 @@ fn basic_request() -> LlmRequest {
             content: "hello".into(),
             tool_calls: None,
             tool_call_id: None,
+            thinking: None,
         }],
         tools: vec![],
+        thinking_enabled: false,
     }
 }
 
@@ -104,6 +106,7 @@ fn build_assistant_tool_calls_to_tool_use_blocks() {
                 content: "read /tmp/x".into(),
                 tool_calls: None,
                 tool_call_id: None,
+                thinking: None,
             },
             LlmMessage {
                 role: "assistant".into(),
@@ -117,6 +120,7 @@ fn build_assistant_tool_calls_to_tool_use_blocks() {
                     },
                 }]),
                 tool_call_id: None,
+                thinking: None,
             },
         ],
         ..basic_request()
@@ -146,6 +150,7 @@ fn build_tool_result_to_tool_result_block() {
             content: "file contents".into(),
             tool_calls: None,
             tool_call_id: Some("toolu_02".into()),
+            thinking: None,
         }],
         ..basic_request()
     };
@@ -180,6 +185,7 @@ fn build_multiple_parallel_tool_calls() {
                 },
             ]),
             tool_call_id: None,
+            thinking: None,
         }],
         ..basic_request()
     };
@@ -230,6 +236,7 @@ fn build_plain_user_message_block_format() {
             content: "plain text".into(),
             tool_calls: None,
             tool_call_id: None,
+            thinking: None,
         }],
         ..basic_request()
     };

@@ -37,6 +37,10 @@ pub struct Message {
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+    /// Assistant thinking text (extended thinking). Persisted so it can be
+    /// replayed to the model on subsequent turns and shown in history.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<String>,
     pub timestamp: i64,
 }
 
@@ -81,7 +85,7 @@ impl SessionManager {
     fn new_msg(role: &str, content: &str) -> Message {
         Message {
             id: Uuid::new_v4().to_string(), role: role.into(), content: content.into(),
-            tool_calls: None, tool_call_id: None,
+            tool_calls: None, tool_call_id: None, thinking: None,
             timestamp: chrono::Utc::now().timestamp_millis(),
         }
     }
@@ -92,9 +96,18 @@ impl SessionManager {
         Ok(msg)
     }
 
-    pub fn add_assistant_tool_calls(&mut self, session_id: &str, tool_calls: Vec<ToolCall>, content: &str) -> Result<()> {
+    /// Add the final assistant message, optionally carrying thinking text.
+    pub fn add_assistant_message(&mut self, session_id: &str, content: &str, thinking: Option<&str>) -> Result<()> {
+        let mut msg = Self::new_msg("assistant", content);
+        msg.thinking = thinking.map(|s| s.to_string());
+        self.store.add_message(session_id, &msg)?;
+        Ok(())
+    }
+
+    pub fn add_assistant_tool_calls(&mut self, session_id: &str, tool_calls: Vec<ToolCall>, content: &str, thinking: Option<&str>) -> Result<()> {
         let mut msg = Self::new_msg("assistant", content);
         msg.tool_calls = Some(tool_calls);
+        msg.thinking = thinking.map(|s| s.to_string());
         self.store.add_message(session_id, &msg)?;
         Ok(())
     }

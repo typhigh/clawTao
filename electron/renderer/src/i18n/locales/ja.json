@@ -36,6 +36,7 @@
     "model": "モデル",
     "logLevel": "ログレベル",
     "bashBlockedCommands": "Bash禁止コマンド（1行ずつ）",
+    "thinkingEnabled": "思考プロセスを表示（青文字）",
     "bashTimeout": "Bashタイムアウト",
     "enable": "有効",
     "seconds": "秒",

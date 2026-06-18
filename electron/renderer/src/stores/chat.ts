@@ -48,6 +48,7 @@ export interface Message {
   timestamp: number;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
+  thinking?: string;
 }
 
 export interface ToolCall {
@@ -80,8 +81,8 @@ export interface Session {
 export type StreamEvent = {
   sessionId: string;
   runId: string;
-  kind: 'started' | 'text' | 'tool_call' | 'tool_result' | 'done';
-  // text
+  kind: 'started' | 'text' | 'thinking' | 'tool_call' | 'tool_result' | 'done';
+  // text / thinking
   delta?: string;
   // tool_call
   toolCallId?: string;
@@ -224,6 +225,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         break;
 
       case 'text':
+      case 'thinking':
       case 'tool_call':
       case 'tool_result':
         set((state) => ({

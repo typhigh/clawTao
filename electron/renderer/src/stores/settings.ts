@@ -6,7 +6,7 @@ import { create } from 'zustand';
 export const DEFAULT_BASH_TIMEOUT_SECS = 600;
 
 export const SUGGESTED_MODELS: Record<string, string[]> = {
-  deepseek: ['deepseek-chat', 'deepseek-r1'],
+  deepseek: ['deepseek-v4-pro', 'deepseek-v4-flash'],
   minimax: ['MiniMax-M3'],
   custom: [],
 };
@@ -21,6 +21,7 @@ export interface LlmConfig {
   models: string[];
   bash_blocked_commands: string[];
   bash_timeout_secs: number | null;
+  thinking_enabled: boolean;
 }
 
 interface SettingsState {

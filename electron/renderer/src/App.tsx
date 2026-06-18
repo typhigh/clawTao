@@ -21,11 +21,13 @@ type AssistantSegment =
   | { kind: 'text'; id: string; content: string; timestamp: number }
   | { kind: 'tool'; id: string; toolName: string; toolInput: unknown; timestamp: number }
   | { kind: 'toolResult'; id: string; content: string; toolCallId?: string; timestamp: number }
-  | { kind: 'toolPair'; id: string; toolName: string; toolInput: unknown; result: string | null; pending: boolean };
+  | { kind: 'toolPair'; id: string; toolName: string; toolInput: unknown; result: string | null; pending: boolean }
+  | { kind: 'thinking'; id: string; content: string; timestamp: number };
 
 type TurnSegment =
   | { kind: 'text'; content: string }
-  | { kind: 'toolPair'; id: string; toolName: string; toolInput: unknown; result: string | null; pending: boolean };
+  | { kind: 'toolPair'; id: string; toolName: string; toolInput: unknown; result: string | null; pending: boolean }
+  | { kind: 'thinking'; content: string };
 
 type TimelineGroup =
   | { kind: 'user'; id: string; content: string; timestamp: number }
@@ -61,8 +63,14 @@ function buildHistoricalTurns(messages: Message[]): TimelineGroup[] {
     } else if (msg.role === 'assistant') {
       if (msg.tool_calls && msg.tool_calls.length > 0) {
         if (!currentTurn) currentTurn = [];
-        // If the model emitted text before issuing tool calls, store it
-        // as a chronologically-placed text segment inside the turn.
+        if (msg.thinking) {
+          currentTurn.push({
+            kind: 'thinking',
+            id: `${msg.id}-thinking`,
+            content: msg.thinking,
+            timestamp: msg.timestamp,
+          });
+        }
         if (msg.content) {
           currentTurn.push({
             kind: 'text',
@@ -82,7 +90,16 @@ function buildHistoricalTurns(messages: Message[]): TimelineGroup[] {
             timestamp: msg.timestamp,
           });
         }
-      } else if (msg.content) {
+      } else if (msg.content || msg.thinking) {
+        if (msg.thinking) {
+          if (!currentTurn) currentTurn = [];
+          currentTurn.push({
+            kind: 'thinking',
+            id: `${msg.id}-thinking`,
+            content: msg.thinking,
+            timestamp: msg.timestamp,
+          });
+        }
         currentConclusion = msg.content;
       }
     } else if (msg.role === 'tool') {
@@ -112,7 +129,15 @@ function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegment[]; is
   const hasDone = events.some((e) => e.kind === 'done');
   const segments: TurnSegment[] = [];
   let textBuf = '';
+  let thinkingBuf = '';
   let pendingTool: { id: string; name: string; input: unknown } | null = null;
+
+  const flushThinking = () => {
+    if (thinkingBuf) {
+      segments.push({ kind: 'thinking', content: thinkingBuf });
+      thinkingBuf = '';
+    }
+  };
 
   const flushText = () => {
     if (textBuf) {
@@ -140,10 +165,15 @@ function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegment[]; is
       case 'started':
       case 'done':
         break;
+      case 'thinking':
+        thinkingBuf += ev.delta!;
+        break;
       case 'text':
+        flushThinking();
         textBuf += ev.delta!;
         break;
       case 'tool_call':
+        flushThinking();
         flushText();
         flushPending();
         pendingTool = { id: ev.toolCallId!, name: ev.toolName!, input: ev.input };
@@ -176,6 +206,7 @@ function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegment[]; is
     }
   }
 
+  flushThinking();
   flushText();
   flushPending();
 
@@ -455,13 +486,26 @@ function UserMessageView({ content }: { content: string }) {
 function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[]; isStreaming: boolean }) {
   return (
     <div className={`agent-turn live ${isStreaming ? 'streaming' : ''}`}>
-      {segments.map((seg, i) =>
-        seg.kind === 'text' ? (
-          <div key={i} className="turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(seg.content)}</ReactMarkdown></div>
-        ) : (
-          <ToolPairView key={seg.id} segment={seg} />
-        ),
-      )}
+      {segments.map((seg, i) => {
+        if (seg.kind === 'text') {
+          return <div key={i} className="turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(seg.content)}</ReactMarkdown></div>;
+        }
+        if (seg.kind === 'thinking') {
+          return <Thinking key={i} content={seg.content} />;
+        }
+        return <ToolPairView key={seg.id} segment={seg} />;
+      })}
+    </div>
+  );
+}
+
+/** Thinking text rendered inline in blue (#007aff). Hides when disabled. */
+function Thinking({ content }: { content: string }) {
+  const { config } = useSettingsStore();
+  if (!config?.thinking_enabled) return null;
+  return (
+    <div className="turn-thinking">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(content)}</ReactMarkdown>
     </div>
   );
 }
@@ -562,6 +606,9 @@ function SegmentView({ segment }: { segment: AssistantSegment }) {
         </div>
       </div>
     );
+  }
+  if (segment.kind === 'thinking') {
+    return <Thinking content={segment.content} />;
   }
   if (segment.kind === 'text') {
     return <div className="turn-segment turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(segment.content)}</ReactMarkdown></div>;

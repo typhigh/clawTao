@@ -6,13 +6,13 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 interface Props { open: boolean; onClose: () => void; }
 
 const PROVIDER_DEFAULTS: Record<string, { base_url: string; protocol: string; baseUrlLocked: boolean; protocolLocked: boolean }> = {
-  deepseek: { base_url: 'https://api.deepseek.com/v1', protocol: 'openai', baseUrlLocked: true, protocolLocked: true },
-  minimax:  { base_url: 'https://api.minimaxi.com/v1',  protocol: 'openai', baseUrlLocked: true, protocolLocked: true },
-  custom:   { base_url: '',  protocol: 'openai', baseUrlLocked: false, protocolLocked: false },
+  deepseek: { base_url: 'https://api.deepseek.com/anthropic', protocol: 'anthropic', baseUrlLocked: true, protocolLocked: true },
+  minimax:  { base_url: 'https://api.minimaxi.com/anthropic', protocol: 'anthropic', baseUrlLocked: true, protocolLocked: true },
+  custom:   { base_url: '',  protocol: 'anthropic', baseUrlLocked: false, protocolLocked: false },
 };
 
 function emptyConfig(): LlmConfig {
-  return { provider: 'deepseek', api_key: '', base_url: PROVIDER_DEFAULTS.deepseek.base_url, model: '', models: [], api_protocol: 'openai', log_level: 'info', bash_blocked_commands: [], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS as any };
+  return { provider: 'deepseek', api_key: '', base_url: PROVIDER_DEFAULTS.deepseek.base_url, model: '', models: [], api_protocol: 'openai', log_level: 'info', bash_blocked_commands: [], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS as any, thinking_enabled: true };
 }
 
 export function SettingsDialog({ open, onClose }: Props) {
@@ -37,6 +37,7 @@ export function SettingsDialog({ open, onClose }: Props) {
         log_level: config.log_level || 'info',
         bash_blocked_commands: config.bash_blocked_commands || [],
         bash_timeout_secs: (config as any).bash_timeout_secs ?? DEFAULT_BASH_TIMEOUT_SECS as any,
+        thinking_enabled: (config as any).thinking_enabled ?? true,
       });
     }
   }, [open, config]);
@@ -149,6 +150,17 @@ export function SettingsDialog({ open, onClose }: Props) {
               <option value="debug">Debug</option>
               <option value="trace">Trace</option>
             </select>
+          </div>
+
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none', fontWeight: 400, fontSize: 14 }}>
+              <input
+                type="checkbox"
+                checked={tmp.thinking_enabled}
+                onChange={(e) => setTmpField('thinking_enabled' as any, e.target.checked)}
+              />
+              {t('settings.thinkingEnabled')}
+            </label>
           </div>
 
           <div className="form-group">

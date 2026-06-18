@@ -38,7 +38,13 @@ pub struct LlmConfig {
     /// Bash command timeout in seconds. None = unlimited.
     #[serde(default = "default_bash_timeout")]
     pub bash_timeout_secs: Option<u64>,
+    /// Show extended thinking content in the UI. Does not affect the
+    /// request — thinking is always on by default for MiniMax / DeepSeek.
+    #[serde(default = "default_true")]
+    pub thinking_enabled: bool,
 }
+
+fn default_true() -> bool { true }
 
 pub const DEFAULT_BASH_TIMEOUT_SECS: u64 = 600;
 
@@ -115,6 +121,7 @@ impl LlmConfig {
             api_protocol: default_api_protocol(),
             bash_timeout_secs: default_bash_timeout(),
             models: vec![],
+            thinking_enabled: true,
         }
     }
 

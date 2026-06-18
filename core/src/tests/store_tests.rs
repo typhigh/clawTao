@@ -31,7 +31,7 @@ fn add_assistant_tool_calls() {
     mgr.add_assistant_tool_calls(&s.id, vec![ToolCall {
         id: "call_1".into(), call_type: "function".into(),
         function: ToolCallFunction { name: "Read".into(), arguments: r#"{"path":"README.md"}"#.into() },
-    }], "").unwrap();
+    }], "", None).unwrap();
     let session = mgr.get_session(&s.id).unwrap().unwrap();
     assert_eq!(session.messages.len(), 1);
     assert!(session.messages[0].tool_calls.is_some());

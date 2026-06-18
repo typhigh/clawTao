@@ -36,6 +36,7 @@
     "model": "模型",
     "logLevel": "日志级别",
     "bashBlockedCommands": "Bash 禁用命令（每行一个）",
+    "thinkingEnabled": "显示思考过程（蓝色文本）",
     "bashTimeout": "Bash 超时",
     "enable": "启用",
     "seconds": "秒",

@@ -30,6 +30,7 @@ impl SqliteSessionStore {
                 content TEXT NOT NULL DEFAULT '',
                 tool_calls TEXT,
                 tool_call_id TEXT,
+                thinking TEXT,
                 timestamp INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);"
@@ -59,7 +60,7 @@ impl SessionStore for SqliteSessionStore {
         }).ok();
         let Some(mut session) = session else { return Ok(None) };
         let mut msg_stmt = conn.prepare(
-            "SELECT id, role, content, tool_calls, tool_call_id, timestamp
+            "SELECT id, role, content, tool_calls, tool_call_id, thinking, timestamp
              FROM messages WHERE session_id = ?1 ORDER BY timestamp"
         )?;
         let msgs = msg_stmt.query_map(rusqlite::params![id], |row| {
@@ -67,7 +68,7 @@ impl SessionStore for SqliteSessionStore {
             Ok(Message {
                 id: row.get(0)?, role: row.get(1)?, content: row.get(2)?,
                 tool_calls: tool_calls.and_then(|s| serde_json::from_str(&s).ok()),
-                tool_call_id: row.get(4)?, timestamp: row.get(5)?,
+                tool_call_id: row.get(4)?, thinking: row.get(5)?, timestamp: row.get(6)?,
             })
         })?;
         for msg in msgs { session.messages.push(msg?); }
@@ -107,9 +108,9 @@ fn add_message_inner(conn: &Connection, session_id: &str, msg: &Message) -> Resu
         rusqlite::params![session_id, title_preview],
     )?;
     conn.execute(
-        "INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, timestamp)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        rusqlite::params![msg.id, session_id, msg.role, msg.content, tool_calls_json, msg.tool_call_id, msg.timestamp],
+        "INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, thinking, timestamp)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        rusqlite::params![msg.id, session_id, msg.role, msg.content, tool_calls_json, msg.tool_call_id, msg.thinking, msg.timestamp],
     )?;
     conn.execute(
         "UPDATE sessions SET updated_at = MAX(updated_at, ?1) WHERE id = ?2",

@@ -74,6 +74,7 @@ describe('settings store', () => {
       log_level: 'debug',
       api_protocol: 'openai', models: [],
       bash_blocked_commands: ['rm -rf /'], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
+      thinking_enabled: true,
     };
     const maskedConfig = { ...newConfig, api_key: 'sk-r****real' };
 

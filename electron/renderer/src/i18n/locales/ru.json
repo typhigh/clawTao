@@ -36,6 +36,7 @@
     "model": "Модель",
     "logLevel": "Уровень логирования",
     "bashBlockedCommands": "Запрещённые Bash команды (по одной на строку)",
+    "thinkingEnabled": "Показывать мышление (синий текст)",
     "bashTimeout": "Таймаут Bash",
     "enable": "Включить",
     "seconds": "сек.",

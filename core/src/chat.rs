@@ -35,10 +35,11 @@ pub(crate) fn handle_chat_send(
         return Err(anyhow::anyhow!("API key not configured"));
     }
 
-    let adapter: &dyn ApiAdapter = match llm_config.api_protocol.as_str() {
-        "anthropic" => &AnthropicAdapter,
-        _ => &OpenAiAdapter,
+    let adapter: Box<dyn ApiAdapter> = match llm_config.api_protocol.as_str() {
+        "anthropic" => Box::new(AnthropicAdapter),
+        _ => Box::new(OpenAiAdapter),
     };
+    let adapter = adapter.as_ref();
 
     let mut messages = session.messages.clone();
 
@@ -50,12 +51,13 @@ pub(crate) fn handle_chat_send(
         }
     }).collect();
 
-    let final_content = loop {
+    let (final_content, final_thinking) = loop {
         let llm_msgs: Vec<LlmMessage> = messages.iter().map(|m| LlmMessage {
             role: m.role.clone(),
             content: m.content.clone(),
             tool_calls: m.tool_calls.clone(),
             tool_call_id: m.tool_call_id.clone(),
+            thinking: m.thinking.clone(),
         }).collect();
 
         let llm_req = LlmRequest {
@@ -63,6 +65,7 @@ pub(crate) fn handle_chat_send(
             model: llm_config.model.clone(),
             messages: llm_msgs,
             tools: unified_tools.clone(),
+            thinking_enabled: llm_config.thinking_enabled,
         };
 
         let http = adapter.build(&llm_req, &llm_config.api_key, &llm_config.base_url)?;
@@ -84,7 +87,6 @@ pub(crate) fn handle_chat_send(
         let mut reader = BufReader::new(resp);
         let mut line = String::new();
         let mut body_bytes = Vec::new();
-        let protocol = &llm_config.api_protocol;
 
         while reader.read_line(&mut line)? > 0 {
             body_bytes.extend_from_slice(line.as_bytes());
@@ -93,24 +95,11 @@ pub(crate) fn handle_chat_send(
             if let Some(data) = trimmed.strip_prefix("data: ") {
                 if data == "[DONE]" { line.clear(); continue; }
                 if let Ok(event) = serde_json::from_str::<serde_json::Value>(data) {
-                    let text = if protocol != "anthropic" {
-                        event["choices"][0]["delta"]["content"].as_str()
-                    } else {
-                        // Anthropic: text_delta or input_json_delta
-                        let delta = &event["delta"];
-                        if delta["type"] == "text_delta" {
-                            delta["text"].as_str()
-                        } else {
-                            event["content_block"]["text"].as_str()
-                        }
-                    };
-                    if let Some(t) = text {
-                        if !t.is_empty() {
-                            write_notification(&Notification::new("chat.stream", Some(json!({
-                                "sessionId": session_id, "runId": run_id,
-                                "kind": "text", "delta": t
-                            }))))?;
-                        }
+                    for se in adapter.stream_events(&event) {
+                        write_notification(&Notification::new("chat.stream", Some(json!({
+                            "sessionId": session_id, "runId": run_id,
+                            "kind": se.kind, "delta": se.delta,
+                        }))))?;
                     }
                 }
             }
@@ -124,12 +113,17 @@ pub(crate) fn handle_chat_send(
         let result = adapter.parse_stream(&body_str)?;
 
         if result.tool_calls.is_empty() {
-            break result.text;
+            break (result.text, result.thinking);
         }
 
         debug!("Executing {} tool calls", result.tool_calls.len());
 
-        session_manager.add_assistant_tool_calls(session_id, result.tool_calls.clone(), &result.text)?;
+        session_manager.add_assistant_tool_calls(
+            session_id,
+            result.tool_calls.clone(),
+            &result.text,
+            result.thinking.as_deref(),
+        )?;
 
         for tc in &result.tool_calls {
             debug!("Executing tool: {} id={} args={}", tc.function.name, tc.id, tc.function.arguments);
@@ -168,11 +162,8 @@ pub(crate) fn handle_chat_send(
             .messages.clone();
     };
 
-    if final_content.is_empty() {
-        session_manager.add_message(session_id, "assistant", "(no response)")?;
-    } else {
-        session_manager.add_message(session_id, "assistant", &final_content)?;
-    }
+    let content = if final_content.is_empty() { "(no response)" } else { &final_content };
+    session_manager.add_assistant_message(session_id, content, final_thinking.as_deref())?;
 
     write_notification(&Notification::new("chat.stream", Some(json!({
         "sessionId": session_id, "runId": run_id,

@@ -32,6 +32,13 @@ use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
 fn main() {
+    // Capture panic messages + backtrace to stderr so they are visible
+    // in the Electron main-process console and crash logs.
+    std::panic::set_hook(Box::new(|info| {
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        eprintln!("=== CLAWTAO PANIC ===\n{info}\n{backtrace}");
+    }));
+
     // Load config first to get log_level, then init tracing
     let mut llm_config = LlmConfig::load();
     let log_level = llm_config.effective_log_level();

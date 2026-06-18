@@ -1,4 +1,4 @@
-use super::adapter::{ApiAdapter, HttpRequest};
+use super::adapter::{ApiAdapter, HttpRequest, StreamEvent};
 use super::types::{LlmRequest, LlmResponse};
 use crate::store::ToolCall;
 use anyhow::Result;
@@ -18,12 +18,28 @@ impl ApiAdapter for AnthropicAdapter {
                     let args: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null);
                     json!({"type": "tool_use", "id": tc.id, "name": tc.function.name, "input": args})
                 }).collect();
+                // thinking → text → tool_use (chronological order).
                 if !m.content.is_empty() {
                     blocks.insert(0, json!({"type": "text", "text": m.content}));
+                }
+                if let Some(ref thinking) = m.thinking {
+                    if !thinking.is_empty() {
+                        blocks.insert(0, json!({"type": "thinking", "thinking": thinking}));
+                    }
                 }
                 json!({"role": "assistant", "content": blocks})
             } else if m.role == "tool" {
                 json!({"role": "user", "content": [{"type": "tool_result", "tool_use_id": m.tool_call_id, "content": m.content}]})
+            } else if m.role == "assistant" {
+                // Assistant text message: include thinking block for multi-turn replay.
+                let mut blocks: Vec<Value> = Vec::new();
+                if let Some(ref thinking) = m.thinking {
+                    if !thinking.is_empty() {
+                        blocks.push(json!({"type": "thinking", "thinking": thinking}));
+                    }
+                }
+                blocks.push(json!({"type": "text", "text": m.content}));
+                json!({"role": "assistant", "content": blocks})
             } else {
                 json!({"role": m.role, "content": [{"type": "text", "text": m.content}]})
             }
@@ -45,6 +61,9 @@ impl ApiAdapter for AnthropicAdapter {
         if !tools.is_empty() {
             body["tools"] = json!(tools);
         }
+        if req.thinking_enabled {
+            body["thinking"] = json!({"type": "adaptive"});
+        }
 
         Ok(HttpRequest {
             url,
@@ -59,14 +78,14 @@ impl ApiAdapter for AnthropicAdapter {
 
     fn parse_stream(&self, body: &str) -> Result<LlmResponse> {
         let mut text = String::new();
+        let mut thinking = String::new();
         let mut tool_calls: Vec<ToolCall> = Vec::new();
-        let mut current_tool: Option<(String, String, String)> = None; // (id, name, args_json)
+        let mut current_tool: Option<(String, String, String)> = None;
 
         for line in body.lines() {
             let line = line.trim();
             if line.is_empty() { continue; }
 
-            // Anthropic SSE: "event: type\ndata: {...}"
             let data = if let Some(d) = line.strip_prefix("data: ") {
                 d.to_string()
             } else {
@@ -83,6 +102,10 @@ impl ApiAdapter for AnthropicAdapter {
                         if let Some(t) = delta["text"].as_str() {
                             text.push_str(t);
                         }
+                    } else if delta["type"] == "thinking_delta" {
+                        if let Some(t) = delta["thinking"].as_str() {
+                            thinking.push_str(t);
+                        }
                     } else if delta["type"] == "input_json_delta" {
                         if let Some(partial) = delta["partial_json"].as_str() {
                             if let Some(ref mut pending) = current_tool {
@@ -96,7 +119,6 @@ impl ApiAdapter for AnthropicAdapter {
                     if block["type"] == "tool_use" {
                         let id = block["id"].as_str().unwrap_or("").to_string();
                         let name = block["name"].as_str().unwrap_or("").to_string();
-                        // If input is empty `{}`, don't use it — wait for partial_json deltas
                         let input_val = &block["input"];
                         let args = if input_val.as_object().is_none_or(|o| o.is_empty()) {
                             String::new()
@@ -104,7 +126,6 @@ impl ApiAdapter for AnthropicAdapter {
                             input_val.to_string()
                         };
                         if !id.is_empty() {
-                            // Finalize previous tool if any
                             if let Some((prev_id, prev_name, prev_args)) = current_tool.take() {
                                 if serde_json::from_str::<Value>(&prev_args).is_ok() {
                                     tool_calls.push(ToolCall {
@@ -118,7 +139,6 @@ impl ApiAdapter for AnthropicAdapter {
                     }
                 }
                 "content_block_stop" => {
-                    // Finalize current tool
                     if let Some((id, name, args)) = current_tool.take() {
                         if !id.is_empty() && serde_json::from_str::<Value>(&args).is_ok() {
                             tool_calls.push(ToolCall {
@@ -135,7 +155,6 @@ impl ApiAdapter for AnthropicAdapter {
             }
         }
 
-        // Don't forget final tool if stream ended without content_block_stop
         if let Some((id, name, args)) = current_tool.take() {
             if !id.is_empty() && serde_json::from_str::<Value>(&args).is_ok() {
                 tool_calls.push(ToolCall {
@@ -145,7 +164,37 @@ impl ApiAdapter for AnthropicAdapter {
             }
         }
 
-        Ok(LlmResponse { text, tool_calls })
+        Ok(LlmResponse {
+            text,
+            thinking: if thinking.is_empty() { None } else { Some(thinking) },
+            tool_calls,
+        })
+    }
+
+    fn stream_events(&self, event: &serde_json::Value) -> Vec<StreamEvent> {
+        let mut out = Vec::new();
+        let delta = match event.get("delta") {
+            Some(d) => d,
+            None => return out,
+        };
+        match delta.get("type").and_then(|v| v.as_str()) {
+            Some("text_delta") => {
+                if let Some(t) = delta.get("text").and_then(|v| v.as_str()) {
+                    if !t.is_empty() {
+                        out.push(StreamEvent { kind: "text".into(), delta: t.to_string() });
+                    }
+                }
+            }
+            Some("thinking_delta") => {
+                if let Some(t) = delta.get("thinking").and_then(|v| v.as_str()) {
+                    if !t.is_empty() {
+                        out.push(StreamEvent { kind: "thinking".into(), delta: t.to_string() });
+                    }
+                }
+            }
+            _ => {}
+        }
+        out
     }
 }
 

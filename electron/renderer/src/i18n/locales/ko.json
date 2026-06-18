@@ -36,6 +36,7 @@
     "model": "모델",
     "logLevel": "로그 레벨",
     "bashBlockedCommands": "Bash 차단 명령어 (한 줄씩)",
+    "thinkingEnabled": "사고 과정 표시 (파란색 텍스트)",
     "bashTimeout": "Bash 타임아웃",
     "enable": "활성화",
     "seconds": "초",

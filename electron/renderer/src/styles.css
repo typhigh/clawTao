@@ -497,6 +497,45 @@ html, body, #root {
   white-space: normal;
 }
 
+/* ── Thinking (extended thinking) ── */
+.turn-thinking {
+  color: #007aff;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.turn-thinking p {
+  margin: 0;
+}
+
+.turn-thinking pre {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 8px 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 4px 0;
+}
+
+.turn-thinking code {
+  background: rgba(0,122,255,0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-family: 'SF Mono', Menlo, Monaco, monospace;
+  color: #007aff;
+}
+
+.turn-thinking ul,
+.turn-thinking ol {
+  padding-left: 16px;
+  margin: 1px 0 2px;
+}
+
 .agent-turn-conclusion.streaming {
   border: 1px solid #007aff;
 }

@@ -1,4 +1,4 @@
-use super::adapter::{ApiAdapter, HttpRequest};
+use super::adapter::{ApiAdapter, HttpRequest, StreamEvent};
 use super::types::{LlmRequest, LlmResponse};
 use crate::sse::parse_sse_response;
 use anyhow::Result;
@@ -39,7 +39,27 @@ impl ApiAdapter for OpenAiAdapter {
 
     fn parse_stream(&self, body: &str) -> Result<LlmResponse> {
         let result = parse_sse_response(body);
-        Ok(LlmResponse { text: result.text, tool_calls: result.tool_calls })
+        Ok(LlmResponse { text: result.text, tool_calls: result.tool_calls, thinking: None })
+    }
+
+    fn stream_events(&self, event: &serde_json::Value) -> Vec<StreamEvent> {
+        let mut out = Vec::new();
+        let delta = match event.get("choices").and_then(|c| c.get(0)).and_then(|c| c.get("delta")) {
+            Some(d) => d,
+            None => return out,
+        };
+        if let Some(c) = delta.get("content").and_then(|v| v.as_str()) {
+            if !c.is_empty() {
+                out.push(StreamEvent { kind: "text".into(), delta: c.to_string() });
+            }
+        }
+        // Some OpenAI-compatible providers stream reasoning content separately.
+        if let Some(r) = delta.get("reasoning_content").and_then(|v| v.as_str()) {
+            if !r.is_empty() {
+                out.push(StreamEvent { kind: "thinking".into(), delta: r.to_string() });
+            }
+        }
+        out
     }
 }
 

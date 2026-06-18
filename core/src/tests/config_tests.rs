@@ -8,6 +8,7 @@ fn make_config(key: &str) -> LlmConfig {
         base_url: DEFAULT_OPENAI_BASE_URL.into(),
         model: DEFAULT_OPENAI_MODEL.into(),
         bash_blocked_commands: vec![], api_protocol: "openai".into(), bash_timeout_secs: Some(600), models: vec![],
+        thinking_enabled: true,
     }
 }
 
