@@ -507,27 +507,27 @@ function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[]; isSt
 function Thinking({ content, forceOpen = false }: { content: string; forceOpen?: boolean }) {
   const { config } = useSettingsStore();
   const { t } = useTranslation();
-  // When forceOpen is true we want the body pinned open, but we still
-  // track `open` for the user-toggle after streaming ends. Initialize
-  // open=true under force so the first paint already shows content.
+  // The user is always in control — `forceOpen` only affects the initial
+  // state (expanded while streaming so the model "thinks out loud",
+  // collapsed for historical turns). After the first render the user can
+  // freely fold/unfold regardless of streaming state: the latest content
+  // is always in `content`, so re-expanding shows the full current text.
   const [open, setOpen] = useState(forceOpen);
 
   if (!config?.thinking_enabled) return null;
 
-  const showBody = forceOpen || open;
-
   return (
-    <div className={`thinking-block ${showBody ? 'open' : ''}`}>
+    <div className={`thinking-block ${open ? 'open' : ''}`}>
       <button
         type="button"
         className="thinking-header"
         onClick={() => setOpen((o) => !o)}
-        aria-expanded={showBody}
+        aria-expanded={open}
       >
         <span className="thinking-title">{t('thinking.title')}</span>
-        <span className={`thinking-chevron ${showBody ? 'open' : ''}`}>›</span>
+        <span className={`thinking-chevron ${open ? 'open' : ''}`}>›</span>
       </button>
-      {showBody && (
+      {open && (
         <div className="thinking-body">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizeMd(content)}</ReactMarkdown>
         </div>
