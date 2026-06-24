@@ -21,6 +21,9 @@
     "running": "実行中",
     "summary": "ツール呼び出し {{tools}} · プロセス メッセージ {{messages}}"
   },
+  "thinking": {
+    "title": "思考過程"
+  },
   "time": {
     "justNow": "たった今",
     "minutesAgo": "{{n}}分前",

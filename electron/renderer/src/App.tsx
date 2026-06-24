@@ -488,10 +488,10 @@ function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[]; isSt
     <div className={`agent-turn live ${isStreaming ? 'streaming' : ''}`}>
       {segments.map((seg, i) => {
         if (seg.kind === 'text') {
-          return <div key={i} className="turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(seg.content)}</ReactMarkdown></div>;
+          return <div key={i} className="turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizeMd(seg.content)}</ReactMarkdown></div>;
         }
         if (seg.kind === 'thinking') {
-          return <Thinking key={i} content={seg.content} />;
+          return <Thinking key={i} content={seg.content} forceOpen={isStreaming} />;
         }
         return <ToolPairView key={seg.id} segment={seg} />;
       })}
@@ -499,16 +499,66 @@ function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[]; isSt
   );
 }
 
-/** Thinking text rendered inline in blue (#007aff). Hides when disabled. */
-function Thinking({ content }: { content: string }) {
+/** Thinking block — collapsible card, mirrors the "深度思考" style.
+ *  - forceOpen: when true (live turn still streaming), pin the body open
+ *    so the user can watch the model think in real time. After streaming
+ *    ends the user can fold/unfold freely. Historical turns default to
+ *    folded. Hides entirely when the user disables extended thinking. */
+function Thinking({ content, forceOpen = false }: { content: string; forceOpen?: boolean }) {
   const { config } = useSettingsStore();
+  const { t } = useTranslation();
+  // When forceOpen is true we want the body pinned open, but we still
+  // track `open` for the user-toggle after streaming ends. Initialize
+  // open=true under force so the first paint already shows content.
+  const [open, setOpen] = useState(forceOpen);
+
   if (!config?.thinking_enabled) return null;
+
+  const showBody = forceOpen || open;
+
   return (
-    <div className="turn-thinking">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(content)}</ReactMarkdown>
+    <div className={`thinking-block ${showBody ? 'open' : ''}`}>
+      <button
+        type="button"
+        className="thinking-header"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={showBody}
+      >
+        <span className="thinking-title">{t('thinking.title')}</span>
+        <span className={`thinking-chevron ${showBody ? 'open' : ''}`}>›</span>
+      </button>
+      {showBody && (
+        <div className="thinking-body">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizeMd(content)}</ReactMarkdown>
+        </div>
+      )}
     </div>
   );
 }
+
+/** Markdown components that route <a href> clicks through the main
+ *  process's shell.openExternal — same handler used by the tool cards,
+ *  so any link rendered in markdown opens in the user's system default
+ *  browser instead of navigating the Electron window itself. */
+const markdownComponents = {
+  a: ({ href, children, ...rest }: { href?: string; children?: React.ReactNode }) => (
+    <a
+      href={href}
+      {...rest}
+      onClick={(e) => {
+        e.preventDefault();
+        if (!href) return;
+        // Only allow http(s) — mirrors the guard in shell:open-external
+        // so a malicious model can't smuggle javascript: or file: URLs
+        // through markdown.
+        if (!/^https?:\/\//i.test(href)) return;
+        window.electronAPI?.shell.openExternal(href);
+      }}
+    >
+      {children}
+    </a>
+  ),
+};
 
 /** Historical turn: tools folded, conclusion always visible. */
 function AgentTurnView({ segments, conclusion }: { segments: AssistantSegment[]; conclusion: string | null }) {
@@ -536,7 +586,7 @@ function AgentTurnView({ segments, conclusion }: { segments: AssistantSegment[];
           ))}
         </div>
       )}
-      {conclusion && <div className="agent-turn-conclusion"><ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(conclusion)}</ReactMarkdown></div>}
+      {conclusion && <div className="agent-turn-conclusion"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizeMd(conclusion)}</ReactMarkdown></div>}
     </div>
   );
 }
@@ -611,7 +661,7 @@ function SegmentView({ segment }: { segment: AssistantSegment }) {
     return <Thinking content={segment.content} />;
   }
   if (segment.kind === 'text') {
-    return <div className="turn-segment turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]}>{normalizeMd(segment.content)}</ReactMarkdown></div>;
+    return <div className="turn-segment turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizeMd(segment.content)}</ReactMarkdown></div>;
   }
   return null;
 }

@@ -21,6 +21,9 @@
     "running": "실행 중",
     "summary": "도구 호출 {{tools}} · 프로세스 메시지 {{messages}}"
   },
+  "thinking": {
+    "title": "사고 과정"
+  },
   "time": {
     "justNow": "방금",
     "minutesAgo": "{{n}}분 전",

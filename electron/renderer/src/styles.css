@@ -305,7 +305,8 @@ html, body, #root {
 }
 
 .message.streaming .message-content {
-  border: 1px solid #007aff;
+  /* No border — streaming state is signalled by the spinner + disabled
+     controls, not by an iOS-blue outline that draws the eye away. */
 }
 
 /* ── Agent turn (collapsible group of tool calls + process messages) ── */
@@ -332,7 +333,7 @@ html, body, #root {
 }
 
 .agent-turn.streaming .agent-turn-header {
-  color: #007aff;
+  color: #555;
 }
 
 .agent-turn-caret {
@@ -497,20 +498,77 @@ html, body, #root {
   white-space: normal;
 }
 
-/* ── Thinking (extended thinking) ── */
-.turn-thinking {
-  color: #007aff;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 14px;
-  line-height: 1.4;
+/* ── Thinking (extended thinking) ──
+   Collapsible card aligned with the "深度思考" style: neutral grey block
+   so it visually reads as an auxiliary note rather than the model's
+   main conclusion. The body is full markdown (lists, links, code, etc.).
+*/
+
+.thinking-block {
+  margin: 8px 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow: hidden;
+  transition: background 0.15s ease;
 }
 
-.turn-thinking p {
-  margin: 0;
+.thinking-block.open {
+  background: rgba(0, 0, 0, 0.05);
 }
 
-.turn-thinking pre {
+.thinking-block:hover:not(.open) {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: #6e6e73;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  user-select: none;
+}
+
+.thinking-chevron {
+  font-size: 12px;
+  flex-shrink: 0;
+  display: inline-block;
+  transition: transform 0.15s ease;
+  color: #999;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.thinking-block.open .thinking-chevron,
+.thinking-chevron.open {
+  transform: rotate(90deg);
+}
+
+.thinking-title {
+  color: #6e6e73;
+}
+
+.thinking-body {
+  padding: 4px 12px 10px;
+  color: #6e6e73;
+}
+
+.thinking-body p {
+  margin: 6px 0;
+}
+.thinking-body p:first-child { margin-top: 0; }
+.thinking-body p:last-child  { margin-bottom: 0; }
+
+.thinking-body pre {
   background: #1e1e1e;
   color: #d4d4d4;
   padding: 8px 10px;
@@ -518,26 +576,32 @@ html, body, #root {
   overflow-x: auto;
   font-size: 13px;
   line-height: 1.4;
-  margin: 4px 0;
+  margin: 6px 0;
 }
 
-.turn-thinking code {
-  background: rgba(0,122,255,0.1);
+.thinking-body code {
+  background: rgba(0, 0, 0, 0.06);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 13px;
   font-family: 'SF Mono', Menlo, Monaco, monospace;
-  color: #007aff;
+  color: #6e6e73;
 }
 
-.turn-thinking ul,
-.turn-thinking ol {
-  padding-left: 16px;
-  margin: 1px 0 2px;
+.thinking-body ul,
+.thinking-body ol {
+  padding-left: 20px;
+  margin: 4px 0;
 }
 
-.agent-turn-conclusion.streaming {
-  border: 1px solid #007aff;
+.thinking-body a {
+  color: #6e6e73;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 0, 0, 0.25);
+  text-underline-offset: 2px;
+}
+.thinking-body a:hover {
+  text-decoration-color: #6e6e73;
 }
 
 /* ── Markdown content ─────────────────────────────────────────────────── */

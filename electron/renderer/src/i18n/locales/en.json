@@ -21,6 +21,9 @@
     "running": "Running",
     "summary": "Tool calls {{tools}} · Process messages {{messages}}"
   },
+  "thinking": {
+    "title": "Thinking"
+  },
   "time": {
     "justNow": "Just now",
     "minutesAgo": "{{n}} min ago",

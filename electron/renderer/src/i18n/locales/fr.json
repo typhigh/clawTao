@@ -21,6 +21,9 @@
     "running": "En cours",
     "summary": "Appels d'outils {{tools}} · Messages de processus {{messages}}"
   },
+  "thinking": {
+    "title": "Réflexion"
+  },
   "time": {
     "justNow": "À l'instant",
     "minutesAgo": "Il y a {{n}} min",
