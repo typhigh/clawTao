@@ -7,6 +7,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::{self, Write};
+use std::sync::Mutex;
 
 /// JSON-RPC 2.0 Request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,16 +80,28 @@ pub fn get_param<'a>(params: &'a Option<Value>, key: &str) -> Result<&'a str> {
         .ok_or_else(|| anyhow::anyhow!("Missing parameter: {key}"))
 }
 
-/// Write a JSON-RPC response to stdout (one line, flushed).
+/// Extract a string parameter, returning None if missing.
+pub fn get_param_opt<'a>(params: &'a Option<Value>, key: &str) -> Option<&'a str> {
+    params
+        .as_ref()
+        .and_then(|obj| obj.get(key))
+        .and_then(|v| v.as_str())
+}
+
+static STDOUT: Mutex<()> = Mutex::new(());
+
+/// Write a JSON-RPC response to stdout (one line, flushed). Thread-safe.
 pub fn write_response(response: &Response) -> io::Result<()> {
+    let _g = STDOUT.lock().unwrap();
     let json =
         serde_json::to_string(response).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     println!("{json}");
     io::stdout().flush()
 }
 
-/// Write a JSON-RPC notification to stdout (one line, flushed).
+/// Write a JSON-RPC notification to stdout (one line, flushed). Thread-safe.
 pub fn write_notification(notification: &Notification) -> io::Result<()> {
+    let _g = STDOUT.lock().unwrap();
     let json = serde_json::to_string(notification)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     println!("{json}");

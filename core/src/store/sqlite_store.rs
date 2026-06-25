@@ -40,7 +40,7 @@ impl SqliteSessionStore {
 }
 
 impl SessionStore for SqliteSessionStore {
-    fn create(&mut self, session: &Session) -> Result<()> {
+    fn create(&self, session: &Session) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO sessions (id, created_at, updated_at, title) VALUES (?1, ?2, ?3, ?4)",
@@ -86,12 +86,12 @@ impl SessionStore for SqliteSessionStore {
         Ok(result)
     }
 
-    fn add_message(&mut self, session_id: &str, msg: &Message) -> Result<()> {
+    fn add_message(&self, session_id: &str, msg: &Message) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         add_message_inner(&conn, session_id, msg)
     }
 
-    fn delete(&mut self, id: &str) -> Result<()> {
+    fn delete(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM messages WHERE session_id = ?1", rusqlite::params![id])?;
         conn.execute("DELETE FROM sessions WHERE id = ?1", rusqlite::params![id])?;

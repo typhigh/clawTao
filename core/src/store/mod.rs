@@ -6,13 +6,14 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use uuid::Uuid;
+
+use store_trait::SessionStore;
 
 pub mod store_trait;
 pub mod json_store;
 pub mod sqlite_store;
-
-use store_trait::SessionStore;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
@@ -59,11 +60,21 @@ pub struct SessionManager {
 }
 
 impl SessionManager {
+    #[allow(dead_code)]
     pub fn new(store: Box<dyn SessionStore>) -> Self {
         Self { store }
     }
 
-    pub fn create_session(&mut self) -> Result<Session> {
+    /// Build from an `Arc<dyn SessionStore>` — the typical path for sharing
+    /// the store across session actors.
+    pub fn new_shared(store: Arc<dyn SessionStore>) -> Self {
+        // `Arc<dyn SessionStore>` can't be directly unboxed, so we need an
+        // indirection.  Since SessionStore is `Send + Sync` and all methods
+        // are `&self`, we wrap the Arc in a thin adapter that delegates.
+        Self { store: Box::new(ArcStore(store)) }
+    }
+
+    pub fn create_session(&self) -> Result<Session> {
         let now = chrono::Utc::now().timestamp_millis();
         let session = Session { id: Uuid::new_v4().to_string(), created_at: now, updated_at: now, messages: vec![], title: "".into() };
         self.store.create(&session)?;
@@ -78,7 +89,7 @@ impl SessionManager {
         self.store.list()
     }
 
-    pub fn delete_session(&mut self, id: &str) -> Result<()> {
+    pub fn delete_session(&self, id: &str) -> Result<()> {
         self.store.delete(id)
     }
 
@@ -90,21 +101,21 @@ impl SessionManager {
         }
     }
 
-    pub fn add_message(&mut self, session_id: &str, role: &str, content: &str) -> Result<Message> {
+    pub fn add_message(&self, session_id: &str, role: &str, content: &str) -> Result<Message> {
         let msg = Self::new_msg(role, content);
         self.store.add_message(session_id, &msg)?;
         Ok(msg)
     }
 
     /// Add the final assistant message, optionally carrying thinking text.
-    pub fn add_assistant_message(&mut self, session_id: &str, content: &str, thinking: Option<&str>) -> Result<()> {
+    pub fn add_assistant_message(&self, session_id: &str, content: &str, thinking: Option<&str>) -> Result<()> {
         let mut msg = Self::new_msg("assistant", content);
         msg.thinking = thinking.map(|s| s.to_string());
         self.store.add_message(session_id, &msg)?;
         Ok(())
     }
 
-    pub fn add_assistant_tool_calls(&mut self, session_id: &str, tool_calls: Vec<ToolCall>, content: &str, thinking: Option<&str>) -> Result<()> {
+    pub fn add_assistant_tool_calls(&self, session_id: &str, tool_calls: Vec<ToolCall>, content: &str, thinking: Option<&str>) -> Result<()> {
         let mut msg = Self::new_msg("assistant", content);
         msg.tool_calls = Some(tool_calls);
         msg.thinking = thinking.map(|s| s.to_string());
@@ -112,12 +123,25 @@ impl SessionManager {
         Ok(())
     }
 
-    pub fn add_tool_result(&mut self, session_id: &str, tool_call_id: &str, content: &str) -> Result<()> {
+    pub fn add_tool_result(&self, session_id: &str, tool_call_id: &str, content: &str) -> Result<()> {
         let mut msg = Self::new_msg("tool", content);
         msg.tool_call_id = Some(tool_call_id.into());
         self.store.add_message(session_id, &msg)?;
         Ok(())
     }
+}
+
+/// Thin adapter that wraps `Arc<dyn SessionStore>` as a `Box<dyn SessionStore>`.
+/// All methods delegate to the inner `Arc`, so the store can be shared across
+/// threads while still fitting into `SessionManager`'s `Box<dyn SessionStore>` field.
+struct ArcStore(Arc<dyn SessionStore>);
+
+impl SessionStore for ArcStore {
+    fn create(&self, s: &Session) -> Result<()> { self.0.create(s) }
+    fn get(&self, id: &str) -> Result<Option<Session>> { self.0.get(id) }
+    fn list(&self) -> Result<Vec<Session>> { self.0.list() }
+    fn add_message(&self, sid: &str, msg: &Message) -> Result<()> { self.0.add_message(sid, msg) }
+    fn delete(&self, id: &str) -> Result<()> { self.0.delete(id) }
 }
 
 #[cfg(test)]

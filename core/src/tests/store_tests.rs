@@ -8,7 +8,7 @@ fn make_session_manager() -> SessionManager {
 
 #[test]
 fn create_and_get_session() {
-    let mut mgr = make_session_manager();
+    let mgr = make_session_manager();
     let s = mgr.create_session().unwrap();
     let retrieved = mgr.get_session(&s.id).unwrap().unwrap();
     assert_eq!(retrieved.id, s.id);
@@ -16,7 +16,7 @@ fn create_and_get_session() {
 
 #[test]
 fn add_user_message() {
-    let mut mgr = make_session_manager();
+    let mgr = make_session_manager();
     let s = mgr.create_session().unwrap();
     mgr.add_message(&s.id, "user", "hello").unwrap();
     let session = mgr.get_session(&s.id).unwrap().unwrap();
@@ -26,7 +26,7 @@ fn add_user_message() {
 
 #[test]
 fn add_assistant_tool_calls() {
-    let mut mgr = make_session_manager();
+    let mgr = make_session_manager();
     let s = mgr.create_session().unwrap();
     mgr.add_assistant_tool_calls(&s.id, vec![ToolCall {
         id: "call_1".into(), call_type: "function".into(),
@@ -39,7 +39,7 @@ fn add_assistant_tool_calls() {
 
 #[test]
 fn add_tool_result() {
-    let mut mgr = make_session_manager();
+    let mgr = make_session_manager();
     let s = mgr.create_session().unwrap();
     mgr.add_tool_result(&s.id, "call_1", "file content here").unwrap();
     let session = mgr.get_session(&s.id).unwrap().unwrap();

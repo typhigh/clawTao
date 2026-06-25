@@ -4,15 +4,12 @@
 //! signature.  The main loop in `main.rs` routes incoming method names
 //! to these functions with the appropriate arguments.
 
-use crate::chat;
 use crate::config::LlmConfig;
 use crate::jsonrpc::{self, Request, Response};
 use crate::store::SessionManager;
-use crate::tools::registry::ToolRegistry;
 use anyhow::Result;
-use reqwest::blocking::Client;
 use serde_json::json;
-use tracing::{info};
+use tracing::info;
 
 // ── Session ──────────────────────────────────────────────────────────────
 
@@ -22,7 +19,7 @@ pub fn session_list(request: &Request, mgr: &SessionManager) -> Result<()> {
     Ok(())
 }
 
-pub fn session_create(request: &Request, mgr: &mut SessionManager) -> Result<()> {
+pub fn session_create(request: &Request, mgr: &SessionManager) -> Result<()> {
     let result = serde_json::to_value(mgr.create_session()?)?;
     jsonrpc::write_response(&Response::success(request.id.clone(), result))?;
     Ok(())
@@ -40,7 +37,7 @@ pub fn session_get(request: &Request, mgr: &SessionManager) -> Result<()> {
     Ok(())
 }
 
-pub fn session_delete(request: &Request, mgr: &mut SessionManager) -> Result<()> {
+pub fn session_delete(request: &Request, mgr: &SessionManager) -> Result<()> {
     let session_id = jsonrpc::get_param(&request.params, "sessionId")?;
     mgr.delete_session(session_id)?;
     jsonrpc::write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
@@ -117,18 +114,6 @@ pub fn config_test_key(request: &Request, cfg: &LlmConfig) -> Result<()> {
         ))?,
     }
     Ok(())
-}
-
-// ── Chat ─────────────────────────────────────────────────────────────────
-
-pub fn chat_send(
-    request: &Request,
-    mgr: &mut SessionManager,
-    tools: &ToolRegistry,
-    cfg: &mut LlmConfig,
-    client: &Client,
-) -> Result<()> {
-    chat::handle_chat_send(request, mgr, tools, cfg, client)
 }
 
 // ── Health ───────────────────────────────────────────────────────────────

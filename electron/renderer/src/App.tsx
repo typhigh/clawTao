@@ -100,7 +100,9 @@ function buildHistoricalTurns(messages: Message[]): TimelineGroup[] {
             timestamp: msg.timestamp,
           });
         }
-        currentConclusion = msg.content;
+        if (msg.content) {
+          currentConclusion = msg.content;
+        }
       }
     } else if (msg.role === 'tool') {
       if (!currentTurn) currentTurn = [];
@@ -293,7 +295,6 @@ function App() {
   const {
     sessions, activeSessionId,
     loadSessions, createSession, selectSession, deleteSession,
-    currentTurn, isStreaming,
     error, clearError,
     handleStreamEvent,
   } = useChatStore();
@@ -352,6 +353,8 @@ function App() {
   };
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const currentTurn = activeSession?.currentTurn || [];
+  const isStreaming = activeSession?.isStreaming || false;
 
   // Historical turns from persisted messages, plus a live turn from stream events
   const historicalGroups = activeSession ? buildHistoricalTurns(activeSession.messages) : [];
@@ -392,7 +395,7 @@ function App() {
               ) : (
                 sessions.map((session) => {
                   const isActive = session.id === activeSessionId;
-                  const isRunning = isActive && isStreaming;
+                  const isRunning = session.isStreaming || false;
                   return (
                     <div
                       key={session.id}
@@ -499,20 +502,14 @@ function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[]; isSt
   );
 }
 
-/** Thinking block — collapsible card, mirrors the "深度思考" style.
- *  - forceOpen: when true (live turn still streaming), pin the body open
- *    so the user can watch the model think in real time. After streaming
- *    ends the user can fold/unfold freely. Historical turns default to
- *    folded. Hides entirely when the user disables extended thinking. */
+/** Thinking block — collapsible card. Expanded while streaming (forceOpen),
+ *  collapsed for historical turns. Hides when thinking is disabled. */
 function Thinking({ content, forceOpen = false }: { content: string; forceOpen?: boolean }) {
   const { config } = useSettingsStore();
   const { t } = useTranslation();
-  // The user is always in control — `forceOpen` only affects the initial
-  // state (expanded while streaming so the model "thinks out loud",
-  // collapsed for historical turns). After the first render the user can
-  // freely fold/unfold regardless of streaming state: the latest content
-  // is always in `content`, so re-expanding shows the full current text.
   const [open, setOpen] = useState(forceOpen);
+  // Follow forceOpen when it changes (e.g. streaming ended → auto-close).
+  useEffect(() => { setOpen(forceOpen); }, [forceOpen]);
 
   if (!config?.thinking_enabled) return null;
 

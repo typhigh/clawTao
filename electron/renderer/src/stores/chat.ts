@@ -65,6 +65,10 @@ export interface Session {
   created_at: number;
   updated_at: number;
   messages: Message[];
+  /** Per-session live stream state — no cross-talk between sessions. */
+  currentTurn?: StreamEvent[];
+  isStreaming?: boolean;
+  currentRunId?: string | null;
 }
 
 // ── Unified stream event ──────────────────────────────────────────────
@@ -97,10 +101,6 @@ export type StreamEvent = {
 interface ChatState {
   sessions: Session[];
   activeSessionId: string | null;
-  /** Ordered stream events for the currently-executing turn. Emptied on done. */
-  currentTurn: StreamEvent[];
-  isStreaming: boolean;
-  currentRunId: string | null;
   error: string | null;
 
   // Actions
@@ -114,12 +114,16 @@ interface ChatState {
   clearError: () => void;
 }
 
+// Helper: update a single session in-place.
+const patchSession = (
+  sessions: Session[],
+  sessionId: string,
+  fn: (s: Session) => Session,
+) => sessions.map((s) => (s.id === sessionId ? fn(s) : s));
+
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions: [],
   activeSessionId: null,
-  currentTurn: [],
-  isStreaming: false,
-  currentRunId: null,
   error: null,
 
   loadSessions: async () => {
@@ -152,10 +156,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const session = await window.electronAPI.session.get(sessionId);
       set((state) => ({
-        sessions: state.sessions.map((s) => (s.id === sessionId ? session : s)),
+        sessions: state.sessions.map((s) => {
+          if (s.id !== sessionId) return s;
+          // Preserve live streaming state — session.get doesn't carry it.
+          return { ...session, currentTurn: s.currentTurn, isStreaming: s.isStreaming, currentRunId: s.currentRunId };
+        }),
         activeSessionId: sessionId,
-        currentTurn: [],
-        isStreaming: false,
       }));
     } catch (error) {
       set({ error: `Failed to load session: ${error}` });
@@ -170,7 +176,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const activeSessionId = state.activeSessionId === sessionId
         ? (sessions[0]?.id || null)
         : state.activeSessionId;
-      set({ sessions, activeSessionId, currentTurn: [], isStreaming: false });
+      set({ sessions, activeSessionId });
     } catch (error) {
       set({ error: `Failed to delete session: ${error}` });
     }
@@ -183,7 +189,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return;
     }
 
-    // Optimistically add user message to UI immediately
     const userMsg: Message = {
       id: `tmp-${Date.now()}`,
       role: 'user',
@@ -191,67 +196,90 @@ export const useChatStore = create<ChatState>((set, get) => ({
       timestamp: Date.now(),
     };
     set((state) => ({
-      isStreaming: true,
-      currentTurn: [],
       error: null,
-      sessions: state.sessions.map((s) =>
-        s.id === activeSessionId ? { ...s, messages: [...s.messages, userMsg] } : s
-      ),
+      sessions: patchSession(state.sessions, activeSessionId, (s) => ({
+        ...s,
+        isStreaming: true,
+        currentTurn: [],
+        messages: [...s.messages, userMsg],
+      })),
     }));
 
     try {
       await window.electronAPI.chat.send(text, activeSessionId);
-      // Reload session from Rust to get the authoritative persisted state.
-      // The stream events (including 'done') have already been processed
-      // by handleStreamEvent; this reload ensures consistency.
       const session = await window.electronAPI.session.get(activeSessionId);
       set((state) => ({
-        sessions: state.sessions.map((s) => (s.id === activeSessionId ? session : s)),
-        isStreaming: false,
-        currentTurn: [],
+        sessions: patchSession(state.sessions, activeSessionId, () => ({
+          ...session,
+          isStreaming: false,
+          currentTurn: [],
+        })),
       }));
     } catch (error) {
-      set({ error: `Failed to send message: ${error}`, isStreaming: false, currentTurn: [] });
+      set((state) => ({
+        error: `Failed to send message: ${error}`,
+        sessions: patchSession(state.sessions, activeSessionId, (s) => ({
+          ...s,
+          isStreaming: false,
+          currentTurn: [],
+          messages: s.messages.filter(m => !m.id.startsWith('tmp-')),
+        })),
+      }));
     }
   },
 
   handleStreamEvent: (ev: StreamEvent) => {
-    const { activeSessionId } = get();
-    if (ev.sessionId !== activeSessionId) return;
-
-    switch (ev.kind) {
-      case 'started':
-        set({ isStreaming: true, currentTurn: [ev], currentRunId: ev.runId });
-        break;
-
-      case 'text':
-      case 'thinking':
-      case 'tool_call':
-      case 'tool_result':
-        set((state) => ({
-          currentTurn: [...state.currentTurn, ev],
-        }));
-        break;
-
-      case 'done':
-        // Mark turn complete, then reload the session from Rust to get
-        // the persisted messages. The stream events are ephemeral — the
-        // authoritative state lives in the Rust session store.
-        set((state) => ({ currentTurn: [...state.currentTurn, ev] }));
-        {
-          const sid = activeSessionId;
+    set((state) => {
+      const sid = ev.sessionId;
+      switch (ev.kind) {
+        case 'started':
+          return {
+            sessions: patchSession(state.sessions, sid, (s) => ({
+              ...s,
+              isStreaming: true,
+              currentTurn: [ev],
+              currentRunId: ev.runId,
+            })),
+          };
+        case 'text':
+        case 'thinking':
+        case 'tool_call':
+        case 'tool_result':
+          return {
+            sessions: patchSession(state.sessions, sid, (s) => ({
+              ...s,
+              currentTurn: [...(s.currentTurn || []), ev],
+            })),
+          };
+        case 'done':
+          // Append 'done' event, then async-reload from Rust.
           window.electronAPI.session.get(sid).then((session) => {
-            set((state) => ({
-              sessions: state.sessions.map((s) => (s.id === sid ? session : s)),
-              isStreaming: false,
-              currentTurn: [],
+            set((s2) => ({
+              sessions: patchSession(s2.sessions, sid, () => ({
+                ...session,
+                isStreaming: false,
+                currentTurn: [],
+              })),
             }));
           }).catch(() => {
-            set({ isStreaming: false, currentTurn: [] });
+            set((s2) => ({
+              sessions: patchSession(s2.sessions, sid, (s) => ({
+                ...s,
+                isStreaming: false,
+                currentTurn: [],
+              })),
+            }));
           });
-        }
-        break;
-    }
+          return {
+            sessions: patchSession(state.sessions, sid, (s) => ({
+              ...s,
+              currentTurn: [...(s.currentTurn || []), ev],
+            })),
+          };
+        default:
+          return {};
+      }
+    });
   },
 
   clearError: () => set({ error: null }),

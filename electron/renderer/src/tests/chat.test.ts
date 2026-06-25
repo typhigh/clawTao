@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock electronAPI
-const mockSession = {
+const mockSessionApi = {
   list: vi.fn(),
   create: vi.fn(),
   get: vi.fn(),
@@ -11,29 +11,23 @@ const mockSession = {
 vi.stubGlobal('window', {
   electronAPI: {
     chat: { send: vi.fn() },
-    session: mockSession,
+    session: mockSessionApi,
     config: { get: vi.fn(), set: vi.fn(), validate: vi.fn(), testKey: vi.fn() },
     onStreamEvent: vi.fn(),
   },
 });
 
-import { useChatStore, StreamEvent } from '../stores/chat';
+import { useChatStore, StreamEvent, Session } from '../stores/chat';
 
-const mockSession1 = {
-  id: 's1',
-  created_at: 1000,
-  updated_at: 2000,
-  messages: [
-    { id: 'm1', role: 'user' as const, content: 'hello', timestamp: 1000 },
-  ],
-};
-
-const mockSession2 = {
-  id: 's2',
-  created_at: 3000,
-  updated_at: 4000,
-  messages: [],
-};
+function makeSession(overrides: Partial<Session> = {}): Session {
+  return {
+    id: 's1',
+    created_at: 1000,
+    updated_at: 2000,
+    messages: [{ id: 'm1', role: 'user' as const, content: 'hello', timestamp: 1000 }],
+    ...overrides,
+  };
+}
 
 function makeEvent(overrides: Partial<StreamEvent> = {}): StreamEvent {
   return {
@@ -44,15 +38,16 @@ function makeEvent(overrides: Partial<StreamEvent> = {}): StreamEvent {
   };
 }
 
+function currentTurn(state: ReturnType<typeof useChatStore.getState>, sid: string) {
+  return state.sessions.find(s => s.id === sid)?.currentTurn || [];
+}
+
 describe('chat store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useChatStore.setState({
       sessions: [],
       activeSessionId: null,
-      currentTurn: [],
-      isStreaming: false,
-      currentRunId: null,
       error: null,
     });
   });
@@ -61,13 +56,13 @@ describe('chat store', () => {
     const state = useChatStore.getState();
     expect(state.sessions).toEqual([]);
     expect(state.activeSessionId).toBeNull();
-    expect(state.isStreaming).toBe(false);
-    expect(state.currentTurn).toEqual([]);
   });
 
   it('loads sessions and selects first', async () => {
-    mockSession.list.mockResolvedValueOnce([mockSession1, mockSession2]);
-    mockSession.get.mockResolvedValueOnce(mockSession1);
+    const s1 = makeSession();
+    const s2 = makeSession({ id: 's2', messages: [] });
+    mockSessionApi.list.mockResolvedValueOnce([s1, s2]);
+    mockSessionApi.get.mockResolvedValueOnce(s1);
 
     await useChatStore.getState().loadSessions();
 
@@ -77,7 +72,8 @@ describe('chat store', () => {
   });
 
   it('creates session and sets as active', async () => {
-    mockSession.create.mockResolvedValueOnce(mockSession2);
+    const s2 = makeSession({ id: 's2', messages: [] });
+    mockSessionApi.create.mockResolvedValueOnce(s2);
 
     await useChatStore.getState().createSession();
 
@@ -87,7 +83,7 @@ describe('chat store', () => {
   });
 
   it('selects session by id', async () => {
-    mockSession.get.mockResolvedValueOnce(mockSession1);
+    mockSessionApi.get.mockResolvedValueOnce(makeSession());
 
     await useChatStore.getState().selectSession('s1');
 
@@ -95,40 +91,59 @@ describe('chat store', () => {
     expect(state.activeSessionId).toBe('s1');
   });
 
-  it('handleStreamEvent "started" sets streaming and clears currentTurn', () => {
-    useChatStore.setState({ activeSessionId: 's1', currentTurn: [{ kind: 'text', sessionId: 's1', runId: 'old', delta: 'old' }] });
+  it('handleStreamEvent "started" sets per-session streaming', () => {
+    useChatStore.setState({
+      activeSessionId: 's1',
+      sessions: [makeSession()],
+    });
 
     useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'started', runId: 'r99' }));
 
     const state = useChatStore.getState();
-    expect(state.isStreaming).toBe(true);
-    expect(state.currentRunId).toBe('r99');
-    expect(state.currentTurn).toHaveLength(1);
-    expect(state.currentTurn[0].kind).toBe('started');
+    const s1 = state.sessions.find(s => s.id === 's1')!;
+    expect(s1.isStreaming).toBe(true);
+    expect(s1.currentRunId).toBe('r99');
+    expect(s1.currentTurn).toHaveLength(1);
+    expect(s1.currentTurn![0].kind).toBe('started');
   });
 
-  it('handleStreamEvent "text" appends to currentTurn', () => {
-    useChatStore.setState({ activeSessionId: 's1', isStreaming: true, currentTurn: [makeEvent({ kind: 'started' })] });
+  it('handleStreamEvent "text" appends to per-session currentTurn', () => {
+    useChatStore.setState({
+      activeSessionId: 's1',
+      sessions: [makeSession({ currentTurn: [makeEvent({ kind: 'started' })], isStreaming: true })],
+    });
 
     useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'text', delta: 'Hello' }));
     useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'text', delta: ' World' }));
 
-    const state = useChatStore.getState();
-    expect(state.currentTurn).toHaveLength(3);
-    expect(state.currentTurn[1].delta).toBe('Hello');
-    expect(state.currentTurn[2].delta).toBe(' World');
+    const turn = currentTurn(useChatStore.getState(), 's1');
+    expect(turn).toHaveLength(3);
+    expect(turn[1].delta).toBe('Hello');
+    expect(turn[2].delta).toBe(' World');
   });
 
-  it('handleStreamEvent ignores non-active session', () => {
-    useChatStore.setState({ activeSessionId: 's2', currentTurn: [] });
+  it('handleStreamEvent receives events for non-active session', () => {
+    // Session s2 is not active but should still receive events.
+    useChatStore.setState({
+      activeSessionId: 's1',
+      sessions: [
+        makeSession(),
+        makeSession({ id: 's2', messages: [], currentTurn: [], isStreaming: true }),
+      ],
+    });
 
-    useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'text', delta: 'nope' }));
+    useChatStore.getState().handleStreamEvent(makeEvent({ sessionId: 's2', kind: 'text', delta: 's2-text' }));
 
-    expect(useChatStore.getState().currentTurn).toHaveLength(0);
+    const s2Turn = currentTurn(useChatStore.getState(), 's2');
+    expect(s2Turn).toHaveLength(1);
+    expect(s2Turn[0].delta).toBe('s2-text');
   });
 
-  it('handleStreamEvent "tool_call" and "tool_result" are ordered in currentTurn', () => {
-    useChatStore.setState({ activeSessionId: 's1', isStreaming: true, currentTurn: [makeEvent({ kind: 'started' })] });
+  it('handleStreamEvent "tool_call" and "tool_result" ordered per-session', () => {
+    useChatStore.setState({
+      activeSessionId: 's1',
+      sessions: [makeSession({ currentTurn: [makeEvent({ kind: 'started' })], isStreaming: true })],
+    });
 
     useChatStore.getState().handleStreamEvent(makeEvent({
       kind: 'tool_call', toolCallId: 'tc1', toolName: 'Bash', input: { command: 'ls' },
@@ -137,7 +152,7 @@ describe('chat store', () => {
       kind: 'tool_result', toolCallId: 'tc1', toolName: 'Bash', output: 'stdout:\nfile.txt',
     }));
 
-    const turn = useChatStore.getState().currentTurn;
+    const turn = currentTurn(useChatStore.getState(), 's1');
     expect(turn).toHaveLength(3);
     expect(turn[1].kind).toBe('tool_call');
     expect(turn[1].toolName).toBe('Bash');
@@ -147,30 +162,67 @@ describe('chat store', () => {
 
   it('handleStreamEvent "done" reloads session and clears streaming', async () => {
     const doneSession = {
-      ...mockSession1,
+      ...makeSession(),
       messages: [
-        ...mockSession1.messages,
+        ...makeSession().messages,
         { id: 'm2', role: 'assistant' as const, content: 'Hi!', timestamp: 3000 },
       ],
     };
-    mockSession.get.mockResolvedValueOnce(doneSession);
+    mockSessionApi.get.mockResolvedValueOnce(doneSession);
 
     useChatStore.setState({
       activeSessionId: 's1',
-      isStreaming: true,
-      currentTurn: [makeEvent({ kind: 'started' }), makeEvent({ kind: 'text', delta: 'Hi!' })],
-      sessions: [mockSession1],
+      sessions: [makeSession({
+        isStreaming: true,
+        currentTurn: [makeEvent({ kind: 'started' }), makeEvent({ kind: 'text', delta: 'Hi!' })],
+      })],
     });
 
     useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'done' }));
 
-    // isStreaming cleared immediately on done
-    // Wait for async reload
     await vi.waitFor(() => {
       const state = useChatStore.getState();
-      expect(state.isStreaming).toBe(false);
-      expect(state.currentTurn).toHaveLength(0);
-      expect(state.sessions[0].messages).toHaveLength(2);
+      const s1 = state.sessions.find(s => s.id === 's1')!;
+      expect(s1.isStreaming).toBe(false);
+      expect(s1.currentTurn).toHaveLength(0);
+      expect(s1.messages).toHaveLength(2);
     });
+  });
+
+  it('selectSession preserves live streaming state', async () => {
+    const freshFromRust = makeSession({ messages: [{ id: 'm99', role: 'assistant' as const, content: 'new', timestamp: 999 }] });
+    mockSessionApi.get.mockResolvedValueOnce(freshFromRust);
+
+    useChatStore.setState({
+      activeSessionId: 's1',
+      sessions: [makeSession({ isStreaming: true, currentTurn: [makeEvent({ kind: 'text', delta: 'live' })], currentRunId: 'r99' })],
+    });
+
+    await useChatStore.getState().selectSession('s1');
+
+    const s1 = useChatStore.getState().sessions.find(s => s.id === 's1')!;
+    expect(s1.isStreaming).toBe(true);
+    expect(s1.currentTurn).toHaveLength(1);
+    expect(s1.currentRunId).toBe('r99');
+    // Messages are refreshed from Rust, but steaming state is preserved.
+    expect(s1.messages).toHaveLength(1);
+    expect(s1.messages[0].id).toBe('m99');
+  });
+
+  it('sendMessage on error removes optimistic user message', async () => {
+    vi.mocked(window.electronAPI.chat.send).mockRejectedValueOnce(new Error('network'));
+    // Prevent the store from auto-creating a session; test a single-session scenario.
+    useChatStore.setState({
+      activeSessionId: 's1',
+      sessions: [makeSession({ messages: [] })],
+    });
+
+    await useChatStore.getState().sendMessage('will fail');
+
+    const state = useChatStore.getState();
+    const s1 = state.sessions.find(s => s.id === 's1')!;
+    expect(s1.isStreaming).toBe(false);
+    expect(s1.messages.filter(m => m.role === 'user')).toHaveLength(0);
+    expect(state.error).toContain('Failed to send message');
   });
 });

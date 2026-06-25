@@ -13,7 +13,7 @@ use tracing::{debug, trace};
 
 pub(crate) fn handle_chat_send(
     request: &crate::jsonrpc::Request,
-    session_manager: &mut SessionManager,
+    session_manager: &SessionManager,
     tool_registry: &ToolRegistry,
     llm_config: &LlmConfig,
     client: &Client,
