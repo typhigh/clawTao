@@ -356,8 +356,19 @@ function App() {
   const currentTurn = activeSession?.currentTurn || [];
   const isStreaming = activeSession?.isStreaming || false;
 
+  // While streaming, hide the in-progress trailing turn from history so
+  // it doesn't double-render alongside liveTurn.
+  const messagesForHistory = (() => {
+    if (!activeSession || !activeSession.isStreaming) return activeSession?.messages ?? [];
+    const msgs = activeSession.messages;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user') return msgs.slice(0, i + 1);
+    }
+    return [];
+  })();
+
   // Historical turns from persisted messages, plus a live turn from stream events
-  const historicalGroups = activeSession ? buildHistoricalTurns(activeSession.messages) : [];
+  const historicalGroups = activeSession ? buildHistoricalTurns(messagesForHistory) : [];
   const live = currentTurn.length > 0 ? buildLiveSegments(currentTurn) : null;
   const timeline: TimelineGroup[] = [
     ...historicalGroups,
