@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use crate::config::LlmConfig;
 use crate::jsonrpc::{Notification, Response};
 use crate::llm::{ApiAdapter, AnthropicAdapter, LlmMessage, LlmRequest, OpenAiAdapter, UnifiedTool};
-use crate::store::SessionManager;
+use crate::store::{self, store_trait::SessionStore};
 use crate::tools::registry::ToolRegistry;
 use crate::jsonrpc::{get_param, write_notification, write_response};
 use reqwest::blocking::Client;
@@ -13,7 +13,7 @@ use tracing::{debug, trace};
 
 pub(crate) fn handle_chat_send(
     request: &crate::jsonrpc::Request,
-    session_manager: &SessionManager,
+    store: &dyn SessionStore,
     tool_registry: &ToolRegistry,
     llm_config: &LlmConfig,
     client: &Client,
@@ -21,9 +21,9 @@ pub(crate) fn handle_chat_send(
     let message_text = get_param(&request.params, "message")?;
     let session_id = get_param(&request.params, "sessionId")?;
 
-    session_manager.add_message(session_id, "user", message_text)?;
+    store::add_message(store, session_id, "user", message_text)?;
 
-    let session = session_manager.get_session(session_id)?
+    let session = store.get(session_id)?
         .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
     let run_id = uuid::Uuid::new_v4().to_string();
 
@@ -118,7 +118,8 @@ pub(crate) fn handle_chat_send(
 
         debug!("Executing {} tool calls", result.tool_calls.len());
 
-        session_manager.add_assistant_tool_calls(
+        store::add_assistant_tool_calls(
+            store,
             session_id,
             result.tool_calls.clone(),
             &result.text,
@@ -154,16 +155,16 @@ pub(crate) fn handle_chat_send(
                 "output": tool_result,
             }))))?;
 
-            session_manager.add_tool_result(session_id, &tc.id, &tool_result)?;
+            store::add_tool_result(store, session_id, &tc.id, &tool_result)?;
         }
 
-        messages = session_manager.get_session(session_id)?
+        messages = store.get(session_id)?
             .ok_or_else(|| anyhow::anyhow!("Session not found after tool execution"))?
             .messages.clone();
     };
 
     let content = if final_content.is_empty() { "(no response)" } else { &final_content };
-    session_manager.add_assistant_message(session_id, content, final_thinking.as_deref())?;
+    store::add_assistant_message(store, session_id, content, final_thinking.as_deref())?;
 
     write_notification(&Notification::new("chat.stream", Some(json!({
         "sessionId": session_id, "runId": run_id,

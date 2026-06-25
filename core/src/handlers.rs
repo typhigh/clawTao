@@ -1,34 +1,31 @@
 //! JSON-RPC method handlers — all supported methods at a glance.
-//!
-//! Each handler function declares exactly the state it needs in its
-//! signature.  The main loop in `main.rs` routes incoming method names
-//! to these functions with the appropriate arguments.
 
 use crate::config::LlmConfig;
 use crate::jsonrpc::{self, Request, Response};
-use crate::store::SessionManager;
+use crate::store::{self, store_trait::SessionStore};
 use anyhow::Result;
 use serde_json::json;
 use tracing::info;
 
 // ── Session ──────────────────────────────────────────────────────────────
 
-pub fn session_list(request: &Request, mgr: &SessionManager) -> Result<()> {
-    let result = serde_json::to_value(mgr.list_sessions().unwrap_or_default())?;
+pub fn session_list(request: &Request, store: &dyn SessionStore) -> Result<()> {
+    let result = serde_json::to_value(store.list().unwrap_or_default())?;
     jsonrpc::write_response(&Response::success(request.id.clone(), result))?;
     Ok(())
 }
 
-pub fn session_create(request: &Request, mgr: &SessionManager) -> Result<()> {
-    let result = serde_json::to_value(mgr.create_session()?)?;
-    jsonrpc::write_response(&Response::success(request.id.clone(), result))?;
+pub fn session_create(request: &Request, store: &dyn SessionStore) -> Result<()> {
+    let s = store::new_session();
+    store.create(&s)?;
+    jsonrpc::write_response(&Response::success(request.id.clone(), serde_json::to_value(&s)?))?;
     Ok(())
 }
 
-pub fn session_get(request: &Request, mgr: &SessionManager) -> Result<()> {
+pub fn session_get(request: &Request, store: &dyn SessionStore) -> Result<()> {
     let session_id = jsonrpc::get_param(&request.params, "sessionId")?;
-    let session = mgr
-        .get_session(session_id)?
+    let session = store
+        .get(session_id)?
         .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
     jsonrpc::write_response(&Response::success(
         request.id.clone(),
@@ -37,9 +34,9 @@ pub fn session_get(request: &Request, mgr: &SessionManager) -> Result<()> {
     Ok(())
 }
 
-pub fn session_delete(request: &Request, mgr: &SessionManager) -> Result<()> {
+pub fn session_delete(request: &Request, store: &dyn SessionStore) -> Result<()> {
     let session_id = jsonrpc::get_param(&request.params, "sessionId")?;
-    mgr.delete_session(session_id)?;
+    store.delete(session_id)?;
     jsonrpc::write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
     Ok(())
 }

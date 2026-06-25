@@ -188,7 +188,6 @@ fn actor_loop(
     tool_registry: Arc<ToolRegistry>,
     llm_config: LlmConfig,
 ) {
-    let session_manager = store::SessionManager::new_shared(store);
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(300))
         .build()
@@ -205,7 +204,7 @@ fn actor_loop(
                 };
                 if let Err(e) = chat::handle_chat_send(
                     &request,
-                    &session_manager,
+                    &*store,
                     &tool_registry,
                     &llm_config,
                     &client,
@@ -238,12 +237,11 @@ fn route(
     store: &Arc<dyn store::store_trait::SessionStore>,
     llm_config: &mut LlmConfig,
 ) -> anyhow::Result<()> {
-    let session_manager = store::SessionManager::new_shared(Arc::clone(store));
     match request.method.as_str() {
-        "session.list" => session_list(request, &session_manager),
-        "session.create" => session_create(request, &session_manager),
-        "session.get" => session_get(request, &session_manager),
-        "session.delete" => session_delete(request, &session_manager),
+        "session.list" => session_list(request, &**store),
+        "session.create" => session_create(request, &**store),
+        "session.get" => session_get(request, &**store),
+        "session.delete" => session_delete(request, &**store),
 
         "config.get" => config_get(request, llm_config),
         "config.set" => config_set(request, llm_config),
