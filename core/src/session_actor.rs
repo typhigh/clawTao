@@ -12,7 +12,6 @@ use std::sync::{Arc, Mutex, mpsc};
 use crate::store::store_trait::SessionStore;
 
 /// Message sent to a session actor.
-#[allow(dead_code)]
 pub enum SessionMsg {
     /// Run a chat turn. The actor calls `handle_chat_send` internally.
     Run {
@@ -56,7 +55,6 @@ impl SessionRegistry {
     }
 
     /// Remove and shut down the actor for `session_id`.
-    #[allow(dead_code)]
     pub fn remove(&self, session_id: &str) {
         let handle = self.actors.lock().unwrap().remove(session_id);
         if let Some(h) = handle {
@@ -66,60 +64,5 @@ impl SessionRegistry {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::store::json_store::JsonSessionStore;
-    use std::sync::Barrier;
-
-    fn make_registry() -> SessionRegistry {
-        let dir = std::env::temp_dir().join(format!("clawtao_test_actor_{}", uuid::Uuid::new_v4()));
-        SessionRegistry::new(Arc::new(JsonSessionStore::new(dir)))
-    }
-
-    #[test]
-    fn get_or_spawn_reuses_existing_actor() {
-        let reg = make_registry();
-        let spawned = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let s = Arc::clone(&spawned);
-
-        let _tx1 = reg.get_or_spawn("s1", move |rx| {
-            s.store(true, std::sync::atomic::Ordering::SeqCst);
-            std::thread::spawn(move || {
-                for msg in rx {
-                    if matches!(msg, SessionMsg::Shutdown) { break; }
-                }
-            })
-        });
-        assert!(spawned.load(std::sync::atomic::Ordering::SeqCst));
-
-        // Second call: factory should NOT run again.
-        let spawned2 = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let s2 = Arc::clone(&spawned2);
-        let _tx2 = reg.get_or_spawn("s1", move |_rx| {
-            s2.store(true, std::sync::atomic::Ordering::SeqCst);
-            std::thread::spawn(|| {})
-        });
-        assert!(!spawned2.load(std::sync::atomic::Ordering::SeqCst));
-
-        reg.remove("s1");
-    }
-
-    #[test]
-    fn remove_shuts_down_actor() {
-        let reg = make_registry();
-        let barrier = Arc::new(Barrier::new(2));
-        let b = Arc::clone(&barrier);
-        let tx = reg.get_or_spawn("s1", move |rx| {
-            std::thread::spawn(move || {
-                b.wait(); // signal ready
-                // Block until Shutdown arrives.
-                assert!(matches!(rx.recv().unwrap(), SessionMsg::Shutdown));
-            })
-        });
-        // Drop tx so remove's Shutdown reaches the actor (no other sender).
-        drop(tx);
-        barrier.wait(); // actor is ready
-        reg.remove("s1");
-        // If remove didn't work, the test would hang (actor never exits).
-    }
-}
+#[path = "tests/session_actor_tests.rs"]
+mod tests;

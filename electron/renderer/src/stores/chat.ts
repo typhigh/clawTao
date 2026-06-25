@@ -208,14 +208,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       await window.electronAPI.chat.send(text, activeSessionId);
-      const session = await window.electronAPI.session.get(activeSessionId);
-      set((state) => ({
-        sessions: patchSession(state.sessions, activeSessionId, () => ({
-          ...session,
-          isStreaming: false,
-          currentTurn: [],
-        })),
-      }));
+      // handleStreamEvent 'done' already reloaded via session.get; no second reload needed.
     } catch (error) {
       set((state) => ({
         error: `Failed to send message: ${error}`,

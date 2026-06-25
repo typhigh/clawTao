@@ -60,7 +60,7 @@ pub struct SessionManager {
 }
 
 impl SessionManager {
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn new(store: Box<dyn SessionStore>) -> Self {
         Self { store }
     }
