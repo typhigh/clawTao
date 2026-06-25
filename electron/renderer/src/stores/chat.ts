@@ -64,6 +64,7 @@ export interface Session {
   id: string;
   created_at: number;
   updated_at: number;
+  title?: string;
   messages: Message[];
   /** Per-session live stream state — no cross-talk between sessions. */
   currentTurn?: StreamEvent[];

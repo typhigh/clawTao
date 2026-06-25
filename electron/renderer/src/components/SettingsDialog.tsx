@@ -12,7 +12,7 @@ const PROVIDER_DEFAULTS: Record<string, { base_url: string; protocol: string; ba
 };
 
 function emptyConfig(): LlmConfig {
-  return { provider: 'deepseek', api_key: '', base_url: PROVIDER_DEFAULTS.deepseek.base_url, model: '', models: [], api_protocol: 'openai', log_level: 'info', bash_blocked_commands: [], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS as any, thinking_enabled: true };
+  return { provider: 'deepseek', api_key: '', base_url: PROVIDER_DEFAULTS.deepseek.base_url, model: '', models: [], api_protocol: 'anthropic', log_level: 'info', bash_blocked_commands: [], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS, thinking_enabled: true };
 }
 
 export function SettingsDialog({ open, onClose }: Props) {
@@ -32,12 +32,12 @@ export function SettingsDialog({ open, onClose }: Props) {
         api_key: '',
         base_url: config.base_url || PROVIDER_DEFAULTS[config.provider || 'deepseek']?.base_url || '',
         model: config.model || '',
-        api_protocol: (config as any).api_protocol || 'openai',
+        api_protocol: config.api_protocol || 'anthropic',
         models: config.models || [config.model].filter(Boolean),
         log_level: config.log_level || 'info',
         bash_blocked_commands: config.bash_blocked_commands || [],
-        bash_timeout_secs: (config as any).bash_timeout_secs ?? DEFAULT_BASH_TIMEOUT_SECS as any,
-        thinking_enabled: (config as any).thinking_enabled ?? true,
+        bash_timeout_secs: config.bash_timeout_secs ?? DEFAULT_BASH_TIMEOUT_SECS,
+        thinking_enabled: config.thinking_enabled ?? true,
       });
     }
   }, [open, config]);
@@ -48,7 +48,7 @@ export function SettingsDialog({ open, onClose }: Props) {
 
   const handleProviderChange = (p: string) => {
     const d = PROVIDER_DEFAULTS[p];
-    const updates: any = { provider: p };
+    const updates: Partial<Pick<LlmConfig, 'provider' | 'base_url' | 'api_protocol'>> = { provider: p };
     if (d) {
       updates.base_url = d.base_url;
       if (d.protocolLocked) updates.api_protocol = d.protocol;
@@ -59,7 +59,7 @@ export function SettingsDialog({ open, onClose }: Props) {
   const handleTest = async () => {
     setTestResult('idle');
     try {
-      const result = await testKey(tmp.api_key, tmp.base_url, tmp.model, (tmp as any).api_protocol || 'openai');
+      const result = await testKey(tmp.api_key, tmp.base_url, tmp.model, tmp.api_protocol || 'openai');
       setTestResult(result.ok ? 'ok' : 'error');
       setTestMessage(result.error || 'OK');
     } catch (e) { setTestResult('error'); setTestMessage(String(e)); }
@@ -68,7 +68,7 @@ export function SettingsDialog({ open, onClose }: Props) {
   const handleSave = async () => {
     setTestResult('idle');
     try {
-      const result = await testKey(tmp.api_key, tmp.base_url, tmp.model, (tmp as any).api_protocol || 'openai');
+      const result = await testKey(tmp.api_key, tmp.base_url, tmp.model, tmp.api_protocol || 'openai');
       if (!result.ok) { setTestResult('error'); setTestMessage(result.error || 'Validation failed'); return; }
       await save(tmp);
       onClose();
@@ -121,7 +121,7 @@ export function SettingsDialog({ open, onClose }: Props) {
           {tmp.provider === 'custom' && (
             <div className="form-group">
               <label>{t('settings.apiProtocol')}</label>
-              <select value={(tmp as any).api_protocol || 'openai'} onChange={(e) => setTmpField('api_protocol' as any, e.target.value)}>
+              <select value={tmp.api_protocol || 'openai'} onChange={(e) => setTmpField('api_protocol', e.target.value)}>
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic</option>
               </select>
@@ -157,7 +157,7 @@ export function SettingsDialog({ open, onClose }: Props) {
               <input
                 type="checkbox"
                 checked={tmp.thinking_enabled}
-                onChange={(e) => setTmpField('thinking_enabled' as any, e.target.checked)}
+                onChange={(e) => setTmpField('thinking_enabled', e.target.checked)}
               />
               {t('settings.thinkingEnabled')}
             </label>
@@ -171,12 +171,12 @@ export function SettingsDialog({ open, onClose }: Props) {
           <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <label style={{ margin: 0 }}>{t('settings.bashTimeout')}</label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer', margin: 0, whiteSpace: 'nowrap' }}>
-              <input type="checkbox" checked={tmp.bash_timeout_secs !== null} onChange={(e) => setTmpField('bash_timeout_secs' as any, e.target.checked ? DEFAULT_BASH_TIMEOUT_SECS : null)} />
+              <input type="checkbox" checked={tmp.bash_timeout_secs !== null} onChange={(e) => setTmpField('bash_timeout_secs', e.target.checked ? DEFAULT_BASH_TIMEOUT_SECS : null)} />
               {t('settings.enable')}
             </label>
             {tmp.bash_timeout_secs !== null && (
               <>
-                <input type="number" value={tmp.bash_timeout_secs} onChange={(e) => setTmpField('bash_timeout_secs' as any, parseInt(e.target.value) || DEFAULT_BASH_TIMEOUT_SECS)} style={{ width: 80, padding: '4px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 }} />
+                <input type="number" value={tmp.bash_timeout_secs} onChange={(e) => setTmpField('bash_timeout_secs', parseInt(e.target.value) || DEFAULT_BASH_TIMEOUT_SECS)} style={{ width: 80, padding: '4px 8px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13 }} />
                 <span style={{ fontSize: 12, color: '#999' }}>{t('settings.seconds')}</span>
               </>
             )}
