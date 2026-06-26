@@ -17,6 +17,7 @@ anyhow = "1.0"
 dirs = "5.0"
 regex = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
+scraper = "0.20"
 
 [profile.release]
 strip = true

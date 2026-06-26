@@ -27,7 +27,12 @@ impl ToolExecutor for WebFetchTool {
         let url = input.get("url").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidInput("missing 'url'".into()))?;
 
-        let resp = reqwest::blocking::get(url)
+        let client = reqwest::blocking::Client::builder()
+            .user_agent("Mozilla/5.0 (compatible; ClawTao/0.1)")
+            .build()
+            .map_err(|e| ToolError::Execution(format!("WebFetch: {e}")))?;
+
+        let resp = client.get(url).send()
             .map_err(|e| ToolError::Execution(format!("WebFetch {url}: {e}")))?;
 
         let status = resp.status();
@@ -49,71 +54,52 @@ impl ToolExecutor for WebFetchTool {
     }
 }
 
+/// HTML-to-text via a real parser (`html5ever` / `scraper`).
+///
+/// All entity decoding, tag matching, and UTF-8 handling is done by the
+/// parser — no hand-rolled state machine, no byte slicing.
 fn strip_html(html: &str) -> String {
-    let mut result = String::with_capacity(html.len());
-    let mut in_tag = false;
-    let mut in_script = false;
-    let mut in_style = false;
-    let mut last_was_newline = false;
+    let doc = scraper::Html::parse_document(html);
 
-    // Iterate the lowercased copy to get byte indices that are valid for
-    // slicing into `lower`. Track the original chars in parallel so we
-    // output the real casing of the page text.
-    let lower = html.to_lowercase();
-    let mut html_chars = html.chars();
-    for (i, lo_ch) in lower.char_indices() {
-        let ch = html_chars.next().unwrap_or(lo_ch);
-        if ch == '<' {
-            in_tag = true;
-            // Check if this is a <script> or <style> tag
-            if lower[i..].starts_with("<script") {
-                in_script = true;
-            } else if lower[i..].starts_with("<style") {
-                in_style = true;
-            }
-            continue;
-        }
-        if ch == '>' {
-            in_tag = false;
-            // Check if </script> or </style> just ended
-            if in_script && lower[i.saturating_sub(8)..=i].contains("</script>") {
-                in_script = false;
-            }
-            if in_style && lower[i.saturating_sub(7)..=i].contains("</style>") {
-                in_style = false;
-            }
-            continue;
-        }
-        if in_tag || in_script || in_style {
-            continue;
-        }
+    let mut text = String::with_capacity(html.len());
+    // Walk the DOM tree from <html> down, skipping <script> and <style> subtrees.
+    let root = doc.root_element();
+    collect_text(&root, &mut text);
 
-        // Normalize whitespace
+    // Normalise whitespace: collapse runs of space/newline into a single space.
+    let mut result = String::with_capacity(text.len());
+    let mut in_space = false;
+    for ch in text.chars() {
         if ch.is_whitespace() {
-            if !last_was_newline {
+            if !in_space {
                 result.push(' ');
-                last_was_newline = true;
+                in_space = true;
             }
         } else {
             result.push(ch);
-            last_was_newline = false;
+            in_space = false;
         }
     }
 
-    // Decode common HTML entities
-    result = result.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&nbsp;", " ");
-
-    // Collapse multiple newlines
-    while result.contains("\n\n\n") {
-        result = result.replace("\n\n\n", "\n\n");
-    }
-
     result.trim().to_string()
+}
+
+/// Recursively collect text from element children, skipping `<script>` and `<style>`.
+fn collect_text(element: &scraper::ElementRef<'_>, out: &mut String) {
+    for child in element.children() {
+        if let Some(el) = child.value().as_element() {
+            let name = el.name();
+            if name == "script" || name == "style" {
+                continue; // skip the entire subtree
+            }
+        }
+        if let Some(t) = child.value().as_text() {
+            out.push_str(t);
+        }
+        if let Some(el_ref) = scraper::ElementRef::wrap(child) {
+            collect_text(&el_ref, out);
+        }
+    }
 }
 
 #[cfg(test)]
