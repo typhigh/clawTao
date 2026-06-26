@@ -202,7 +202,7 @@ fn actor_loop(
                     method: "chat.send".into(),
                     params: Some(params),
                 };
-                if let Err(e) = chat::handle_chat_send(
+                if let Err(e) = chat::run_turn(
                     &request,
                     &*store,
                     &tool_registry,
