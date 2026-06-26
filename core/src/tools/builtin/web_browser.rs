@@ -26,14 +26,21 @@ impl ToolExecutor for WebBrowserTool {
 
     fn spec(&self) -> ToolSpec {
         ToolSpec::new("WebBrowser",
-            "Control a visible Chromium browser. Actions: start, stop, navigate, snapshot, screenshot, click, type, evaluate, tabs, newTab.",
+            "Control a full Chromium browser (supports JavaScript). Use for: searching the web (action=search), visiting JS-heavy pages, interactive browsing. After navigate/search, use snapshot to read the rendered page text, or screenshot for a visual capture.",
             json!({
                 "type": "object",
                 "properties": {
-                    "action": { "type": "string", "enum": ["start","stop","navigate","search","snapshot","screenshot","click","type","evaluate","tabs","newTab"] },
-                    "url":    { "type": "string", "description": "URL or search keywords" },
-                    "selector": { "type": "string", "description": "CSS selector for click/type/evaluate" },
-                    "text":   { "type": "string", "description": "Text to type" }
+                    "action": {
+                        "type": "string",
+                        "description": "Browser action: start opens a new tab, navigate goes to a URL, search performs a search engine query (Google), snapshot returns the accessibility tree as text, screenshot returns a base64 PNG, click/type/evaluate interact with the page, tabs lists open tabs, newTab opens a blank tab, stop closes the browser.",
+                        "enum": ["start","stop","navigate","search","snapshot","screenshot","click","type","evaluate","tabs","newTab"]
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "For action=navigate: a full URL. For action=search: keywords to search for on Google."
+                    },
+                    "selector": { "type": "string", "description": "CSS selector for click/type/evaluate actions" },
+                    "text":   { "type": "string", "description": "Text to type (for type action)" }
                 },
                 "required": ["action"]
             }),

@@ -26,5 +26,11 @@ pub fn build(tool_registry: &ToolRegistry) -> String {
         Use Grep instead of grep in Bash. \
         After code changes, run tests or build to verify.".to_string());
 
+    // Tool selection hints
+    lines.push(String::new());
+    lines.push("WebFetch is for simple static pages (API responses, documentation, plain HTML). \
+        For search engines, JS-heavy sites, or interactive browsing, use WebBrowser instead: \
+        call search first, then snapshot to read the rendered page.".to_string());
+
     lines.join("\n")
 }
