@@ -1,5 +1,5 @@
 use super::adapter::{ApiAdapter, HttpRequest, StreamEvent};
-use super::types::{LlmRequest, LlmResponse};
+use super::types::{LlmMessage, LlmRequest, LlmResponse};
 use crate::store::ToolCall;
 use anyhow::Result;
 use serde_json::{json, Value};
@@ -12,38 +12,7 @@ impl ApiAdapter for AnthropicAdapter {
     fn build(&self, req: &LlmRequest, api_key: &str, base_url: &str) -> Result<HttpRequest> {
         let url = format!("{}/v1/messages", base_url.trim_end_matches('/'));
 
-        let messages: Vec<serde_json::Value> = req.messages.iter().map(|m| {
-            if let Some(ref tool_calls) = m.tool_calls {
-                let mut blocks: Vec<Value> = tool_calls.iter().map(|tc| {
-                    let args: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null);
-                    json!({"type": "tool_use", "id": tc.id, "name": tc.function.name, "input": args})
-                }).collect();
-                // thinking → text → tool_use (chronological order).
-                if !m.content.is_empty() {
-                    blocks.insert(0, json!({"type": "text", "text": m.content}));
-                }
-                if let Some(ref thinking) = m.thinking {
-                    if !thinking.is_empty() {
-                        blocks.insert(0, json!({"type": "thinking", "thinking": thinking}));
-                    }
-                }
-                json!({"role": "assistant", "content": blocks})
-            } else if m.role == "tool" {
-                json!({"role": "user", "content": [{"type": "tool_result", "tool_use_id": m.tool_call_id, "content": m.content}]})
-            } else if m.role == "assistant" {
-                // Assistant text message: include thinking block for multi-turn replay.
-                let mut blocks: Vec<Value> = Vec::new();
-                if let Some(ref thinking) = m.thinking {
-                    if !thinking.is_empty() {
-                        blocks.push(json!({"type": "thinking", "thinking": thinking}));
-                    }
-                }
-                blocks.push(json!({"type": "text", "text": m.content}));
-                json!({"role": "assistant", "content": blocks})
-            } else {
-                json!({"role": m.role, "content": [{"type": "text", "text": m.content}]})
-            }
-        }).collect();
+        let messages = Self::convert_messages(&req.messages);
 
         let tools: Vec<Value> = req.tools.iter().map(|t| {
             json!({"name": t.name, "description": t.description, "input_schema": t.parameters})
@@ -195,6 +164,97 @@ impl ApiAdapter for AnthropicAdapter {
             _ => {}
         }
         out
+    }
+}
+
+// ── Message conversion helpers ─────────────────────────────────────────
+//
+// These convert the internal LlmMessage representation into Anthropic's
+// content-block wire format ({type, role, content: [...]}).
+
+impl AnthropicAdapter {
+    /// Convert a slice of `LlmMessage` into Anthropic message JSON.
+    ///
+    /// Consecutive `role: "tool"` messages are merged into a single user
+    /// message so that all `tool_result` blocks sit together — required
+    /// by the Anthropic API for parallel tool calls.
+    fn convert_messages(msgs: &[LlmMessage]) -> Vec<Value> {
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < msgs.len() {
+            if msgs[i].role == "tool" {
+                // Collect a run of consecutive tool messages.
+                let start = i;
+                while i < msgs.len() && msgs[i].role == "tool" {
+                    i += 1;
+                }
+                out.push(Self::build_tool_results(&msgs[start..i]));
+            } else if msgs[i].tool_calls.is_some() {
+                out.push(Self::build_assistant_tool_use(&msgs[i]));
+                i += 1;
+            } else if msgs[i].role == "assistant" {
+                out.push(Self::build_assistant_text(&msgs[i]));
+                i += 1;
+            } else {
+                out.push(Self::build_text_message(&msgs[i]));
+                i += 1;
+            }
+        }
+        out
+    }
+
+    /// User or system message → `[{type: "text", text: "..."}]`
+    fn build_text_message(msg: &LlmMessage) -> Value {
+        json!({"role": msg.role, "content": [{"type": "text", "text": msg.content}]})
+    }
+
+    /// Assistant text reply with optional thinking block.
+    ///
+    /// Output order: `thinking` (if present), then `text`.
+    fn build_assistant_text(msg: &LlmMessage) -> Value {
+        let mut blocks: Vec<Value> = Vec::new();
+        if let Some(ref thinking) = msg.thinking {
+            if !thinking.is_empty() {
+                blocks.push(json!({"type": "thinking", "thinking": thinking}));
+            }
+        }
+        blocks.push(json!({"type": "text", "text": msg.content}));
+        json!({"role": "assistant", "content": blocks})
+    }
+
+    /// Assistant message that contains tool calls.
+    ///
+    /// Output order follows Anthropic's chronological requirement:
+    /// `thinking` → `text` → `tool_use` (one block per call).
+    fn build_assistant_tool_use(msg: &LlmMessage) -> Value {
+        let tool_calls = msg.tool_calls.as_ref().expect("build_assistant_tool_use called without tool_calls");
+        let mut blocks: Vec<Value> = Vec::new();
+        if let Some(ref thinking) = msg.thinking {
+            if !thinking.is_empty() {
+                blocks.push(json!({"type": "thinking", "thinking": thinking}));
+            }
+        }
+        if !msg.content.is_empty() {
+            blocks.push(json!({"type": "text", "text": msg.content}));
+        }
+        for tc in tool_calls {
+            let args: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null);
+            blocks.push(json!({"type": "tool_use", "id": tc.id, "name": tc.function.name, "input": args}));
+        }
+        json!({"role": "assistant", "content": blocks})
+    }
+
+    /// Pack one or more consecutive tool-result messages into a single
+    /// `user` message with multiple `tool_result` blocks.
+    ///
+    /// The Anthropic protocol requires this: when an assistant makes N
+    /// parallel tool calls, all N results must live in the next user
+    /// message, not in N separate user messages.
+    fn build_tool_results(msgs: &[LlmMessage]) -> Value {
+        let blocks: Vec<Value> = msgs.iter().map(|tm| {
+            json!({"type": "tool_result", "tool_use_id": tm.tool_call_id, "content": tm.content})
+        }).collect();
+        json!({"role": "user", "content": blocks})
     }
 }
 

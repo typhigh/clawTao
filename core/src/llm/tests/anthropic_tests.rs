@@ -166,6 +166,82 @@ fn build_tool_result_to_tool_result_block() {
 }
 
 #[test]
+fn build_parallel_tool_results_merged_into_single_user_message() {
+    let adapter = AnthropicAdapter;
+    // Simulate: assistant makes 2 parallel tool calls, then both results come back.
+    // These should be merged into ONE user message with TWO tool_result blocks.
+    let req = LlmRequest {
+        messages: vec![
+            // User message
+            LlmMessage {
+                role: "user".into(),
+                content: "read two files".into(),
+                tool_calls: None,
+                tool_call_id: None,
+                thinking: None,
+            },
+            // Assistant message with 2 parallel tool_use blocks
+            LlmMessage {
+                role: "assistant".into(),
+                content: "".into(),
+                tool_calls: Some(vec![
+                    ToolCall {
+                        id: "call_00".into(),
+                        call_type: "function".into(),
+                        function: ToolCallFunction { name: "Read".into(), arguments: r#"{"path":"a.txt"}"#.into() },
+                    },
+                    ToolCall {
+                        id: "call_01".into(),
+                        call_type: "function".into(),
+                        function: ToolCallFunction { name: "Read".into(), arguments: r#"{"path":"b.txt"}"#.into() },
+                    },
+                ]),
+                tool_call_id: None,
+                thinking: None,
+            },
+            // Tool result 1 (separate message in DB)
+            LlmMessage {
+                role: "tool".into(),
+                content: "content A".into(),
+                tool_calls: None,
+                tool_call_id: Some("call_00".into()),
+                thinking: None,
+            },
+            // Tool result 2 (separate message in DB)
+            LlmMessage {
+                role: "tool".into(),
+                content: "content B".into(),
+                tool_calls: None,
+                tool_call_id: Some("call_01".into()),
+                thinking: None,
+            },
+        ],
+        ..basic_request()
+    };
+
+    let http = adapter.build(&req, "sk-ant-test", "https://api.anthropic.com").unwrap();
+    let body: serde_json::Value = serde_json::from_str(&http.body).unwrap();
+
+    // Should have 3 messages: user, assistant (with tool_use blocks), user (with merged tool_result blocks)
+    let msgs = body["messages"].as_array().expect("messages should be array");
+    assert_eq!(msgs.len(), 3, "expected 3 messages: user, assistant, user(merged tool_results)");
+
+    // Third message should be the merged user message with both tool_result blocks
+    let tool_result_msg = &msgs[2];
+    assert_eq!(tool_result_msg["role"], "user");
+    let blocks = tool_result_msg["content"].as_array().expect("content should be array");
+    assert_eq!(blocks.len(), 2, "should have 2 tool_result blocks merged into 1 message");
+
+    assert_eq!(blocks[0]["type"], "tool_result");
+    assert_eq!(blocks[0]["tool_use_id"], "call_00");
+    assert_eq!(blocks[0]["content"], "content A");
+
+    assert_eq!(blocks[1]["type"], "tool_result");
+    assert_eq!(blocks[1]["tool_use_id"], "call_01");
+    assert_eq!(blocks[1]["content"], "content B");
+}
+
+#[test]
 fn build_multiple_parallel_tool_calls() {
     let adapter = AnthropicAdapter;
     let req = LlmRequest {
