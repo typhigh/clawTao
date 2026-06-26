@@ -47,3 +47,38 @@ fn edit_not_found_fails() {
     assert!(format!("{err}").contains("not found"));
     std::fs::remove_file(&tmp).ok();
 }
+
+#[test]
+fn edit_replace_all() {
+    let tool = EditTool;
+    let tmp = std::env::temp_dir().join("clawtao_test_edit4.txt");
+    std::fs::write(&tmp, "aa bb aa cc aa").unwrap();
+
+    let result = tool.execute(serde_json::json!({
+        "path": tmp.to_str().unwrap(),
+        "old_string": "aa",
+        "new_string": "xx",
+        "replace_all": true
+    })).unwrap();
+
+    assert_eq!(std::fs::read_to_string(&tmp).unwrap(), "xx bb xx cc xx");
+    assert!(result.contains("3 replacement(s)"));
+    std::fs::remove_file(&tmp).ok();
+}
+
+#[test]
+fn edit_replace_all_not_found_fails() {
+    let tool = EditTool;
+    let tmp = std::env::temp_dir().join("clawtao_test_edit5.txt");
+    std::fs::write(&tmp, "hello").unwrap();
+
+    let err = tool.execute(serde_json::json!({
+        "path": tmp.to_str().unwrap(),
+        "old_string": "xyz",
+        "new_string": "abc",
+        "replace_all": true
+    })).unwrap_err();
+
+    assert!(format!("{err}").contains("not found"));
+    std::fs::remove_file(&tmp).ok();
+}

@@ -12,7 +12,7 @@ impl ToolExecutor for EditTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec::new(
             "Edit",
-            "Perform exact string replacements in a file. If `old_string` is not unique in the file, the edit fails (no partial replacements).",
+            "Performs exact string replacement in a file. When `replace_all` is false (default), `old_string` must be unique. When true, replaces every occurrence.",
             json!({
                 "type": "object",
                 "properties": {
@@ -22,11 +22,15 @@ impl ToolExecutor for EditTool {
                     },
                     "old_string": {
                         "type": "string",
-                        "description": "The exact text to replace (must be unique in the file)"
+                        "description": "The exact text to replace"
                     },
                     "new_string": {
                         "type": "string",
                         "description": "The text to replace it with"
+                    },
+                    "replace_all": {
+                        "type": "boolean",
+                        "description": "If true, replace all occurrences instead of requiring exactly one match (default: false)"
                     }
                 },
                 "required": ["path", "old_string", "new_string"]
@@ -44,27 +48,36 @@ impl ToolExecutor for EditTool {
         let new_string = input.get("new_string").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidInput("missing or invalid 'new_string'".into()))?;
 
+        let replace_all = input.get("replace_all")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
         let content = std::fs::read_to_string(path)
             .map_err(|e| ToolError::Execution(format!("Edit({path}): read failed: {e}")))?;
 
-        // Count occurrences — must be exactly 1
         let count = content.matches(old_string).count();
         if count == 0 {
             return Err(ToolError::Execution(format!(
                 "Edit({path}): old_string not found in file"
             )));
         }
-        if count > 1 {
-            return Err(ToolError::Execution(format!(
-                "Edit({path}): old_string found {count} times (must be unique)"
-            )));
+
+        if !replace_all {
+            if count > 1 {
+                return Err(ToolError::Execution(format!(
+                    "Edit({path}): old_string found {count} times (must be unique). Use replace_all: true to replace all."
+                )));
+            }
+            let new_content = content.replacen(old_string, new_string, 1);
+            std::fs::write(path, &new_content)
+                .map_err(|e| ToolError::Execution(format!("Edit({path}): write failed: {e}")))?;
+            Ok(format!("Successfully edited {path}"))
+        } else {
+            let new_content = content.replace(old_string, new_string);
+            std::fs::write(path, &new_content)
+                .map_err(|e| ToolError::Execution(format!("Edit({path}): write failed: {e}")))?;
+            Ok(format!("Successfully edited {path}: {count} replacement(s)"))
         }
-
-        let new_content = content.replacen(old_string, new_string, 1);
-        std::fs::write(path, &new_content)
-            .map_err(|e| ToolError::Execution(format!("Edit({path}): write failed: {e}")))?;
-
-        Ok(format!("Successfully edited {path}"))
     }
 }
 
