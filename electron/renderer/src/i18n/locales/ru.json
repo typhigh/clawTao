@@ -5,7 +5,11 @@
     "newSession": "Новая сессия",
     "noSessions": "Нет сессий",
     "emptySession": "Пустая сессия",
-    "deleteSession": "Удалить сессию"
+    "deleteSession": "Удалить сессию",
+    "newChat": "Новый чат",
+    "settings": "Настройки",
+    "expand": "Развернуть",
+    "collapse": "Свернуть"
   },
   "chat": {
     "placeholder": "Введите сообщение...",

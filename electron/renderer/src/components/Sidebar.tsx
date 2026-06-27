@@ -1,7 +1,7 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { LanguageSwitcher } from './LanguageSwitcher';
-import { SpinnerIcon, CheckIcon } from './icons';
+import { SpinnerIcon, CheckIcon, PlusIcon, GearIcon, TrashIcon } from './icons';
 import { formatRelative } from '../utils/format';
 import type { Session } from '../stores/chat';
 
@@ -16,42 +16,56 @@ interface Props {
 
 export function Sidebar({ sessions, activeSessionId, onSelect, onCreate, onDelete, onOpenSettings }: Props) {
   const { t } = useTranslation();
+  const [sessionsOpen, setSessionsOpen] = useState(true);
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-section config-section">
-        <div className="sidebar-section-header">
-          <h2>{t('sidebar.configuration')}</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <LanguageSwitcher />
-            <button className="btn-icon" onClick={onOpenSettings} title={t('sidebar.configuration')}>⚙️</button>
-          </div>
-        </div>
+      <div className="sidebar-new-chat">
+        <button className="new-chat-btn" onClick={onCreate} title={t('sidebar.newChat')}>
+          <span className="new-chat-icon"><PlusIcon /></span>
+          <span className="new-chat-label">{t('sidebar.newChat')}</span>
+        </button>
       </div>
 
       <div className="sidebar-spacer" />
 
       <div className="sidebar-section sessions-section">
-        <div className="sidebar-section-header">
+        <button
+          className="sidebar-section-header"
+          onClick={() => setSessionsOpen((o) => !o)}
+          title={t(sessionsOpen ? 'sidebar.collapse' : 'sidebar.expand')}
+          aria-expanded={sessionsOpen}
+        >
           <h2>{t('sidebar.sessions')}</h2>
-          <button onClick={onCreate} title={t('sidebar.newSession')}>+</button>
-        </div>
-        <div className="session-items">
-          {sessions.length === 0 ? (
-            <div className="session-empty">{t('sidebar.noSessions')}</div>
-          ) : (
-            sessions.map((session) => (
-              <SessionItem
-                key={session.id}
-                session={session}
-                isActive={session.id === activeSessionId}
-                onSelect={onSelect}
-                onDelete={onDelete}
-                t={t}
-              />
-            ))
-          )}
-        </div>
+          <span className="sidebar-section-toggle">
+            <span className={`chevron ${sessionsOpen ? 'open' : ''}`}>›</span>
+          </span>
+        </button>
+        {sessionsOpen && (
+          <div className="session-items">
+            {sessions.length === 0 ? (
+              <div className="session-empty">{t('sidebar.noSessions')}</div>
+            ) : (
+              sessions.map((session) => (
+                <SessionItem
+                  key={session.id}
+                  session={session}
+                  isActive={session.id === activeSessionId}
+                  onSelect={onSelect}
+                  onDelete={onDelete}
+                  t={t}
+                />
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="sidebar-footer">
+        <button className="sidebar-footer-config" onClick={onOpenSettings} title={t('sidebar.settings')}>
+          <GearIcon />
+          <span>{t('sidebar.settings')}</span>
+        </button>
       </div>
     </aside>
   );
@@ -76,7 +90,7 @@ function SessionItem({ session, isActive, onSelect, onDelete, t }: {
         className="session-delete-btn"
         onClick={(e) => { e.stopPropagation(); onDelete(session.id); }}
         title={t('sidebar.deleteSession')}
-      >×</button>
+      ><TrashIcon /></button>
     </div>
   );
 }

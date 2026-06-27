@@ -5,7 +5,11 @@
     "newSession": "New session",
     "noSessions": "No sessions yet",
     "emptySession": "Empty session",
-    "deleteSession": "Delete session"
+    "deleteSession": "Delete session",
+    "newChat": "New chat",
+    "settings": "Settings",
+    "expand": "Expand",
+    "collapse": "Collapse"
   },
   "chat": {
     "placeholder": "Type your message...",

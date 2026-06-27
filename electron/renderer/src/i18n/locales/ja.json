@@ -5,7 +5,11 @@
     "newSession": "新規セッション",
     "noSessions": "セッションなし",
     "emptySession": "空のセッション",
-    "deleteSession": "セッションを削除"
+    "deleteSession": "セッションを削除",
+    "newChat": "新しい会話",
+    "settings": "設定",
+    "expand": "展開",
+    "collapse": "折りたたむ"
   },
   "chat": {
     "placeholder": "メッセージを入力...",

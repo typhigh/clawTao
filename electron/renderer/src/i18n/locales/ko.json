@@ -5,7 +5,11 @@
     "newSession": "새 세션",
     "noSessions": "세션 없음",
     "emptySession": "빈 세션",
-    "deleteSession": "세션 삭제"
+    "deleteSession": "세션 삭제",
+    "newChat": "새 대화",
+    "settings": "설정",
+    "expand": "펼치기",
+    "collapse": "접기"
   },
   "chat": {
     "placeholder": "메시지 입력...",

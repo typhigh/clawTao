@@ -5,7 +5,11 @@
     "newSession": "Nouvelle session",
     "noSessions": "Aucune session",
     "emptySession": "Session vide",
-    "deleteSession": "Supprimer la session"
+    "deleteSession": "Supprimer la session",
+    "newChat": "Nouvelle conversation",
+    "settings": "Paramètres",
+    "expand": "Déplier",
+    "collapse": "Replier"
   },
   "chat": {
     "placeholder": "Saisissez votre message...",

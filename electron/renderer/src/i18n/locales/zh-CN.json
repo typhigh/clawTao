@@ -1,11 +1,15 @@
 {
   "sidebar": {
     "configuration": "⚙️ 配置",
+    "settings": "设置",
+    "expand": "展开",
+    "collapse": "折叠",
     "sessions": "会话",
     "newSession": "新建会话",
     "noSessions": "暂无会话",
     "emptySession": "空会话",
-    "deleteSession": "删除会话"
+    "deleteSession": "删除会话",
+    "newChat": "新对话"
   },
   "chat": {
     "placeholder": "输入消息...",
