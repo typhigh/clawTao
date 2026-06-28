@@ -28,36 +28,36 @@ export function InputArea({
 
   return (
     <div className="input-area-wrapper">
-      <div className="input-model-picker">
-        <select
-          className="input-model-select"
-          value={selectedModelKey}
-          onChange={(e) => onSelectModel(e.target.value)}
-          disabled={disabledModel || modelOptions.length === 0}
-          title={t('chat.selectModel')}
-        >
-          {modelOptions.length === 0 ? (
-            <option value="">{t('chat.noModelsConfigured')}</option>
-          ) : (
-            modelOptions.map(opt => (
-              <option key={opt.key} value={opt.key}>
-                {opt.providerName} / {opt.model}
-              </option>
-            ))
-          )}
-        </select>
-      </div>
       <form className="input-area" onSubmit={(e) => { e.preventDefault(); onSend(); }}>
-        <textarea
-          ref={textareaRef}
-          rows={2}
-          placeholder={t('chat.placeholder')}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          disabled={disabled}
-        />
-        <button type="submit" disabled={!value.trim() || disabled}>{t('chat.send')}</button>
+        <div className="input-textarea-wrap">
+          <textarea
+            ref={textareaRef}
+            rows={3}
+            placeholder={t('chat.placeholder')}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            disabled={disabled}
+          />
+          <select
+            className="input-model-select input-model-select-inline"
+            value={selectedModelKey}
+            onChange={(e) => onSelectModel(e.target.value)}
+            disabled={disabledModel || modelOptions.length === 0}
+            title={t('chat.selectModel')}
+          >
+            {modelOptions.length === 0 ? (
+              <option value="">{t('chat.noModelsConfigured')}</option>
+            ) : (
+              modelOptions.map(opt => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.providerId === 'custom' ? `${opt.providerName} / ${opt.model}` : opt.model}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+        <button type="submit" className="input-send-btn" disabled={!value.trim() || disabled}>{t('chat.send')}</button>
       </form>
     </div>
   );
