@@ -1,9 +1,25 @@
-//! JSON-RPC method handlers — session CRUD and health.
+//! JSON-RPC method handlers and routing.
 
 use crate::jsonrpc::{self, Request, Response};
 use crate::store::{self, store_trait::SessionStore};
 use anyhow::Result;
 use serde_json::json;
+use std::sync::Arc;
+
+/// Route a JSON-RPC request to the appropriate handler.
+pub fn route(
+    request: &Request,
+    store: &Arc<dyn SessionStore>,
+) -> Result<()> {
+    match request.method.as_str() {
+        "session.list" => session_list(request, &**store),
+        "session.create" => session_create(request, &**store),
+        "session.get" => session_get(request, &**store),
+        "session.delete" => session_delete(request, &**store),
+        "ping" => ping(request),
+        _ => not_found(request),
+    }
+}
 
 // ── Session ──────────────────────────────────────────────────────────────
 

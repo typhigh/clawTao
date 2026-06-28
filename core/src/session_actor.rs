@@ -66,6 +66,43 @@ impl SessionRegistry {
     }
 }
 
+/// Dispatch a chat.send request to the appropriate session actor.
+/// Spawns the actor on first use for a session.
+pub(crate) fn dispatch_chat_send(
+    request: &crate::jsonrpc::Request,
+    registry: &SessionRegistry,
+) {
+    let session_id = match request.params.as_ref().and_then(|p| p.get("sessionId")).and_then(|v| v.as_str()) {
+        Some(id) => id.to_string(),
+        None => {
+            let _ = crate::jsonrpc::write_response(&crate::jsonrpc::Response::error(
+                request.id.clone(), -32602, "Missing sessionId",
+            ));
+            return;
+        }
+    };
+
+    let store = Arc::clone(&registry.store);
+    let params = request.params.clone().unwrap_or_default();
+    let response_id = request.id.clone();
+    let sid = session_id.clone();
+
+    let tx = registry.get_or_spawn(&session_id, move |rx| {
+        let store = Arc::clone(&store);
+        let sid = sid.clone();
+        std::thread::spawn(move || {
+            actor_loop(rx, &sid, store, process_run_wrapper);
+        })
+    });
+
+    if tx.send(SessionMsg::Run { params, response_id }).is_err() {
+        tracing::error!("Failed to send to session actor {session_id} (channel closed)");
+        let _ = crate::jsonrpc::write_response(&crate::jsonrpc::Response::error(
+            request.id.clone(), -32603, "Session actor has stopped",
+        ));
+    }
+}
+
 /// Session actor loop. Processes Run messages sequentially, calling `process`
 /// for each one. The `process` function is `process_run_wrapper` in production,
 /// or a counter in tests.
