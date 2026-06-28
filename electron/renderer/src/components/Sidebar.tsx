@@ -12,9 +12,10 @@ interface Props {
   onCreate: () => void;
   onDelete: (id: string) => void;
   onOpenSettings: () => void;
+  isActive?: boolean;
 }
 
-export function Sidebar({ sessions, activeSessionId, onSelect, onCreate, onDelete, onOpenSettings }: Props) {
+export function Sidebar({ sessions, activeSessionId, onSelect, onCreate, onDelete, onOpenSettings, isActive }: Props) {
   const { t } = useTranslation();
   const [sessionsOpen, setSessionsOpen] = useState(true);
 
@@ -61,7 +62,7 @@ export function Sidebar({ sessions, activeSessionId, onSelect, onCreate, onDelet
         )}
       </div>
 
-      <div className="sidebar-footer">
+      <div className={`sidebar-footer ${isActive ? 'active' : ''}`}>
         <button className="sidebar-footer-config" onClick={onOpenSettings} title={t('sidebar.settings')}>
           <GearIcon />
           <span>{t('sidebar.settings')}</span>

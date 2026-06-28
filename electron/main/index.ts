@@ -33,24 +33,45 @@ function secretsPath(): string {
   return path.join(dataDir, 'secrets.json');
 }
 
-function readEncryptedKey(): string | null {
+type SecretsFile = {
+  providers: Record<string, string>;
+};
+
+function readSecrets(): SecretsFile {
   try {
-    const data = JSON.parse(fs.readFileSync(secretsPath(), 'utf-8'));
-    if (data.api_key && safeStorage.isEncryptionAvailable()) {
-      return safeStorage.decryptString(Buffer.from(data.api_key, 'base64'));
-    }
-  } catch {}
+    return JSON.parse(fs.readFileSync(secretsPath(), 'utf-8')) as SecretsFile;
+  } catch {
+    return { providers: {} };
+  }
+}
+
+function writeSecrets(secrets: SecretsFile): void {
+  fs.writeFileSync(secretsPath(), JSON.stringify(secrets));
+}
+
+function readEncryptedKey(providerId: string): string | null {
+  const data = readSecrets();
+  if (!safeStorage.isEncryptionAvailable()) return null;
+  if (data.providers && data.providers[providerId]) {
+    return safeStorage.decryptString(Buffer.from(data.providers[providerId], 'base64'));
+  }
   return null;
 }
 
-function writeEncryptedKey(plaintext: string): void {
+function writeEncryptedKey(plaintext: string, providerId: string): void {
+  const data = readSecrets();
+  const cipher = safeStorage.isEncryptionAvailable()
+    ? safeStorage.encryptString(plaintext).toString('base64')
+    : Buffer.from(plaintext).toString('base64');
   if (!safeStorage.isEncryptionAvailable()) {
     console.warn('safeStorage unavailable — storing key as plaintext');
-    fs.writeFileSync(secretsPath(), JSON.stringify({ api_key: Buffer.from(plaintext).toString('base64') }));
-    return;
   }
-  const encrypted = safeStorage.encryptString(plaintext).toString('base64');
-  fs.writeFileSync(secretsPath(), JSON.stringify({ api_key: encrypted }));
+  data.providers = { ...(data.providers || {}), [providerId]: cipher };
+  writeSecrets(data);
+}
+
+function maskKey(plain: string): string {
+  return plain.length > 8 ? plain.slice(0, 4) + '********' + plain.slice(-4) : '***';
 }
 
 // -- Config persistence (Electron-managed) --
@@ -98,10 +119,15 @@ function startRust() {
   const manifestPath = path.join(__dirname, '../../core/Cargo.toml');
   const coreDir = path.dirname(manifestPath);
 
+  // Read log_level from our Electron-managed config.json and forward it to the
+  // Rust child via RUST_LOG (EnvFilter picks it up on init).
+  const cfg = readConfig() as { log_level?: string };
+  const logLevel = cfg.log_level || 'info';
+
   rustProcess = spawn('cargo', ['run', '--manifest-path', manifestPath], {
     cwd: coreDir,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, RUST_BACKTRACE: '1' },
+    env: { ...process.env, RUST_BACKTRACE: '1', RUST_LOG: logLevel },
   });
 
   const rl = readline.createInterface({ input: rustProcess.stdout!, crlfDelay: Infinity });
@@ -157,43 +183,82 @@ function setupIpc() {
 
   // chat.send — auto-attach config from Electron's config store.
   ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string }) => {
-    const config = readConfig();
-    config.api_key = readEncryptedKey() || '';
+    const config: any = readConfig();
+    const activeId = config.active_provider_id as string | undefined;
+    config.api_key = activeId ? (readEncryptedKey(activeId) || '') : '';
     return sendRpc('chat.send', { ...p, config });
   });
 
   // config:get — reads from Electron-managed config.json + secrets.json.
+  // Schema is the new multi-provider shape only. Per-provider: we set
+  // `providers[i].api_key` to a masked string and never expose plaintext
+  // to the renderer.
   ipcMain.handle('config:get', () => {
-    const config = readConfig();
-    const plain = readEncryptedKey();
-    (config as any).has_api_key = !!plain;
-    if (plain) {
-      config.api_key = plain.length > 8
-        ? plain.slice(0, 4) + '**' + plain.slice(-4)
-        : '***';
-    }
+    const config: any = readConfig();
+    config.providers = (config.providers || []).map((p: any) => {
+      const plain = readEncryptedKey(p.id);
+      return {
+        ...p,
+        api_key: plain ? maskKey(plain) : '',
+        has_api_key: !!plain,
+      };
+    });
     return config;
   });
 
   // config:set — writes to Electron config.json + secrets.json.
+  // cfg.providers[i].api_key: masked (with '*') or undefined means "don't change".
+  // Plaintext (no '*') means "set this provider's key to that value".
+  // Explicit null means "remove this provider's key".
   ipcMain.handle('config:set', (_e, cfg: Record<string, unknown>) => {
-    const plaintext = (cfg.api_key as string)?.trim();
-    if (plaintext && !plaintext.includes('*')) {
-      writeEncryptedKey(plaintext);
+    const providers = cfg.providers as any[] | undefined;
+    if (Array.isArray(providers)) {
+      providers.forEach(p => {
+        if (p.api_key === null) {
+          const data = readSecrets();
+          if (data.providers) {
+            delete data.providers[p.id];
+            writeSecrets(data);
+          }
+          return;
+        }
+        const k = (p.api_key as string | undefined)?.trim();
+        if (k && !k.includes('*')) {
+          writeEncryptedKey(k, p.id);
+        }
+        // masked or empty/missing => leave secrets untouched
+      });
     }
-    const { api_key, ...rest } = cfg;
-    writeConfig(rest);
+
+    // If log_level changed, push it to the running Rust process so tracing
+    // updates without an app restart.
+    const newLevel = cfg.log_level as string | undefined;
+    if (newLevel) {
+      try {
+        const prev = readConfig();
+        if (prev.log_level !== newLevel) {
+          sendRpc('config.set_log_level', { level: newLevel }).catch((e) => {
+            console.error('Failed to push log_level to rust:', e);
+          });
+        }
+      } catch { /* readConfig already swallows */ }
+    }
+
+    writeConfig(cfg);
     return { ok: true };
   });
 
   // config:probe — tests an LLM endpoint from the main process (has proxy access).
-  ipcMain.handle('config:probe', async (_e, p: { base_url: string; model: string; api_key: string; api_protocol: string }) => {
-    // If the frontend sent an empty or masked key, use the real one from secrets.
-    let key = p.api_key || '';
+  // Behavior:
+  //   - If the caller provided a non-masked api_key, use it (in-progress edit).
+  //   - Otherwise look up the saved key for `provider_id` (the only correct
+  //     fallback: it keeps each provider's key isolated).
+  ipcMain.handle('config:probe', async (_e, p: { base_url: string; model: string; api_key: string; api_protocol: string; provider_id?: string }) => {
+    let key = (p.api_key || '').trim();
     if (!key || key.includes('*')) {
-      key = readEncryptedKey() || '';
+      if (p.provider_id) key = readEncryptedKey(p.provider_id) || '';
     }
-    if (!key) return { ok: false, error: 'No API key configured' };
+    if (!key) return { ok: false, error: 'No API key' };
     const base = p.base_url.replace(/\/+$/, '');
     const isAnthropic = p.api_protocol === 'anthropic';
     const url = isAnthropic ? `${base}/v1/models?limit=1` : `${base}/models`;

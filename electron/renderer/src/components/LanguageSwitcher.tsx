@@ -11,21 +11,16 @@ export function LanguageSwitcher() {
   };
 
   return (
-    <select
-      value={i18n.language}
-      onChange={handleChange}
-      style={{
-        padding: '4px 8px',
-        border: '1px solid #ddd',
-        borderRadius: 6,
-        fontSize: 12,
-        background: '#fff',
-        cursor: 'pointer',
-      }}
-    >
-      {SUPPORTED_LANGS.map((l) => (
-        <option key={l.code} value={l.code}>{l.label}</option>
-      ))}
-    </select>
+    <span className="settings-inline-select-wrap">
+      <select
+        className="settings-inline-select"
+        value={i18n.language}
+        onChange={handleChange}
+      >
+        {SUPPORTED_LANGS.map((l) => (
+          <option key={l.code} value={l.code}>{l.label}</option>
+        ))}
+      </select>
+    </span>
   );
 }

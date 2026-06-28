@@ -15,7 +15,9 @@
     "placeholder": "Saisissez votre message...",
     "send": "Envoyer",
     "noSession": "Aucune session sélectionnée",
-    "createSession": "Créer une session"
+    "createSession": "Créer une session",
+    "selectModel": "Sélectionner un modèle",
+    "noModelsConfigured": "Aucun modèle configuré (allez dans Paramètres)"
   },
   "tool": {
     "input": "Entrée",
@@ -35,15 +37,35 @@
     "daysAgo": "Il y a {{n}} j"
   },
   "settings": {
-    "title": "⚙️ Paramètres du fournisseur LLM",
-    "provider": "Fournisseur",
+    "title": "Paramètres",
+    "providers": "Fournisseurs",
+    "global": "Global",
+    "addProvider": "Ajouter un fournisseur",
+    "removeProvider": "Supprimer le fournisseur",
     "apiKey": "Clé API",
     "baseUrl": "URL de base",
     "apiProtocol": "Protocole API",
-    "model": "Modèle",
-    "logLevel": "Niveau de log",
+    "models": "Modèles",
+    "addModel": "Ajouter",
+    "removeModel": "Supprimer",
+    "noModels": "Aucun modèle — ajoutez-en ci-dessus",
+    "noModelsShort": "aucun modèle",
+    "modelCount": "{{count}} modèles",
+    "configured": "Configuré",
+    "notConfigured": "Non défini",
+    "cancelEdit": "Annuler",
+    "unsaved": "Modifications non enregistrées",
+    "bashTitle": "Bash",
+    "globalConfig": "Config globale",
+    "logLevel": {
+      "label": "Niveau de log",
+      "error": "Error",
+      "warn": "Warn",
+      "info": "Info",
+      "debug": "Debug",
+      "trace": "Trace"
+    },
     "bashBlockedCommands": "Commandes Bash bloquées (une par ligne)",
-    "thinkingEnabled": "Afficher la réflexion (texte bleu)",
     "bashTimeout": "Délai d'expiration Bash",
     "enable": "Activer",
     "seconds": "secondes",
@@ -52,13 +74,19 @@
     "testConnection": "Tester la connexion",
     "save": "Enregistrer",
     "connectionSuccess": "✅ Connexion réussie",
+    "providerSaved": "✅ Enregistré",
+    "apiKeyRequired": "Veuillez d'abord saisir une clé API",
     "suggested": "Suggestions",
     "enterNewKey": "Saisir une nouvelle clé API...",
-    "enterModelId": "Saisir l'ID du modèle"
+    "enterModelId": "Saisir l'ID du modèle",
+    "language": {
+      "label": "Langue"
+    }
   },
   "common": {
     "auto": "(auto)",
     "error": "Erreur",
-    "loading": "Chargement..."
+    "loading": "Chargement...",
+    "back": "Retour"
   }
 }

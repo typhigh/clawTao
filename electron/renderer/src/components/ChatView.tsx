@@ -5,6 +5,13 @@ import { AgentTurnView } from './AgentTurn';
 import { InputArea } from './InputArea';
 import type { TimelineGroup } from '../types/timeline';
 
+export interface ModelOption {
+  providerId: string;
+  providerName: string;
+  model: string;
+  key: string;
+}
+
 interface Props {
   timeline: TimelineGroup[];
   error: string | null;
@@ -19,9 +26,12 @@ interface Props {
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
     onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   };
+  modelOptions: ModelOption[];
+  selectedModelKey: string;
+  onSelectModel: (key: string) => void;
 }
 
-export function ChatView({ timeline, error, onClearError, hasActiveSession, onCreateSession, input }: Props) {
+export function ChatView({ timeline, error, onClearError, hasActiveSession, onCreateSession, input, modelOptions, selectedModelKey, onSelectModel }: Props) {
   const { t } = useTranslation();
 
   return (
@@ -37,7 +47,12 @@ export function ChatView({ timeline, error, onClearError, hasActiveSession, onCr
               return <AgentTurnView key={`${group.id}-done`} segments={group.segments} conclusion={group.conclusion} />;
             })}
           </div>
-          <InputArea {...input} />
+          <InputArea
+            {...input}
+            modelOptions={modelOptions}
+            selectedModelKey={selectedModelKey}
+            onSelectModel={onSelectModel}
+          />
         </>
       ) : (
         <div className="empty-state">

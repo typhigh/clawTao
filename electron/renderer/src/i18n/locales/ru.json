@@ -15,7 +15,9 @@
     "placeholder": "Введите сообщение...",
     "send": "Отправить",
     "noSession": "Сессия не выбрана",
-    "createSession": "Создать сессию"
+    "createSession": "Создать сессию",
+    "selectModel": "Выберите модель",
+    "noModelsConfigured": "Модели не настроены (перейдите в Настройки)"
   },
   "tool": {
     "input": "Ввод",
@@ -35,15 +37,35 @@
     "daysAgo": "{{n}} дн. назад"
   },
   "settings": {
-    "title": "⚙️ Настройки LLM провайдера",
-    "provider": "Провайдер",
+    "title": "Настройки",
+    "providers": "Провайдеры",
+    "global": "Глобальные",
+    "addProvider": "Добавить провайдера",
+    "removeProvider": "Удалить провайдера",
     "apiKey": "API ключ",
     "baseUrl": "Базовый URL",
     "apiProtocol": "API протокол",
-    "model": "Модель",
-    "logLevel": "Уровень логирования",
+    "models": "Модели",
+    "addModel": "Добавить",
+    "removeModel": "Удалить",
+    "noModels": "Нет моделей — добавьте выше",
+    "noModelsShort": "нет моделей",
+    "modelCount": "{{count}} мод.",
+    "configured": "Настроено",
+    "notConfigured": "Не настроено",
+    "cancelEdit": "Отмена",
+    "unsaved": "Есть несохранённые изменения",
+    "bashTitle": "Bash",
+    "globalConfig": "Глобальная настройка",
+    "logLevel": {
+      "label": "Уровень логирования",
+      "error": "Error",
+      "warn": "Warn",
+      "info": "Info",
+      "debug": "Debug",
+      "trace": "Trace"
+    },
     "bashBlockedCommands": "Запрещённые Bash команды (по одной на строку)",
-    "thinkingEnabled": "Показывать мышление (синий текст)",
     "bashTimeout": "Таймаут Bash",
     "enable": "Включить",
     "seconds": "сек.",
@@ -52,13 +74,19 @@
     "testConnection": "Проверить соединение",
     "save": "Сохранить",
     "connectionSuccess": "✅ Соединение успешно",
+    "providerSaved": "✅ Сохранено",
+    "apiKeyRequired": "Сначала введите API-ключ",
     "suggested": "Рекомендуемые",
     "enterNewKey": "Введите новый API ключ...",
-    "enterModelId": "Введите ID модели"
+    "enterModelId": "Введите ID модели",
+    "language": {
+      "label": "Язык"
+    }
   },
   "common": {
     "auto": "(авто)",
     "error": "Ошибка",
-    "loading": "Загрузка..."
+    "loading": "Загрузка...",
+    "back": "Назад"
   }
 }

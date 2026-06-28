@@ -20,12 +20,26 @@ vi.stubGlobal('window', {
   },
 });
 
-import { useSettingsStore } from '../stores/settings';
+import { useSettingsStore, emptyConfig, PROVIDER_TEMPLATES } from '../stores/settings';
+
+function makeConfig() {
+  return {
+    providers: [
+      { id: 'deepseek', api_key: 'sk-ds**ef', base_url: PROVIDER_TEMPLATES.deepseek.base_url, api_protocol: 'anthropic' as const, models: ['deepseek-v4-pro'] },
+      { id: 'minimax',  api_key: 'sk-mn**ef', base_url: PROVIDER_TEMPLATES.minimax.base_url,  api_protocol: 'anthropic' as const, models: ['MiniMax-M3'] },
+    ],
+    active_provider_id: 'minimax',
+    active_model_id: 'MiniMax-M3',
+    log_level: 'info',
+    bash_blocked_commands: ['rm -rf /'],
+    bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
+  };
+}
 
 describe('settings store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useSettingsStore.setState({ config: null, loaded: false });
+    useSettingsStore.setState({ config: null, savedConfig: null, loaded: false });
   });
 
   it('starts with null config and not loaded', () => {
@@ -35,15 +49,7 @@ describe('settings store', () => {
   });
 
   it('loads config and sets loaded flag', async () => {
-    const mockConfig = {
-      provider: 'openai',
-      api_key: 'sk-1**cdef',
-      base_url: 'https://api.openai.com/v1',
-      model: 'gpt-4o',
-      log_level: 'info',
-      api_protocol: 'openai', models: [],
-      bash_blocked_commands: ['rm -rf /'], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
-    };
+    const mockConfig = makeConfig();
     mockConfigApi.get.mockResolvedValueOnce(mockConfig);
 
     await useSettingsStore.getState().load();
@@ -53,36 +59,42 @@ describe('settings store', () => {
     expect(state.config).toEqual(mockConfig);
   });
 
-  it('handles load error gracefully', async () => {
+  it('preserves whatever shape main returns (no compatibility shim)', async () => {
+    // Whatever main returns, the store just mirrors it. No fallback to empty.
+    const raw = { provider: 'openai', api_key: 'sk-xxx', base_url: 'x', model: 'y' };
+    mockConfigApi.get.mockResolvedValueOnce(raw);
+
+    await useSettingsStore.getState().load();
+
+    const state = useSettingsStore.getState();
+    expect(state.loaded).toBe(true);
+    expect(state.config).toEqual(raw);
+    expect(state.savedConfig).toEqual(raw);
+  });
+
+  it('handles load error gracefully by returning empty config', async () => {
     mockConfigApi.get.mockRejectedValueOnce(new Error('Rust not ready'));
 
     await useSettingsStore.getState().load();
 
     const state = useSettingsStore.getState();
     expect(state.loaded).toBe(true);
-    expect(state.config).toBeNull();
+    expect(state.config).toEqual(emptyConfig());
   });
 
-  it('save calls config.set and reloads masked config', async () => {
-    const newConfig = {
-      provider: 'minimax',
-      api_key: 'sk-real',
-      base_url: 'https://api.minimaxi.com/v1',
-      model: 'MiniMax-M3',
-      log_level: 'debug',
-      api_protocol: 'openai', models: [],
-      bash_blocked_commands: ['rm -rf /'], bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
-      thinking_enabled: true,
-    };
-    const maskedConfig = { ...newConfig, api_key: 'sk-r****real' };
-
+  it('save projects active provider onto top level for backend', async () => {
+    const newConfig = makeConfig();
+    const maskedConfig = makeConfig();
     mockConfigApi.set.mockResolvedValueOnce({ ok: true });
     mockConfigApi.get.mockResolvedValueOnce(maskedConfig);
 
     await useSettingsStore.getState().save(newConfig);
 
-    expect(mockConfigApi.set).toHaveBeenCalledWith(newConfig);
-    expect(useSettingsStore.getState().config?.api_key).toBe('sk-r****real');
+    const sent = mockConfigApi.set.mock.calls[0][0] as Record<string, unknown>;
+    expect(sent.provider).toBe('minimax');
+    expect(sent.base_url).toBe(PROVIDER_TEMPLATES.minimax.base_url);
+    expect(sent.model).toBe('MiniMax-M3');
+    expect(sent.providers).toBeDefined();
   });
 
 });

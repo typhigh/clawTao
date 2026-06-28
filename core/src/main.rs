@@ -24,7 +24,10 @@ use store::sqlite_store::SqliteSessionStore;
 use std::io::{self, BufRead};
 use std::sync::Arc;
 use tracing::{error, info};
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{reload, EnvFilter};
+use serde_json::json;
+
+type FilterHandle = reload::Handle<EnvFilter, tracing_subscriber::Registry>;
 
 fn main() {
     std::panic::set_hook(Box::new(|info| {
@@ -32,13 +35,18 @@ fn main() {
         eprintln!("=== CLAWTAO PANIC ===\n{info}\n{backtrace}");
     }));
 
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info"))
-        )
+    let initial_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
+    let env_filter = EnvFilter::try_new(&initial_level)
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let (filter_layer, reload_handle) = reload::Layer::new(env_filter);
+
+    use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt::Layer::default().with_writer(std::io::stderr))
         .init();
+
+    let reload_handle = Arc::new(reload_handle);
     info!("ClawTao backend starting");
 
     let storage_path = dirs::data_local_dir()
@@ -74,7 +82,7 @@ fn main() {
                 if trimmed.is_empty() { continue; }
 
                 match serde_json::from_str::<Request>(trimmed) {
-                    Ok(request) => dispatch(&request, &registry, &store),
+                    Ok(request) => dispatch(&request, &registry, &store, &reload_handle),
                     Err(e) => {
                         error!("Failed to parse request: {e}");
                         if serde_json::from_str::<jsonrpc::Notification>(trimmed).is_ok() {
@@ -93,22 +101,41 @@ fn dispatch(
     request: &Request,
     registry: &SessionRegistry,
     store: &Arc<dyn store::store_trait::SessionStore>,
+    filter: &FilterHandle,
 ) {
     if request.method == "chat.send" {
         session_actor::dispatch_chat_send(request, registry);
     } else if request.method == "session.delete" {
         let sid = jsonrpc::get_param_opt(&request.params, "sessionId");
         if let Some(id) = sid { registry.remove(id); }
-        try_route(request, store);
+        try_route(request, store, filter);
     } else {
-        try_route(request, store);
+        try_route(request, store, filter);
     }
 }
 
 fn try_route(
     request: &Request,
     store: &Arc<dyn store::store_trait::SessionStore>,
+    filter: &FilterHandle,
 ) {
+    if request.method == "config.set_log_level" {
+        let level = jsonrpc::get_param_opt(&request.params, "level").unwrap_or_else(|| "info");
+        match EnvFilter::try_new(&level) {
+            Ok(f) => {
+                if filter.reload(f).is_ok() {
+                    info!("Log level set to: {level}");
+                    let _ = jsonrpc::write_response(&Response::success(request.id.clone(), json!({"ok": true, "level": level})));
+                } else {
+                    let _ = jsonrpc::write_response(&Response::error(request.id.clone(), -32000, "reload failed"));
+                }
+            }
+            Err(e) => {
+                let _ = jsonrpc::write_response(&Response::error(request.id.clone(), -32000, format!("invalid filter: {e}")));
+            }
+        }
+        return;
+    }
     if let Err(e) = handlers::route(request, store) {
         error!("Error handling request: {:#}", e);
         let _ = jsonrpc::write_response(&Response::error(

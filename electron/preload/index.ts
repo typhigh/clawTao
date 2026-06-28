@@ -33,7 +33,7 @@ const electronAPI = {
   config: {
     get: () => ipcRenderer.invoke('config:get'),
     set: (c: unknown) => ipcRenderer.invoke('config:set', c),
-    probe: (p: { base_url: string; model: string; api_key: string; api_protocol: string }) => ipcRenderer.invoke('config:probe', p),
+    probe: (p: { base_url: string; model: string; api_key: string; api_protocol: string; provider_id?: string | null }) => ipcRenderer.invoke('config:probe', p),
   },
 
   // Shell helpers (open URL in system default browser)

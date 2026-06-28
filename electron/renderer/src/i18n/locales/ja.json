@@ -15,7 +15,9 @@
     "placeholder": "メッセージを入力...",
     "send": "送信",
     "noSession": "セッションが選択されていません",
-    "createSession": "セッションを作成"
+    "createSession": "セッションを作成",
+    "selectModel": "モデルを選択",
+    "noModelsConfigured": "モデル未設定（設定から追加してください）"
   },
   "tool": {
     "input": "入力",
@@ -35,15 +37,35 @@
     "daysAgo": "{{n}}日前"
   },
   "settings": {
-    "title": "⚙️ LLM プロバイダー設定",
-    "provider": "プロバイダー",
+    "title": "設定",
+    "providers": "プロバイダー",
+    "global": "全体",
+    "addProvider": "プロバイダーを追加",
+    "removeProvider": "プロバイダーを削除",
     "apiKey": "APIキー",
     "baseUrl": "ベースURL",
     "apiProtocol": "APIプロトコル",
-    "model": "モデル",
-    "logLevel": "ログレベル",
+    "models": "モデル",
+    "addModel": "追加",
+    "removeModel": "削除",
+    "noModels": "モデルがありません — 上で追加してください",
+    "noModelsShort": "モデルなし",
+    "modelCount": "{{count}} モデル",
+    "configured": "設定済み",
+    "notConfigured": "未設定",
+    "cancelEdit": "キャンセル",
+    "unsaved": "未保存の変更",
+    "bashTitle": "Bash",
+    "globalConfig": "全体設定",
+    "logLevel": {
+      "label": "ログレベル",
+      "error": "Error",
+      "warn": "Warn",
+      "info": "Info",
+      "debug": "Debug",
+      "trace": "Trace"
+    },
     "bashBlockedCommands": "Bash禁止コマンド（1行ずつ）",
-    "thinkingEnabled": "思考プロセスを表示（青文字）",
     "bashTimeout": "Bashタイムアウト",
     "enable": "有効",
     "seconds": "秒",
@@ -52,13 +74,19 @@
     "testConnection": "接続テスト",
     "save": "保存",
     "connectionSuccess": "✅ 接続成功",
+    "providerSaved": "✅ 保存しました",
+    "apiKeyRequired": "まず API キーを入力してください",
     "suggested": "推奨",
     "enterNewKey": "新しいAPIキーを入力...",
-    "enterModelId": "モデルIDを入力"
+    "enterModelId": "モデルIDを入力",
+    "language": {
+      "label": "言語"
+    }
   },
   "common": {
     "auto": "（自動）",
     "error": "エラー",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "back": "戻る"
   }
 }

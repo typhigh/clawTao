@@ -15,7 +15,9 @@
     "placeholder": "Type your message...",
     "send": "Send",
     "noSession": "No session selected",
-    "createSession": "Create a session"
+    "createSession": "Create a session",
+    "selectModel": "Select model",
+    "noModelsConfigured": "No models configured (go to Settings)"
   },
   "tool": {
     "input": "Input",
@@ -35,15 +37,35 @@
     "daysAgo": "{{n}} day(s) ago"
   },
   "settings": {
-    "title": "⚙️ LLM Provider Settings",
-    "provider": "Provider",
+    "title": "Settings",
+    "providers": "Providers",
+    "global": "Global",
+    "addProvider": "Add provider",
+    "removeProvider": "Remove provider",
     "apiKey": "API Key",
     "baseUrl": "Base URL",
     "apiProtocol": "API Protocol",
-    "model": "Model",
-    "logLevel": "Log Level",
+    "models": "Models",
+    "addModel": "Add",
+    "removeModel": "Remove",
+    "noModels": "No models yet — add some above",
+    "noModelsShort": "no models",
+    "modelCount": "{{count}} models",
+    "configured": "Configured",
+    "notConfigured": "Not set",
+    "cancelEdit": "Cancel",
+    "unsaved": "Unsaved changes",
+    "bashTitle": "Bash",
+    "globalConfig": "Global config",
+    "logLevel": {
+      "label": "Log Level",
+      "error": "Error",
+      "warn": "Warn",
+      "info": "Info",
+      "debug": "Debug",
+      "trace": "Trace"
+    },
     "bashBlockedCommands": "Bash Blocked Commands (one per line)",
-    "thinkingEnabled": "Show thinking (blue text)",
     "bashTimeout": "Bash Timeout",
     "enable": "Enable",
     "seconds": "seconds",
@@ -52,13 +74,19 @@
     "testConnection": "Test Connection",
     "save": "Save",
     "connectionSuccess": "✅ Connection successful",
+    "providerSaved": "✅ Saved",
+    "apiKeyRequired": "Please enter an API key first",
     "suggested": "Suggested",
     "enterNewKey": "Enter new API key...",
-    "enterModelId": "Enter model ID"
+    "enterModelId": "Enter model ID",
+    "language": {
+      "label": "Language"
+    }
   },
   "common": {
     "auto": "(auto)",
     "error": "Error",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "back": "Back"
   }
 }

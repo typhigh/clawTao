@@ -15,7 +15,9 @@
     "placeholder": "메시지 입력...",
     "send": "보내기",
     "noSession": "선택된 세션 없음",
-    "createSession": "세션 만들기"
+    "createSession": "세션 만들기",
+    "selectModel": "모델 선택",
+    "noModelsConfigured": "모델 미설정 (설정에서 추가하세요)"
   },
   "tool": {
     "input": "입력",
@@ -35,15 +37,35 @@
     "daysAgo": "{{n}}일 전"
   },
   "settings": {
-    "title": "⚙️ LLM 공급자 설정",
-    "provider": "공급자",
+    "title": "설정",
+    "providers": "공급자",
+    "global": "전역",
+    "addProvider": "공급자 추가",
+    "removeProvider": "공급자 제거",
     "apiKey": "API 키",
     "baseUrl": "기본 URL",
     "apiProtocol": "API 프로토콜",
-    "model": "모델",
-    "logLevel": "로그 레벨",
+    "models": "모델",
+    "addModel": "추가",
+    "removeModel": "제거",
+    "noModels": "모델 없음 — 위에서 추가하세요",
+    "noModelsShort": "모델 없음",
+    "modelCount": "모델 {{count}}개",
+    "configured": "설정됨",
+    "notConfigured": "미설정",
+    "cancelEdit": "취소",
+    "unsaved": "저장되지 않은 변경",
+    "bashTitle": "Bash",
+    "globalConfig": "전역 설정",
+    "logLevel": {
+      "label": "로그 레벨",
+      "error": "Error",
+      "warn": "Warn",
+      "info": "Info",
+      "debug": "Debug",
+      "trace": "Trace"
+    },
     "bashBlockedCommands": "Bash 차단 명령어 (한 줄씩)",
-    "thinkingEnabled": "사고 과정 표시 (파란색 텍스트)",
     "bashTimeout": "Bash 타임아웃",
     "enable": "활성화",
     "seconds": "초",
@@ -52,13 +74,19 @@
     "testConnection": "연결 테스트",
     "save": "저장",
     "connectionSuccess": "✅ 연결 성공",
+    "providerSaved": "✅ 저장됨",
+    "apiKeyRequired": "먼저 API 키를 입력하세요",
     "suggested": "추천",
     "enterNewKey": "새 API 키 입력...",
-    "enterModelId": "모델 ID 입력"
+    "enterModelId": "모델 ID 입력",
+    "language": {
+      "label": "언어"
+    }
   },
   "common": {
     "auto": "(자동)",
     "error": "오류",
-    "loading": "로딩 중..."
+    "loading": "로딩 중...",
+    "back": "뒤로"
   }
 }
