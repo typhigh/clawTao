@@ -1,15 +1,14 @@
 //! chat.send handler — the agent turn loop.
 
 use anyhow::{Context, Result};
-use crate::config::LlmConfig;
 use crate::jsonrpc::{Notification, Response};
 use crate::llm::{ApiAdapter, AnthropicAdapter, LlmMessage, LlmRequest, OpenAiAdapter, UnifiedTool};
 use crate::llm::types::LlmResponse;
 use crate::store::{self, store_trait::SessionStore};
-use crate::tools::registry::ToolRegistry;
+use crate::tools::{self, registry::ToolRegistry};
 use crate::jsonrpc::{get_param, write_notification, write_response};
 use reqwest::blocking::Client;
-use serde_json::json;
+use serde_json::{json, Value};
 use tracing::{debug, trace};
 
 /// Immutable context for a single turn.
@@ -21,15 +20,39 @@ struct TurnContext {
 }
 
 /// Entry point for a single chat turn.
+/// `config` is a free-form JSON object sent by the frontend.
 pub(crate) fn run_turn(
     request: &crate::jsonrpc::Request,
     store: &dyn SessionStore,
-    tool_registry: &ToolRegistry,
-    llm_config: &LlmConfig,
     client: &Client,
 ) -> Result<()> {
     let message_text = get_param(&request.params, "message")?;
     let session_id = get_param(&request.params, "sessionId")?;
+
+    let config = request.params.as_ref()
+        .and_then(|p| p.get("config"))
+        .ok_or_else(|| anyhow::anyhow!("Missing config"))?;
+
+    let api_key = config["api_key"].as_str().filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("API key not configured"))?;
+    let base_url = config["base_url"].as_str()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("Missing config field: base_url"))?;
+    let model = config["model"].as_str()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("Missing config field: model"))?;
+    let protocol = config["api_protocol"].as_str()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("Missing config field: api_protocol"))?;
+    let thinking_enabled = config["thinking_enabled"].as_bool().unwrap_or(false);
+
+    // Per-request tool registry — pulls bash config from the request.
+    let blocked: Vec<String> = config["bash_blocked_commands"]
+        .as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+    let bash_timeout = config["bash_timeout_secs"].as_u64();
+    let mut tool_registry = ToolRegistry::new();
+    tools::builtin::register_all(&mut tool_registry, blocked, bash_timeout);
 
     store::add_message(store, session_id, "user", message_text)?;
 
@@ -41,11 +64,7 @@ pub(crate) fn run_turn(
         "sessionId": session_id, "runId": run_id, "kind": "started"
     }))))?;
 
-    if llm_config.api_key.is_empty() {
-        return Err(anyhow::anyhow!("API key not configured"));
-    }
-
-    let adapter: Box<dyn ApiAdapter> = match llm_config.api_protocol.as_str() {
+    let adapter: Box<dyn ApiAdapter> = match protocol {
         "anthropic" => Box::new(AnthropicAdapter),
         _ => Box::new(OpenAiAdapter),
     };
@@ -60,7 +79,7 @@ pub(crate) fn run_turn(
     let ctx = TurnContext {
         session_id: session_id.to_string(),
         run_id,
-        system_prompt: crate::system_prompt::build(tool_registry),
+        system_prompt: crate::system_prompt::build(&tool_registry),
         tools,
     };
 
@@ -69,7 +88,7 @@ pub(crate) fn run_turn(
     // ── Agent loop ──────────────────────────────────────────────────
 
     let (final_content, final_thinking) = loop {
-        let response = llm_step(adapter, client, llm_config, &messages, &ctx)?;
+        let response = llm_step(adapter, client, api_key, base_url, model, thinking_enabled, &messages, &ctx)?;
 
         if response.tool_calls.is_empty() {
             break (response.text, response.thinking);
@@ -85,7 +104,7 @@ pub(crate) fn run_turn(
         for tc in &response.tool_calls {
             debug!("Executing tool: {} id={} args={}", tc.function.name, tc.id, tc.function.arguments);
 
-            let args_val: serde_json::Value = serde_json::from_str(&tc.function.arguments).unwrap_or(serde_json::Value::Null);
+            let args_val: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null);
 
             write_notification(&Notification::new("chat.stream", Some(json!({
                 "sessionId": ctx.session_id, "runId": ctx.run_id,
@@ -145,7 +164,10 @@ pub(crate) fn run_turn(
 fn llm_step(
     adapter: &dyn ApiAdapter,
     client: &Client,
-    config: &LlmConfig,
+    api_key: &str,
+    base_url: &str,
+    model: &str,
+    thinking_enabled: bool,
     messages: &[store::Message],
     ctx: &TurnContext,
 ) -> Result<LlmResponse> {
@@ -159,13 +181,13 @@ fn llm_step(
 
     let http = adapter.build(&LlmRequest {
         system: ctx.system_prompt.clone(),
-        model: config.model.clone(),
+        model: model.to_string(),
         messages: llm_msgs,
         tools: ctx.tools.clone(),
-        thinking_enabled: config.thinking_enabled,
-    }, &config.api_key, &config.base_url)?;
+        thinking_enabled,
+    }, api_key, base_url)?;
 
-    debug!("LLM call: url={} model={}", http.url, config.model);
+    debug!("LLM call: url={} model={}", http.url, model);
     trace!("LLM request body: {}", http.body);
 
     let mut resp = client.post(&http.url);
@@ -186,7 +208,7 @@ fn llm_step(
         body_bytes.extend_from_slice(line.as_bytes());
         if let Some(data) = line.trim().strip_prefix("data: ") {
             if data == "[DONE]" { line.clear(); continue; }
-            if let Ok(event) = serde_json::from_str::<serde_json::Value>(data) {
+            if let Ok(event) = serde_json::from_str::<Value>(data) {
                 for se in adapter.stream_events(&event) {
                     write_notification(&Notification::new("chat.stream", Some(json!({
                         "sessionId": ctx.session_id, "runId": ctx.run_id,

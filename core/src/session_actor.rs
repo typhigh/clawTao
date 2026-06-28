@@ -10,6 +10,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, mpsc};
 
 use crate::store::store_trait::SessionStore;
+use reqwest::blocking::Client;
+use serde_json::Value;
+use tracing::{error, info};
 
 /// Message sent to a session actor.
 pub enum SessionMsg {
@@ -60,6 +63,54 @@ impl SessionRegistry {
         if let Some(h) = handle {
             let _ = h.tx.send(SessionMsg::Shutdown);
         }
+    }
+}
+
+/// Session actor loop. Processes Run messages sequentially, calling `process`
+/// for each one. The `process` function is `process_run_wrapper` in production,
+/// or a counter in tests.
+pub(crate) fn actor_loop(
+    rx: mpsc::Receiver<SessionMsg>,
+    session_id: &str,
+    store: Arc<dyn SessionStore>,
+    process: impl Fn(&Client, &dyn SessionStore, Value, Option<Value>) + Send + 'static,
+) {
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .expect("Failed to build HTTP client");
+
+    for msg in rx {
+        match msg {
+            SessionMsg::Run { params, response_id } => {
+                process(&client, &*store, params, response_id);
+            }
+            SessionMsg::Shutdown => {
+                info!("Actor for session {session_id} shutting down");
+                break;
+            }
+        }
+    }
+}
+
+/// Production processor: delegates to chat::run_turn.
+pub(crate) fn process_run_wrapper(
+    client: &Client,
+    store: &dyn SessionStore,
+    params: Value,
+    response_id: Option<Value>,
+) {
+    let request = crate::jsonrpc::Request {
+        jsonrpc: "2.0".into(),
+        id: response_id,
+        method: "chat.send".into(),
+        params: Some(params),
+    };
+    if let Err(e) = crate::chat::run_turn(&request, store, client) {
+        error!("chat error: {e:#}");
+        let _ = crate::jsonrpc::write_response(&crate::jsonrpc::Response::error(
+            request.id, -32603, format!("Internal error: {e:#}"),
+        ));
     }
 }
 

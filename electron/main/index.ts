@@ -53,8 +53,24 @@ function writeEncryptedKey(plaintext: string): void {
   fs.writeFileSync(secretsPath(), JSON.stringify({ api_key: encrypted }));
 }
 
-async function injectKeyIntoRust(key: string): Promise<void> {
-  await sendRpc('config.injectKey', { api_key: key });
+// -- Config persistence (Electron-managed) --
+
+function configPath(): string {
+  const dataDir = path.join(app.getPath('userData'), 'clawtao');
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  return path.join(dataDir, 'config.json');
+}
+
+function readConfig(): Record<string, unknown> {
+  try {
+    return JSON.parse(fs.readFileSync(configPath(), 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeConfig(cfg: Record<string, unknown>): void {
+  fs.writeFileSync(configPath(), JSON.stringify(cfg, null, 2));
 }
 
 // -- Browser server --
@@ -115,7 +131,7 @@ function startRust() {
   });
   rustProcess.on('exit', (code, signal) => {
     const reason = signal ? `signal=${signal}` : `code=${code}`;
-    if (code === 0 || signal) {
+    if (code !== 0 && !signal) {
       console.error(`Rust crashed (${reason}). stderr tail:\n${stderrTail}`);
     } else {
       console.log(`Rust exited (${reason})`);
@@ -138,37 +154,65 @@ function setupIpc() {
   ipcMain.handle('session:create', () => sendRpc('session.create'));
   ipcMain.handle('session:get', (_e, p: { sessionId: string }) => sendRpc('session.get', p));
   ipcMain.handle('session:delete', (_e, p: { sessionId: string }) => sendRpc('session.delete', p));
-  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string }) => sendRpc('chat.send', p));
 
-  // config:get — returns masked config, adds has_api_key flag
-  ipcMain.handle('config:get', async () => {
-    const config = await sendRpc('config.get') as Record<string, unknown>;
-    (config as any).has_api_key = !!readEncryptedKey();
+  // chat.send — auto-attach config from Electron's config store.
+  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string }) => {
+    const config = readConfig();
+    config.api_key = readEncryptedKey() || '';
+    return sendRpc('chat.send', { ...p, config });
+  });
+
+  // config:get — reads from Electron-managed config.json + secrets.json.
+  ipcMain.handle('config:get', () => {
+    const config = readConfig();
+    const plain = readEncryptedKey();
+    (config as any).has_api_key = !!plain;
+    if (plain) {
+      config.api_key = plain.length > 8
+        ? plain.slice(0, 4) + '**' + plain.slice(-4)
+        : '***';
+    }
     return config;
   });
 
-  // config:set — always sends complete config with real api_key to Rust
-  ipcMain.handle('config:set', async (_e, cfg: Record<string, unknown>) => {
+  // config:set — writes to Electron config.json + secrets.json.
+  ipcMain.handle('config:set', (_e, cfg: Record<string, unknown>) => {
     const plaintext = (cfg.api_key as string)?.trim();
     if (plaintext && !plaintext.includes('*')) {
-      // User typed a new key — encrypt and use it
       writeEncryptedKey(plaintext);
-      cfg.api_key = plaintext;
-    } else {
-      // No new key provided — re-use the existing one
-      cfg.api_key = readEncryptedKey() || '';
     }
-    return sendRpc('config.set', cfg);
+    const { api_key, ...rest } = cfg;
+    writeConfig(rest);
+    return { ok: true };
   });
 
-  ipcMain.handle('config:validate', () => sendRpc('config.validate'));
-  ipcMain.handle('config:testKey', (_e, p: { api_key: string; base_url: string; model: string }) => sendRpc('config.testKey', p));
+  // config:probe — tests an LLM endpoint from the main process (has proxy access).
+  ipcMain.handle('config:probe', async (_e, p: { base_url: string; model: string; api_key: string; api_protocol: string }) => {
+    // If the frontend sent an empty or masked key, use the real one from secrets.
+    let key = p.api_key || '';
+    if (!key || key.includes('*')) {
+      key = readEncryptedKey() || '';
+    }
+    if (!key) return { ok: false, error: 'No API key configured' };
+    const base = p.base_url.replace(/\/+$/, '');
+    const isAnthropic = p.api_protocol === 'anthropic';
+    const url = isAnthropic ? `${base}/v1/models?limit=1` : `${base}/models`;
+    const headers: Record<string, string> = isAnthropic
+      ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' }
+      : { Authorization: `Bearer ${key}` };
+    try {
+      const resp = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+      if (resp.ok || resp.status === 429) return { ok: true };
+      if (resp.status === 401 || resp.status === 403) return { ok: false, error: 'Invalid API key' };
+      return { ok: false, error: `HTTP ${resp.status}` };
+    } catch (e) {
+      return { ok: false, error: String(e) };
+    }
+  });
 
-  // Open external URL in the system default browser (not Electron's built-in one).
-  // See https://www.electronjs.org/docs/latest/api/shell#shellopenexternalurl-options
+  // Open external URL in the system default browser.
   ipcMain.handle('shell:open-external', async (_e, url: string) => {
     if (typeof url !== 'string') return { ok: false, error: 'invalid url' };
-    // Only allow http(s) — never let a tool-attacker call file:// or shell-protocol.
     if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'only http(s) allowed' };
     await shell.openExternal(url);
     return { ok: true };
@@ -207,13 +251,6 @@ app.whenReady().then(async () => {
   startBrowserServer();
   startRust();
   await waitForRustReady();
-
-  // Inject API key from encrypted secrets.json into Rust
-  const key = readEncryptedKey();
-  if (key) {
-    try { await injectKeyIntoRust(key); } catch (e) { console.error('Failed to inject key:', e); }
-  }
-
   await createWindow();
   app.on('activate', async () => { if (BrowserWindow.getAllWindows().length === 0) await createWindow(); });
 });

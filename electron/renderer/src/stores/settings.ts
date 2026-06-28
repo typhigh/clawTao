@@ -11,6 +11,13 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
   custom: [],
 };
 
+/** Probe an LLM API endpoint via Electron main process (respects system proxy). */
+export async function probeConnection(
+  base_url: string, _model: string, api_key: string, api_protocol: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return window.electronAPI.config.probe({ base_url, model: _model, api_key, api_protocol }) as Promise<{ ok: boolean; error?: string }>;
+}
+
 export interface LlmConfig {
   provider: string;
   api_key: string;
@@ -29,8 +36,6 @@ interface SettingsState {
   loaded: boolean;
   load: () => Promise<void>;
   save: (c: LlmConfig) => Promise<void>;
-  validate: () => Promise<{ ok: boolean; error?: string }>;
-  testKey: (api_key: string, base_url: string, model: string, api_protocol: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -48,18 +53,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
 
   save: async (c: LlmConfig) => {
     await window.electronAPI.config.set(c);
-    // Reload masked version
     const config = await window.electronAPI.config.get() as LlmConfig;
     set({ config });
-  },
-
-  validate: async () => {
-    const result = await window.electronAPI.config.validate() as { ok: boolean; error?: string };
-    return result;
-  },
-
-  testKey: async (api_key: string, base_url: string, model: string, api_protocol: string) => {
-    const result = await window.electronAPI.config.testKey({ api_key, base_url, model, api_protocol }) as { ok: boolean; error?: string };
-    return result;
   },
 }));

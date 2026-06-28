@@ -29,12 +29,11 @@ const electronAPI = {
     ipcRenderer.on('chat:stream', (_event, params) => callback(params));
   },
 
-  // Config operations
+  // Config operations (managed by Electron main, no Rust RPC needed)
   config: {
     get: () => ipcRenderer.invoke('config:get'),
     set: (c: unknown) => ipcRenderer.invoke('config:set', c),
-    validate: () => ipcRenderer.invoke('config:validate'),
-    testKey: (p: { api_key: string; base_url: string; model: string }) => ipcRenderer.invoke('config:testKey', p),
+    probe: (p: { base_url: string; model: string; api_key: string; api_protocol: string }) => ipcRenderer.invoke('config:probe', p),
   },
 
   // Shell helpers (open URL in system default browser)

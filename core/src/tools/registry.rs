@@ -27,11 +27,13 @@ impl ToolRegistry {
     }
 
     /// Number of registered tools.
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.tools.len()
     }
 
     /// Tool names for logging.
+    #[allow(dead_code)]
     pub fn names(&self) -> Vec<&str> {
         self.tools.values().map(|t| t.name()).collect()
     }

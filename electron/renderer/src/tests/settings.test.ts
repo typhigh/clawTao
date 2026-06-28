@@ -5,8 +5,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockConfigApi = {
   get: vi.fn(),
   set: vi.fn(),
-  validate: vi.fn(),
-  testKey: vi.fn(),
 };
 
 vi.stubGlobal('window', {
@@ -87,31 +85,4 @@ describe('settings store', () => {
     expect(useSettingsStore.getState().config?.api_key).toBe('sk-r****real');
   });
 
-  it('validate returns ok', async () => {
-    mockConfigApi.validate.mockResolvedValueOnce({ ok: true });
-
-    const result = await useSettingsStore.getState().validate();
-    expect(result.ok).toBe(true);
-  });
-
-  it('validate returns error', async () => {
-    mockConfigApi.validate.mockResolvedValueOnce({ ok: false, error: '401: Unauthorized' });
-
-    const result = await useSettingsStore.getState().validate();
-    expect(result.ok).toBe(false);
-    expect(result.error).toBe('401: Unauthorized');
-  });
-
-  it('testKey sends credentials and returns result', async () => {
-    mockConfigApi.testKey.mockResolvedValueOnce({ ok: true });
-
-    const result = await useSettingsStore.getState().testKey('sk-test', 'https://api.test.com/v1', 'gpt-4o', 'openai');
-    expect(mockConfigApi.testKey).toHaveBeenCalledWith({
-      api_key: 'sk-test',
-      api_protocol: 'openai',
-      base_url: 'https://api.test.com/v1',
-      model: 'gpt-4o',
-    });
-    expect(result.ok).toBe(true);
-  });
 });

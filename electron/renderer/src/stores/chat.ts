@@ -26,8 +26,7 @@ declare global {
       config: {
         get: () => Promise<{ provider: string; api_key: string; base_url: string; model: string; log_level: string; bash_blocked_commands: string[] }>;
         set: (c: unknown) => Promise<unknown>;
-        validate: () => Promise<{ ok: boolean; error?: string }>;
-        testKey: (p: { api_key: string; base_url: string; model: string; api_protocol: string }) => Promise<{ ok: boolean; error?: string }>;
+        probe: (p: { base_url: string; model: string; api_key: string; api_protocol: string }) => Promise<{ ok: boolean; error?: string }>;
       };
       /** Unified stream listener — all turn events arrive through this single channel. */
       onStreamEvent: (callback: (params: StreamEvent) => void) => void;

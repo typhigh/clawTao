@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSettingsStore, LlmConfig, DEFAULT_BASH_TIMEOUT_SECS, SUGGESTED_MODELS } from '../stores/settings';
+import { useSettingsStore, LlmConfig, DEFAULT_BASH_TIMEOUT_SECS, SUGGESTED_MODELS, probeConnection } from '../stores/settings';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface Props { open: boolean; onClose: () => void; }
@@ -17,7 +17,7 @@ function emptyConfig(): LlmConfig {
 
 export function SettingsDialog({ open, onClose }: Props) {
   const { t } = useTranslation();
-  const { config, load, save, testKey } = useSettingsStore();
+  const { config, load, save } = useSettingsStore();
   const [tmp, setTmp] = useState<LlmConfig>(emptyConfig);
   const [editingKey, setEditingKey] = useState(false);
   const [testResult, setTestResult] = useState<'idle' | 'ok' | 'error'>('idle');
@@ -59,7 +59,7 @@ export function SettingsDialog({ open, onClose }: Props) {
   const handleTest = async () => {
     setTestResult('idle');
     try {
-      const result = await testKey(tmp.api_key, tmp.base_url, tmp.model, tmp.api_protocol || 'openai');
+      const result = await probeConnection(tmp.base_url, tmp.model, tmp.api_key, tmp.api_protocol);
       setTestResult(result.ok ? 'ok' : 'error');
       setTestMessage(result.error || 'OK');
     } catch (e) { setTestResult('error'); setTestMessage(String(e)); }
@@ -68,7 +68,7 @@ export function SettingsDialog({ open, onClose }: Props) {
   const handleSave = async () => {
     setTestResult('idle');
     try {
-      const result = await testKey(tmp.api_key, tmp.base_url, tmp.model, tmp.api_protocol || 'openai');
+      const result = await probeConnection(tmp.base_url, tmp.model, tmp.api_key, tmp.api_protocol);
       if (!result.ok) { setTestResult('error'); setTestMessage(result.error || 'Validation failed'); return; }
       await save(tmp);
       onClose();
