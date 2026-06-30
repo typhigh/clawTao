@@ -261,16 +261,32 @@ function setupIpc() {
     if (!key) return { ok: false, error: 'No API key' };
     const base = p.base_url.replace(/\/+$/, '');
     const isAnthropic = p.api_protocol === 'anthropic';
-    const url = isAnthropic ? `${base}/v1/models?limit=1` : `${base}/models`;
+    // Probe by sending a minimal chat request to the actual LLM endpoint.
+    // We deliberately do NOT use a model-listing endpoint (e.g. /v1/models) because
+    // some Anthropic-compatible providers (like DeepSeek's anthropic mirror) don't
+    // expose that path and would 404 even though the chat endpoint works fine.
+    const url = isAnthropic ? `${base}/v1/messages` : `${base}/chat/completions`;
     const headers: Record<string, string> = isAnthropic
-      ? { 'x-api-key': key, 'anthropic-version': '2023-06-01' }
-      : { Authorization: `Bearer ${key}` };
+      ? { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }
+      : { Authorization: `Bearer ${key}`, 'content-type': 'application/json' };
+    const model = (p.model && p.model !== '__probe__') ? p.model : 'probe';
+    const body = isAnthropic
+      ? JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
+      : JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] });
+    console.log('[config:probe] request', { url, method: 'POST', headers, base_url: p.base_url, api_protocol: p.api_protocol, provider_id: p.provider_id, model });
     try {
-      const resp = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
-      if (resp.ok || resp.status === 429) return { ok: true };
+      const resp = await fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(15000) });
+      const respHeaders: Record<string, string> = {};
+      resp.headers.forEach((v, k) => { respHeaders[k] = v; });
+      const respBody = await resp.text();
+      console.log('[config:probe] response', { status: resp.status, ok: resp.ok, headers: respHeaders, body: respBody.slice(0, 2000) });
+      if (resp.ok) return { ok: true };
       if (resp.status === 401 || resp.status === 403) return { ok: false, error: 'Invalid API key' };
+      if (resp.status === 404) return { ok: false, error: `HTTP 404 — check base_url (got ${url})` };
+      if (resp.status === 429) return { ok: true }; // rate-limit means auth+endpoint are fine
       return { ok: false, error: `HTTP ${resp.status}` };
     } catch (e) {
+      console.log('[config:probe] fetch error', { url, error: String(e) });
       return { ok: false, error: String(e) };
     }
   });

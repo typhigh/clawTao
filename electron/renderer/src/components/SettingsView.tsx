@@ -149,7 +149,7 @@ export function SettingsView(_props: Props = {}) {
     try {
       const result = await probeConnection(
         provider.base_url,
-        config.active_model_id || '__probe__',
+        provider.models[0] || config.active_model_id || '__probe__',
         provider.api_key,
         provider.api_protocol,
         providerId,
@@ -166,7 +166,7 @@ export function SettingsView(_props: Props = {}) {
     try {
       const result = await probeConnection(
         provider.base_url,
-        config.active_model_id || '__probe__',
+        provider.models[0] || config.active_model_id || '__probe__',
         provider.api_key,
         provider.api_protocol,
         providerId,
