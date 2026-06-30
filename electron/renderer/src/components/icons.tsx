@@ -62,3 +62,22 @@ export function TrashIcon() {
     </svg>
   );
 }
+
+/** Paper-plane / send icon — used as the chat send button. */
+export function SendIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      style={{ display: 'block', fill: '#ffffff' }}
+    >
+      <path
+        d="M22 2 L2 11 L10 13 L13 22 Z"
+        style={{ fill: '#ffffff', stroke: '#ffffff', strokeWidth: 1 }}
+      />
+    </svg>
+  );
+}

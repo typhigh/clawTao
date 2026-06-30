@@ -80,6 +80,7 @@
     "connectionSuccess": "✅ 连接成功",
     "providerSaved": "✅ 已保存",
     "apiKeyRequired": "请先输入 API Key",
+    "testRequiresModels": "请先添加至少一个模型，再测试连接",
     "suggested": "推荐",
     "enterNewKey": "输入新 API Key…",
     "enterModelId": "输入模型 ID",

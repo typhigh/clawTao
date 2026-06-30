@@ -23,6 +23,7 @@ interface Props {
     onChange: (v: string) => void;
     onSend: () => void;
     disabled: boolean;
+    sendDisabled?: boolean;
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
     onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   };

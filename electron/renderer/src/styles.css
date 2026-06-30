@@ -872,6 +872,16 @@ html, body, #root {
   align-self: flex-end;
 }
 
+.input-send-btn-inline {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  transition: transform 0.05s;
+}
+.input-send-btn-inline:hover:not(:disabled) { transform: scale(1.05); }
+.input-send-btn-inline:active:not(:disabled) { transform: scale(0.94); }
+
 .input-model-select {
   background: transparent;
   border: 0;
@@ -1084,22 +1094,25 @@ html, body, #root {
 }
 .settings-inline-label {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: #555;
   font-weight: 500;
 }
 .settings-inline-select {
   width: fit-content;
   min-width: 100px;
-  height: 30px;
+  height: 26px;
   border: 1px solid #d4d4d4;
   border-radius: 8px;
   background: #fff;
-  font-size: 13px;
-  padding: 0 28px 0 12px;
+  font-size: 12px;
+  padding: 0 26px 0 12px;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
 }
 
 .settings-inline-row > .settings-inline-select-wrap {
@@ -1112,6 +1125,7 @@ html, body, #root {
   align-items: center;
   width: fit-content;
   flex-shrink: 0;
+  height: 26px;
 }
 
 .settings-inline-select-wrap::after {
@@ -1128,7 +1142,7 @@ html, body, #root {
 }
 
 .settings-section-label {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: #555;
   margin: 0 0 8px 2px;
@@ -1148,7 +1162,7 @@ html, body, #root {
   border: 0;
   color: #1c1c1e;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   text-align: left;
   transition: background 0.12s;
 }
@@ -1166,7 +1180,7 @@ html, body, #root {
   border: 0;
   color: inherit;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   text-align: left;
   min-width: 0;
@@ -1191,14 +1205,21 @@ html, body, #root {
 .settings-row-chevron {
   display: inline-block;
   color: #999;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   width: 12px;
+  flex-shrink: 0;
   transition: transform 0.15s ease;
 }
 .settings-provider-row.open .settings-row-chevron { transform: rotate(90deg); color: #555; }
 
-.settings-row-name { font-weight: 500; }
+.settings-row-name {
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .settings-row-status { display: inline-flex; align-items: center; }
 
@@ -1219,11 +1240,12 @@ html, body, #root {
 }
 
 .settings-row-meta-inline {
-  margin-left: 8px;
+  margin-left: auto;
   font-size: 11px;
   color: #999;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .settings-provider-row-body {
@@ -1267,7 +1289,7 @@ html, body, #root {
   border: 1px solid #ddd;
   color: #c62828;
   font: inherit;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
   padding: 8px 16px;
   border-radius: 8px;
@@ -1294,7 +1316,7 @@ html, body, #root {
   background: #f7f7f7;
   border: 1px solid #ececec;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   color: #1c1c1e;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   word-break: break-all;
@@ -1324,7 +1346,7 @@ html, body, #root {
   border-radius: 8px;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   color: #888;
   cursor: pointer;
   outline: none;
@@ -1362,7 +1384,7 @@ html, body, #root {
   padding: 6px 12px;
   background: #f5f5f5;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
 }
 .settings-key-row input { flex: 1; }
 
@@ -1371,18 +1393,21 @@ html, body, #root {
   gap: 6px;
   align-items: center;
   margin-bottom: 8px;
+  font-size: 12px;
 }
 
-.settings-model-input { flex: 1; min-width: 0; }
+.settings-model-input { flex: 1; min-width: 0; font-size: 12px; padding: 6px 12px; height: 26px; line-height: 1; border: 1px solid #ddd; border-radius: 8px; background: #fff; outline: none; box-sizing: border-box; color: #1c1c1e; }
+.settings-model-input::placeholder { color: #999; font-size: 12px; }
+.settings-model-input:focus { border-color: #999; }
 
 .settings-add-btn {
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border: 1px solid #ddd;
   background: white;
   color: #555;
-  border-radius: 8px;
-  font-size: 18px;
+  border-radius: 6px;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
   display: inline-flex;
@@ -1394,17 +1419,72 @@ html, body, #root {
 }
 .settings-add-btn:hover { background: #f0f0f0; border-color: #999; }
 
-.settings-model-suggest {
-  width: auto;
-  min-width: 90px;
-  max-width: 130px;
+.suggest-picker {
+  position: relative;
+  display: inline-flex;
   flex-shrink: 1;
-  font-size: 12px;
 }
+
+.suggest-picker-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 150px;
+  max-width: 200px;
+  height: 26px;
+  padding: 0 8px 0 12px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  color: #555;
+  font: inherit;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.suggest-picker-btn:hover { border-color: #999; color: #1c1c1e; }
+.suggest-picker-btn:focus { border-color: #999; }
+
+.suggest-picker-chevron {
+  display: inline-flex;
+  align-items: center;
+  color: #777;
+  flex-shrink: 0;
+}
+
+.suggest-picker-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.suggest-picker-item {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #1c1c1e;
+  cursor: pointer;
+}
+.suggest-picker-item:hover { background: #f0f0f0; }
 
 .settings-model-list {
   list-style: none;
-  margin: 0;
+  margin: 0 0 12px 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
@@ -1416,17 +1496,17 @@ html, body, #root {
   align-items: center;
   gap: 6px;
   padding: 4px 4px 4px 10px;
-  background: #f0f0f0;
+  background: #d8efd8;
   border-radius: 14px;
-  font-size: 12px;
-  color: #1c1c1e;
+  font-size: 11px;
+  color: #3a6f3a;
 }
 
 .settings-model-remove {
   background: transparent;
   border: 0;
   color: #999;
-  font-size: 14px;
+  font-size: 11px;
   line-height: 1;
   width: 20px;
   height: 20px;
@@ -1449,14 +1529,14 @@ html, body, #root {
   gap: 8px;
   text-transform: none;
   font-weight: 400;
-  font-size: 14px;
+  font-size: 11px;
 }
 
 .settings-checkbox-inline {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 11px;
   cursor: pointer;
   margin: 0;
   white-space: nowrap;
@@ -1465,7 +1545,7 @@ html, body, #root {
 .settings-bash-timeout { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .settings-bash-timeout > label:first-child { margin-bottom: 0; }
 
-.settings-unit { font-size: 12px; color: #999; }
+.settings-unit { font-size: 11px; color: #999; }
 
 .form-group { margin-bottom: 16px; }
 .form-group label {
@@ -1502,10 +1582,10 @@ html, body, #root {
 .alert-error { background: #ffebee; color: #c62828; }
 
 .btn {
-  padding: 8px 16px;
+  padding: 6px 14px;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
 }
 .btn-primary { background: #007aff; color: white; }

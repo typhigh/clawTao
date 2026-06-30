@@ -76,6 +76,7 @@
     "connectionSuccess": "✅ Соединение успешно",
     "providerSaved": "✅ Сохранено",
     "apiKeyRequired": "Сначала введите API-ключ",
+    "testRequiresModels": "Добавьте хотя бы одну модель, прежде чем проверять соединение",
     "suggested": "Рекомендуемые",
     "enterNewKey": "Введите новый API ключ...",
     "enterModelId": "Введите ID модели",

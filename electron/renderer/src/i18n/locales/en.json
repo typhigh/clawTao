@@ -76,6 +76,7 @@
     "connectionSuccess": "✅ Connection successful",
     "providerSaved": "✅ Saved",
     "apiKeyRequired": "Please enter an API key first",
+    "testRequiresModels": "Add at least one model before testing the connection",
     "suggested": "Suggested",
     "enterNewKey": "Enter new API key...",
     "enterModelId": "Enter model ID",

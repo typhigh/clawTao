@@ -76,6 +76,7 @@
     "connectionSuccess": "✅ Connexion réussie",
     "providerSaved": "✅ Enregistré",
     "apiKeyRequired": "Veuillez d'abord saisir une clé API",
+    "testRequiresModels": "Ajoutez au moins un modèle avant de tester la connexion",
     "suggested": "Suggestions",
     "enterNewKey": "Saisir une nouvelle clé API...",
     "enterModelId": "Saisir l'ID du modèle",

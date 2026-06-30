@@ -76,6 +76,7 @@
     "connectionSuccess": "✅ 接続成功",
     "providerSaved": "✅ 保存しました",
     "apiKeyRequired": "まず API キーを入力してください",
+    "testRequiresModels": "接続をテストする前に少なくとも 1 つのモデルを追加してください",
     "suggested": "推奨",
     "enterNewKey": "新しいAPIキーを入力...",
     "enterModelId": "モデルIDを入力",

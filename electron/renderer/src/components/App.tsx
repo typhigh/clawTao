@@ -149,7 +149,7 @@ function App() {
             onClearError={clearError}
             hasActiveSession={!!activeSession}
             onCreateSession={createSession}
-            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: isStreaming, textareaRef, onKeyDown: handleKeyDown }}
+            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming, textareaRef, onKeyDown: handleKeyDown }}
             modelOptions={modelOptions}
             selectedModelKey={selectedModelKeyFinal}
             onSelectModel={handleSelectModel}

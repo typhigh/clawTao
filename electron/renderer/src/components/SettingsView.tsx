@@ -9,6 +9,7 @@ import {
   probeConnection,
 } from '../stores/settings';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { SuggestPicker } from './SuggestPicker';
 import { TrashIcon } from './icons';
 
 interface Props { onBack?: () => void; } // optional — kept to avoid breaking call sites
@@ -146,10 +147,14 @@ export function SettingsView(_props: Props = {}) {
     const provider = config.providers.find(p => p.id === providerId);
     if (!provider) return;
     setStatus(providerId, 'idle');
+    if (provider.models.length === 0) {
+      setStatus(providerId, 'error', t('settings.testRequiresModels'));
+      return;
+    }
     try {
       const result = await probeConnection(
         provider.base_url,
-        provider.models[0] || config.active_model_id || '__probe__',
+        provider.models[0],
         provider.api_key,
         provider.api_protocol,
         providerId,
@@ -163,10 +168,14 @@ export function SettingsView(_props: Props = {}) {
     const provider = config.providers.find(p => p.id === providerId);
     if (!provider) return;
     setStatus(providerId, 'idle');
+    if (provider.models.length === 0) {
+      setStatus(providerId, 'error', t('settings.testRequiresModels'));
+      return;
+    }
     try {
       const result = await probeConnection(
         provider.base_url,
-        provider.models[0] || config.active_model_id || '__probe__',
+        provider.models[0],
         provider.api_key,
         provider.api_protocol,
         providerId,
@@ -311,17 +320,11 @@ export function SettingsView(_props: Props = {}) {
                         />
                         <button className="settings-add-btn" onClick={() => handleAddModel(provider.id)} title={t('settings.addModel')}>+</button>
                         {suggested.length > 0 && (
-                          <select
-                            className="settings-model-suggest"
-                            value=""
-                            onChange={(e) => { if (e.target.value) { setModelInputs(s => ({ ...s, [provider.id]: e.target.value })); } }}
-                            title={t('settings.suggested')}
-                          >
-                            <option value="">{t('settings.suggested')}</option>
-                            {suggested
-                              .filter(m => !provider.models.includes(m))
-                              .map(m => <option key={m} value={m}>{m}</option>)}
-                          </select>
+                          <SuggestPicker
+                            suggested={suggested.filter(m => !provider.models.includes(m))}
+                            placeholder={t('settings.suggested')}
+                            onPick={(m) => setModelInputs(s => ({ ...s, [provider.id]: m }))}
+                          />
                         )}
                       </div>
                       {provider.models.length === 0 && (

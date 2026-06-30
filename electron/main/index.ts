@@ -269,10 +269,8 @@ function setupIpc() {
     const headers: Record<string, string> = isAnthropic
       ? { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }
       : { Authorization: `Bearer ${key}`, 'content-type': 'application/json' };
-    const model = (p.model && p.model !== '__probe__') ? p.model : 'probe';
-    const body = isAnthropic
-      ? JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] })
-      : JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] });
+    const model = p.model || '';
+    const body = JSON.stringify({ model, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] });
     console.log('[config:probe] request', { url, method: 'POST', headers, base_url: p.base_url, api_protocol: p.api_protocol, provider_id: p.provider_id, model });
     try {
       const resp = await fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(15000) });

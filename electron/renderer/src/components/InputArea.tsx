@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { SendIcon } from './icons';
 
 interface ModelOption {
   providerId: string;
@@ -12,6 +13,7 @@ interface Props {
   onChange: (v: string) => void;
   onSend: () => void;
   disabled: boolean;
+  sendDisabled?: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   modelOptions: ModelOption[];
@@ -21,7 +23,7 @@ interface Props {
 }
 
 export function InputArea({
-  value, onChange, onSend, disabled, textareaRef, onKeyDown,
+  value, onChange, onSend, disabled, sendDisabled, textareaRef, onKeyDown,
   modelOptions, selectedModelKey, onSelectModel, disabledModel,
 }: Props) {
   const { t } = useTranslation();
@@ -56,8 +58,29 @@ export function InputArea({
               ))
             )}
           </select>
+          <button
+            type="submit"
+            className="input-send-btn input-send-btn-inline"
+            disabled={!value.trim() || disabled || sendDisabled}
+            title={t('chat.send')}
+            style={{
+              background: '#1c1c1e',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '50%',
+              width: '28px',
+              height: '28px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              cursor: !value.trim() || disabled || sendDisabled ? 'not-allowed' : 'pointer',
+              opacity: !value.trim() || disabled || sendDisabled ? 0.55 : 1,
+            }}
+          >
+            <SendIcon />
+          </button>
         </div>
-        <button type="submit" className="input-send-btn" disabled={!value.trim() || disabled}>{t('chat.send')}</button>
       </form>
     </div>
   );
