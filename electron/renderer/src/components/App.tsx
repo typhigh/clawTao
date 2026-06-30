@@ -88,6 +88,7 @@ function App() {
   // Send
   const handleSend = async () => {
     if (!inputValue.trim()) return;
+    if (isStreaming) return; // refuse while a previous answer is still streaming
     const text = inputValue;
     setInputValue('');
     if (textareaRef.current) {
@@ -110,6 +111,10 @@ function App() {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      if (isStreaming) {
+        e.preventDefault(); // swallow Enter — no send, no newline
+        return;
+      }
       e.preventDefault();
       handleSend();
     }
@@ -120,12 +125,18 @@ function App() {
   const currentTurn = activeSession?.currentTurn || [];
   const isStreaming = activeSession?.isStreaming || false;
 
-  const historicalGroups = activeSession ? buildHistoricalTurns(activeSession.messages) : [];
-  const live = currentTurn.length > 0 ? buildLiveSegments(currentTurn) : null;
-  const timeline: TimelineGroup[] = [
+  const historicalGroups = useMemo(
+    () => (activeSession ? buildHistoricalTurns(activeSession.messages) : []),
+    [activeSession?.messages],
+  );
+  const live = useMemo(
+    () => (currentTurn.length > 0 ? buildLiveSegments(currentTurn) : null),
+    [currentTurn],
+  );
+  const timeline: TimelineGroup[] = useMemo(() => [
     ...historicalGroups,
     ...(live ? [{ kind: 'liveTurn' as const, id: 'live-turn', segments: live.segments, isStreaming: live.isStreaming }] : []),
-  ];
+  ], [historicalGroups, live]);
 
   const selectedModelKeyFinal = selectedModelKey || (modelOptions[0]?.key ?? '');
 

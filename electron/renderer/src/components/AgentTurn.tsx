@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -9,7 +9,7 @@ import type { AssistantSegment } from '../types/timeline';
 import { SegmentView } from './ToolCard';
 
 /** Historical turn: tools folded, conclusion always visible. */
-export function AgentTurnView({ segments, conclusion }: { segments: AssistantSegment[]; conclusion: string | null }) {
+function AgentTurnViewInner({ segments, conclusion }: { segments: AssistantSegment[]; conclusion: string | null }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -40,3 +40,5 @@ export function AgentTurnView({ segments, conclusion }: { segments: AssistantSeg
     </div>
   );
 }
+
+export const AgentTurnView = memo(AgentTurnViewInner);
