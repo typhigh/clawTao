@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useSettingsStore,
@@ -7,6 +7,7 @@ import {
 } from '../stores/settings';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ProviderRow } from './ProviderRow';
+import type { ModelOption } from './ChatView';
 
 export function SettingsView({ onBack }: { onBack?: () => void }) {
   const { t } = useTranslation();
@@ -26,7 +27,7 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
     const tmpl = PROVIDER_TEMPLATES[id];
     if (!tmpl) return;
     const np: ProviderConfig = { id: tmpl.id, api_key: '', base_url: tmpl.base_url, api_protocol: tmpl.api_protocol, models: [] };
-    replace({ ...config, providers: [...config.providers, np], active_provider_id: config.active_provider_id || tmpl.id });
+    replace({ ...config, providers: [...config.providers, np] });
   };
 
   const handleCancel = (id: string) => {
@@ -35,7 +36,7 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
       replace({ ...config, providers: config.providers.map(p => p.id === id ? { ...saved, api_key: saved.api_key } : p) });
     } else {
       const remaining = config.providers.filter(p => p.id !== id);
-      replace({ ...config, providers: remaining, active_provider_id: config.active_provider_id === id ? (remaining[0]?.id ?? '') : config.active_provider_id });
+      replace({ ...config, providers: remaining });
     }
   };
 
@@ -80,6 +81,8 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
           </div>
         )}
 
+        <DefaultModelSelector config={config} onChange={(next) => replace(next)} />
+
         <div className="settings-inline-group">
           <div className="settings-inline-row">
             <label className="settings-inline-label">{t('settings.logLevel.label')}</label>
@@ -103,6 +106,36 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DefaultModelSelector({ config, onChange }: { config: LlmConfig; onChange: (next: LlmConfig) => void }) {
+  const options: ModelOption[] = useMemo(() => {
+    const opts: ModelOption[] = [];
+    for (const p of config.providers) {
+      for (const m of p.models) {
+        opts.push({ providerId: p.id, providerName: p.id, model: m, key: `${p.id}/${m}` });
+      }
+    }
+    return opts;
+  }, [config.providers]);
+
+  if (options.length === 0) return null;
+
+  return (
+    <div className="settings-inline-row">
+      <label className="settings-inline-label">Default Model</label>
+      <span className="settings-inline-select-wrap">
+        <select
+          className="settings-inline-select"
+          value={config.default_model_id}
+          onChange={(e) => onChange({ ...config, default_model_id: e.target.value })}
+        >
+          <option value="">(none)</option>
+          {options.map(o => <option key={o.key} value={o.key}>{o.model}</option>)}
+        </select>
+      </span>
     </div>
   );
 }

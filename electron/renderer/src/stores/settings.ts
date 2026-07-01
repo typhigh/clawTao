@@ -42,8 +42,7 @@ export interface ProviderConfig {
 
 export interface LlmConfig {
   providers: ProviderConfig[];
-  active_provider_id: string;
-  active_model_id: string;
+  default_model_id: string;
   log_level: string;
   bash_blocked_commands: string[];
   bash_timeout_secs: number | null;
@@ -59,6 +58,18 @@ interface SettingsState {
   removeProvider: (id: string) => Promise<void>;
 }
 
+/** Ensure default_model_id references a valid model. If not, pick the first available. */
+function ensureDefaultModel(c: LlmConfig): LlmConfig {
+  if (c.default_model_id) {
+    const [pid, ...rest] = c.default_model_id.split('/');
+    const m = rest.join('/');
+    const provider = c.providers.find(p => p.id === pid);
+    if (provider && provider.models.includes(m)) return c; // still valid
+  }
+  const first = c.providers.find(p => p.models.length > 0);
+  return { ...c, default_model_id: first ? `${first.id}/${first.models[0]}` : '' };
+}
+
 /** Probe an LLM API endpoint via Electron main process (respects system proxy). */
 export async function probeConnection(
   base_url: string, _model: string, api_key: string, api_protocol: string,
@@ -71,8 +82,7 @@ export async function probeConnection(
 export function emptyConfig(): LlmConfig {
   return {
     providers: [],
-    active_provider_id: '',
-    active_model_id: '',
+    default_model_id: '',
     log_level: 'info',
     bash_blocked_commands: [],
     bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
@@ -95,47 +105,32 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   save: async (c: LlmConfig) => {
-    // Backend (chat.send) reads top-level provider/base_url/api_protocol/model/api_key
-    // from config.json. Resolve the active provider and project those fields onto
-    // the top level so chat routing keeps working without IPC changes.
-    const active = c.providers.find(p => p.id === c.active_provider_id);
-    const topLevel: Record<string, unknown> = {
-      ...c,
-      provider: active?.id ?? c.active_provider_id,
-      base_url: active?.base_url ?? '',
-      api_protocol: active?.api_protocol ?? 'anthropic',
-      model: c.active_model_id,
-    };
-    await window.electronAPI.config.set(topLevel);
+    // Ensure default_model_id is set if providers have models.
+    if (!c.default_model_id) {
+      const firstWithModel = c.providers.find(p => p.models.length > 0);
+      if (firstWithModel) c.default_model_id = `${firstWithModel.id}/${firstWithModel.models[0]}`;
+    }
+    await window.electronAPI.config.set(c as unknown as Record<string, unknown>);
     const config = await window.electronAPI.config.get() as unknown as LlmConfig;
     set({ config, savedConfig: config });
   },
 
-  replace: (c: LlmConfig) => set({ config: c }),
+  replace: (c: LlmConfig) => set({ config: ensureDefaultModel(c) }),
 
   removeProvider: async (id: string) => {
     const cur = get().config;
     if (!cur) return;
-    // Tell main to clear the removed provider's stored key (api_key=null signals
-    // "remove this key"), then drop it from `providers` so the file no longer
-    // references it.
-    const withNullKey = {
+    // Drop the provider and fix default_model_id BEFORE null-ing api_key
+    // (api_key: null is a signal to Electron to delete the stored key).
+    const withoutRemoved = ensureDefaultModel({
       ...cur,
-      providers: cur.providers.map(p => p.id === id ? { ...p, api_key: null } : p),
-    };
-    const withoutRemoved = {
-      ...withNullKey,
-      providers: withNullKey.providers.filter(p => p.id !== id),
-    };
-    const projected = withoutRemoved.providers.find(p => p.id === withoutRemoved.active_provider_id);
-    const topLevel: Record<string, unknown> = {
+      providers: cur.providers.filter(p => p.id !== id),
+    });
+    const withNullKey = {
       ...withoutRemoved,
-      provider: projected?.id ?? withoutRemoved.active_provider_id,
-      base_url: projected?.base_url ?? '',
-      api_protocol: projected?.api_protocol ?? 'anthropic',
-      model: withoutRemoved.active_model_id,
+      providers: withoutRemoved.providers.map(p => p.id === id ? { ...p, api_key: null } : p),
     };
-    await window.electronAPI.config.set(topLevel);
+    await window.electronAPI.config.set(withNullKey as unknown as Record<string, unknown>);
     const fresh = await window.electronAPI.config.get() as unknown as LlmConfig;
     set({ config: fresh, savedConfig: fresh });
   },

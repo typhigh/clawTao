@@ -32,7 +32,7 @@ function makeConfig() {
     active_model_id: 'MiniMax-M3',
     log_level: 'info',
     bash_blocked_commands: ['rm -rf /'],
-    bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
+    bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS, default_model_id: '',
   };
 }
 
@@ -82,7 +82,7 @@ describe('settings store', () => {
     expect(state.config).toEqual(emptyConfig());
   });
 
-  it('save projects active provider onto top level for backend', async () => {
+  it('save calls config.set and reloads masked config', async () => {
     const newConfig = makeConfig();
     const maskedConfig = makeConfig();
     mockConfigApi.set.mockResolvedValueOnce({ ok: true });
@@ -90,11 +90,8 @@ describe('settings store', () => {
 
     await useSettingsStore.getState().save(newConfig);
 
-    const sent = mockConfigApi.set.mock.calls[0][0] as Record<string, unknown>;
-    expect(sent.provider).toBe('minimax');
-    expect(sent.base_url).toBe(PROVIDER_TEMPLATES.minimax.base_url);
-    expect(sent.model).toBe('MiniMax-M3');
-    expect(sent.providers).toBeDefined();
+    expect(mockConfigApi.set).toHaveBeenCalled();
+    expect(useSettingsStore.getState().config?.providers[0].api_key).toBe(maskedConfig.providers[0].api_key);
   });
 
 });

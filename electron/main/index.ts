@@ -181,11 +181,20 @@ function setupIpc() {
   ipcMain.handle('session:get', (_e, p: { sessionId: string }) => sendRpc('session.get', p));
   ipcMain.handle('session:delete', (_e, p: { sessionId: string }) => sendRpc('session.delete', p));
 
-  // chat.send — auto-attach config from Electron's config store.
-  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string }) => {
+  // chat.send — resolve per-session model_key to provider/model/api_key.
+  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string }) => {
     const config: any = readConfig();
-    const activeId = config.active_provider_id as string | undefined;
-    config.api_key = activeId ? (readEncryptedKey(activeId) || '') : '';
+    const key = p.model_key || config.default_model_id || '';
+    if (!key) return Promise.reject(new Error('No model selected.'));
+    const [providerId, ...rest] = key.split('/');
+    const model = rest.join('/');
+    const provider = config.providers?.find((pr: any) => pr.id === providerId);
+    if (!provider) return Promise.reject(new Error(`Provider not found: ${providerId}`));
+
+    config.api_key = readEncryptedKey(providerId) || '';
+    config.base_url = provider.base_url || '';
+    config.model = model;
+    config.api_protocol = provider.api_protocol || 'anthropic';
     return sendRpc('chat.send', { ...p, config });
   });
 

@@ -89,9 +89,6 @@ export function ProviderRow({ provider, config, isNew, hasSavedKey, onUpdate, on
     if (!m || provider.models.includes(m)) { setModelInput(''); return; }
     onUpdate({ models: [...provider.models, m] });
     setModelInput('');
-    if (config.active_provider_id === provider.id && !config.active_model_id) {
-      // auto-select first added model
-    }
   };
 
   return (

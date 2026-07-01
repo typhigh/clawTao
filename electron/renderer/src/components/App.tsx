@@ -19,33 +19,16 @@ function App() {
     handleStreamEvent,
   } = useChatStore();
 
-  const { config, loaded, load: loadConfig, save: saveConfig } = useSettingsStore();
+  const { config, loaded, load: loadConfig } = useSettingsStore();
   const [view, setView] = useState<View>('chat');
   const [inputValue, setInputValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [selectedModelKey, setSelectedModelKey] = useState<string>('');
-
   useEffect(() => {
     loadSessions();
     loadConfig();
     window.electronAPI.onStreamEvent(handleStreamEvent);
     return () => { window.electronAPI.onStreamEvent(() => {}); };
   }, []);
-
-  useEffect(() => {
-    if (loaded && config && !selectedModelKey) {
-      // Auto-select default: first provider's first model; or empty if none configured.
-      const firstWithModel = config.providers.find(p => p.models.length > 0);
-      const key = firstWithModel ? `${firstWithModel.id}/${firstWithModel.models[0]}` : '';
-      if (key || config.active_provider_id) {
-        // Always reflect saved active selection if available.
-        const activeKey = config.active_provider_id && config.active_model_id
-          ? `${config.active_provider_id}/${config.active_model_id}`
-          : key;
-        setSelectedModelKey(activeKey);
-      }
-    }
-  }, [loaded, config]);
 
   // First-run with no api_key anywhere → land in settings.
   useEffect(() => {
@@ -68,13 +51,8 @@ function App() {
   }, [config]);
 
   const handleSelectModel = async (key: string) => {
-    setSelectedModelKey(key);
-    if (!config) return;
-    const [providerId, ...rest] = key.split('/');
-    const model = rest.join('/');
-    if (!providerId || !model) return;
-    if (config.active_provider_id === providerId && config.active_model_id === model) return;
-    await saveConfig({ ...config, active_provider_id: providerId, active_model_id: model });
+    if (!activeSessionId) return;
+    useChatStore.getState().setSessionModel(activeSessionId, key);
   };
 
   const handleOpenSettings = () => {
@@ -138,7 +116,7 @@ function App() {
     ...(live ? [{ kind: 'liveTurn' as const, id: 'live-turn', segments: live.segments, isStreaming: live.isStreaming }] : []),
   ], [historicalGroups, live]);
 
-  const selectedModelKeyFinal = selectedModelKey || (modelOptions[0]?.key ?? '');
+  const selectedModelKey = activeSession?.model_key || config?.default_model_id || modelOptions[0]?.key || '';
 
   return (
     <div className="app">
@@ -162,7 +140,7 @@ function App() {
             onCreateSession={createSession}
             input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming, textareaRef, onKeyDown: handleKeyDown }}
             modelOptions={modelOptions}
-            selectedModelKey={selectedModelKeyFinal}
+            selectedModelKey={selectedModelKey}
             onSelectModel={handleSelectModel}
           />
         ) : (

@@ -7,12 +7,13 @@
  * execution order — no stitching or guessing required.
  */
 import { create } from 'zustand';
+import { useSettingsStore } from './settings';
 
 declare global {
   interface Window {
     electronAPI: {
       chat: {
-        send: (message: string, sessionId: string) => Promise<{
+        send: (message: string, sessionId: string, model_key?: string) => Promise<{
           runId: string;
           message: Message;
         }>;
@@ -69,6 +70,8 @@ export interface Session {
   currentTurn?: StreamEvent[];
   isStreaming?: boolean;
   currentRunId?: string | null;
+  /** Per-session model selection — "providerId/modelName" format. */
+  model_key?: string;
 }
 
 // ── Unified stream event ──────────────────────────────────────────────
@@ -109,6 +112,7 @@ interface ChatState {
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
+  setSessionModel: (sessionId: string, modelKey: string) => void;
   /** Single handler for all stream events — dispatches on `kind`. */
   handleStreamEvent: (ev: StreamEvent) => void;
   clearError: () => void;
@@ -129,6 +133,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadSessions: async () => {
     try {
       const sessions = await window.electronAPI.session.list();
+      // Restore session model preferences from localStorage.
+      let saved: Record<string, string> = {};
+      try { saved = JSON.parse(localStorage.getItem('clawtao-session-models') || '{}'); } catch {}
+      for (const s of sessions) {
+        if (saved[s.id]) s.model_key = saved[s.id];
+      }
       set({ sessions });
       if (sessions.length === 0) {
         await get().createSession();
@@ -143,8 +153,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   createSession: async () => {
     try {
       const session = await window.electronAPI.session.create();
+      // Inherit the default model so the session works immediately.
+      const defaultModel = (useSettingsStore as any)?.getState?.()?.config?.default_model_id || '';
       set((state) => ({
-        sessions: [session, ...state.sessions],
+        sessions: [{ ...session, model_key: defaultModel || undefined }, ...state.sessions],
         activeSessionId: session.id,
       }));
     } catch (error) {
@@ -159,7 +171,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sessions: state.sessions.map((s) => {
           if (s.id !== sessionId) return s;
           // Preserve live streaming state — session.get doesn't carry it.
-          return { ...session, currentTurn: s.currentTurn, isStreaming: s.isStreaming, currentRunId: s.currentRunId };
+          return { ...session, currentTurn: s.currentTurn, isStreaming: s.isStreaming, currentRunId: s.currentRunId, model_key: s.model_key };
         }),
         activeSessionId: sessionId,
       }));
@@ -171,6 +183,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   deleteSession: async (sessionId: string) => {
     try {
       await window.electronAPI.session.delete(sessionId);
+      // Clean up persisted model preference.
+      try {
+        const saved = JSON.parse(localStorage.getItem('clawtao-session-models') || '{}');
+        delete saved[sessionId];
+        localStorage.setItem('clawtao-session-models', JSON.stringify(saved));
+      } catch {}
       const state = get();
       const sessions = state.sessions.filter(s => s.id !== sessionId);
       const activeSessionId = state.activeSessionId === sessionId
@@ -206,7 +224,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     try {
-      await window.electronAPI.chat.send(text, activeSessionId);
+      const session = get().sessions.find(s => s.id === activeSessionId);
+      await window.electronAPI.chat.send(text, activeSessionId, session?.model_key);
       // handleStreamEvent 'done' already reloaded via session.get; no second reload needed.
     } catch (error) {
       set((state) => ({
@@ -252,6 +271,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 ...session,
                 isStreaming: false,
                 currentTurn: [],
+                model_key: s2.sessions.find(x => x.id === sid)?.model_key,
               })),
             }));
           }).catch(() => {
@@ -273,6 +293,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
           return {};
       }
     });
+  },
+
+  setSessionModel: (sessionId, modelKey) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) => s.id === sessionId ? { ...s, model_key: modelKey } : s),
+    }));
+    // Persist across restarts.
+    try {
+      const saved = JSON.parse(localStorage.getItem('clawtao-session-models') || '{}');
+      saved[sessionId] = modelKey;
+      localStorage.setItem('clawtao-session-models', JSON.stringify(saved));
+    } catch {}
   },
 
   clearError: () => set({ error: null }),
