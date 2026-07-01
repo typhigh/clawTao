@@ -38,7 +38,7 @@ impl ToolExecutor for EditTool {
         )
     }
 
-    fn execute(&self, input: serde_json::Value) -> Result<String, ToolError> {
+    fn execute(&self, input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {
         let path = input.get("path").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidInput("missing or invalid 'path'".into()))?;
 

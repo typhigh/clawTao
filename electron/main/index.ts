@@ -181,6 +181,11 @@ function setupIpc() {
   ipcMain.handle('session:get', (_e, p: { sessionId: string }) => sendRpc('session.get', p));
   ipcMain.handle('session:delete', (_e, p: { sessionId: string }) => sendRpc('session.delete', p));
 
+  // chat.interrupt
+  ipcMain.handle('chat:interrupt', (_e, p: { sessionId: string }) =>
+    sendRpc('chat.interrupt', p)
+  );
+
   // chat.send — resolve per-session model_key to provider/model/api_key.
   ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string }) => {
     const config: any = readConfig();

@@ -7,7 +7,7 @@
 //! The store (persistence) is shared across all actors via `Arc<dyn SessionStore>`.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}, mpsc};
 
 use crate::store::store_trait::SessionStore;
 use reqwest::blocking::Client;
@@ -28,6 +28,7 @@ pub enum SessionMsg {
 /// Handle to a running session actor.
 pub struct ActorHandle {
     pub tx: mpsc::Sender<SessionMsg>,
+    pub cancel: Arc<AtomicBool>,
 }
 
 /// Global registry of active session actors.
@@ -45,16 +46,22 @@ impl SessionRegistry {
     pub fn get_or_spawn(
         &self,
         session_id: &str,
-        factory: impl FnOnce(mpsc::Receiver<SessionMsg>) -> std::thread::JoinHandle<()> + Send + 'static,
+        factory: impl FnOnce(mpsc::Receiver<SessionMsg>, Arc<AtomicBool>) -> std::thread::JoinHandle<()> + Send + 'static,
     ) -> mpsc::Sender<SessionMsg> {
         let mut actors = self.actors.lock().unwrap();
         if let Some(handle) = actors.get(session_id) {
             return handle.tx.clone();
         }
         let (tx, rx) = mpsc::channel();
-        let _handle = factory(rx);
-        actors.insert(session_id.to_string(), ActorHandle { tx: tx.clone() });
+        let cancel = Arc::new(AtomicBool::new(false));
+        let _handle = factory(rx, Arc::clone(&cancel));
+        actors.insert(session_id.to_string(), ActorHandle { tx: tx.clone(), cancel });
         tx
+    }
+
+    /// Get the cancel token for a session, if the actor exists.
+    pub fn get_cancel(&self, session_id: &str) -> Option<Arc<AtomicBool>> {
+        self.actors.lock().unwrap().get(session_id).map(|h| Arc::clone(&h.cancel))
     }
 
     /// Remove and shut down the actor for `session_id`.
@@ -87,11 +94,11 @@ pub(crate) fn dispatch_chat_send(
     let response_id = request.id.clone();
     let sid = session_id.clone();
 
-    let tx = registry.get_or_spawn(&session_id, move |rx| {
+    let tx = registry.get_or_spawn(&session_id, move |rx, cancel| {
         let store = Arc::clone(&store);
         let sid = sid.clone();
         std::thread::spawn(move || {
-            actor_loop(rx, &sid, store, process_run_wrapper);
+            actor_loop(rx, &sid, store, cancel, process_run_wrapper);
         })
     });
 
@@ -103,14 +110,14 @@ pub(crate) fn dispatch_chat_send(
     }
 }
 
-/// Session actor loop. Processes Run messages sequentially, calling `process`
-/// for each one. The `process` function is `process_run_wrapper` in production,
-/// or a counter in tests.
+/// Session actor loop. Processes Run messages sequentially.
+/// Resets the cancel flag at the start of each Run.
 pub(crate) fn actor_loop(
     rx: mpsc::Receiver<SessionMsg>,
     session_id: &str,
     store: Arc<dyn SessionStore>,
-    process: impl Fn(&Client, &dyn SessionStore, Value, Option<Value>) + Send + 'static,
+    cancel: Arc<AtomicBool>,
+    process: impl Fn(&Client, &dyn SessionStore, Value, Option<Value>, &AtomicBool) + Send + 'static,
 ) {
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(300))
@@ -120,7 +127,8 @@ pub(crate) fn actor_loop(
     for msg in rx {
         match msg {
             SessionMsg::Run { params, response_id } => {
-                process(&client, &*store, params, response_id);
+                cancel.store(false, Ordering::SeqCst);
+                process(&client, &*store, params, response_id, &cancel);
             }
             SessionMsg::Shutdown => {
                 info!("Actor for session {session_id} shutting down");
@@ -136,6 +144,7 @@ pub(crate) fn process_run_wrapper(
     store: &dyn SessionStore,
     params: Value,
     response_id: Option<Value>,
+    cancel: &AtomicBool,
 ) {
     let request = crate::jsonrpc::Request {
         jsonrpc: "2.0".into(),
@@ -143,7 +152,7 @@ pub(crate) fn process_run_wrapper(
         method: "chat.send".into(),
         params: Some(params),
     };
-    if let Err(e) = crate::chat::run_turn(&request, store, client) {
+    if let Err(e) = crate::chat::run_turn(&request, store, client, cancel) {
         error!("chat error: {e:#}");
         let _ = crate::jsonrpc::write_response(&crate::jsonrpc::Response::error(
             request.id, -32603, format!("Internal error: {e:#}"),

@@ -105,6 +105,11 @@ fn dispatch(
 ) {
     if request.method == "chat.send" {
         session_actor::dispatch_chat_send(request, registry);
+    } else if request.method == "chat.interrupt" {
+        if let Err(e) = handlers::chat_interrupt(request, registry) {
+            error!("Error handling request: {:#}", e);
+            let _ = jsonrpc::write_response(&Response::error(request.id.clone(), -32603, format!("Internal error: {:#}", e)));
+        }
     } else if request.method == "session.delete" {
         let sid = jsonrpc::get_param_opt(&request.params, "sessionId");
         if let Some(id) = sid { registry.remove(id); }

@@ -9,22 +9,24 @@ use crate::tools::{self, registry::ToolRegistry};
 use crate::jsonrpc::{get_param, write_notification, write_response};
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::{debug, trace};
 
 /// Immutable context for a single turn.
-struct TurnContext {
+pub(crate) struct TurnContext {
     session_id: String,
     run_id: String,
     system_prompt: String,
     tools: Vec<UnifiedTool>,
 }
 
-/// Entry point for a single chat turn.
-/// `config` is a free-form JSON object sent by the frontend.
+/// Entry point for a single chat turn. Sets up the adapter, tool registry,
+/// and context, then runs the state machine.
 pub(crate) fn run_turn(
     request: &crate::jsonrpc::Request,
     store: &dyn SessionStore,
     client: &Client,
+    cancel: &AtomicBool,
 ) -> Result<()> {
     let message_text = get_param(&request.params, "message")?;
     let session_id = get_param(&request.params, "sessionId")?;
@@ -46,7 +48,6 @@ pub(crate) fn run_turn(
         .ok_or_else(|| anyhow::anyhow!("Missing config field: api_protocol"))?;
     let thinking_enabled = config["thinking_enabled"].as_bool().unwrap_or(false);
 
-    // Per-request tool registry — pulls bash config from the request.
     let blocked: Vec<String> = config["bash_blocked_commands"]
         .as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
         .unwrap_or_default();
@@ -68,7 +69,6 @@ pub(crate) fn run_turn(
         "anthropic" => Box::new(AnthropicAdapter),
         _ => Box::new(OpenAiAdapter),
     };
-    let adapter = adapter.as_ref();
 
     let tools: Vec<UnifiedTool> = tool_registry.list_specs().iter().map(|spec| UnifiedTool {
         name: spec.function.name.clone(),
@@ -83,63 +83,13 @@ pub(crate) fn run_turn(
         tools,
     };
 
-    let mut messages = session.messages;
-
-    // ── Agent loop ──────────────────────────────────────────────────
-
-    let (final_content, final_thinking) = loop {
-        let response = llm_step(adapter, client, api_key, base_url, model, thinking_enabled, &messages, &ctx)?;
-
-        if response.tool_calls.is_empty() {
-            break (response.text, response.thinking);
-        }
-
-        store::add_assistant_tool_calls(
-            store, &ctx.session_id,
-            response.tool_calls.clone(),
-            &response.text,
-            response.thinking.as_deref(),
-        )?;
-
-        for tc in &response.tool_calls {
-            debug!("Executing tool: {} id={} args={}", tc.function.name, tc.id, tc.function.arguments);
-
-            let args_val: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null);
-
-            write_notification(&Notification::new("chat.stream", Some(json!({
-                "sessionId": ctx.session_id, "runId": ctx.run_id,
-                "kind": "tool_call",
-                "toolCallId": tc.id, "toolName": tc.function.name,
-                "input": args_val,
-            }))))?;
-
-            let tool_result = match tool_registry.get(&tc.function.name) {
-                Some(executor) => match executor.execute(args_val.clone()) {
-                    Ok(output) => output,
-                    Err(e) => format!("Tool error: {e}"),
-                },
-                None => format!("Unknown tool: {}", tc.function.name),
-            };
-
-            debug!("Tool result for {}: {:.200}", tc.function.name, tool_result);
-
-            write_notification(&Notification::new("chat.stream", Some(json!({
-                "sessionId": ctx.session_id, "runId": ctx.run_id,
-                "kind": "tool_result",
-                "toolCallId": tc.id, "toolName": tc.function.name,
-                "output": tool_result,
-            }))))?;
-
-            store::add_tool_result(store, &ctx.session_id, &tc.id, &tool_result)?;
-        }
-
-        messages = store.get(&ctx.session_id)?
-            .ok_or_else(|| anyhow::anyhow!("Session not found after tool execution"))?
-            .messages;
-    };
+    let (final_content, final_thinking) = run_state_machine(
+        store, adapter.as_ref(), client,
+        api_key, base_url, model, thinking_enabled,
+        session.messages, &ctx, &tool_registry, cancel,
+    )?;
 
     // ── Finalize ─────────────────────────────────────────────────────
-
     let content = if final_content.is_empty() { "(no response)" } else { &final_content };
     store::add_assistant_message(store, &ctx.session_id, content, final_thinking.as_deref())?;
 
@@ -160,7 +110,98 @@ pub(crate) fn run_turn(
     Ok(())
 }
 
-/// One LLM call: build request → HTTP → stream SSE → parse response.
+// ── State machine ──────────────────────────────────────────────────
+
+enum TurnState {
+    Sampling,
+    Evaluating { response: LlmResponse },
+    Executing { response: LlmResponse, cursor: usize },
+    Interrupted { text: String, thinking: Option<String> },
+    Finalizing { text: String, thinking: Option<String> },
+}
+
+fn run_state_machine(
+    store: &dyn SessionStore,
+    adapter: &dyn ApiAdapter,
+    client: &Client,
+    api_key: &str,
+    base_url: &str,
+    model: &str,
+    thinking_enabled: bool,
+    mut messages: Vec<store::Message>,
+    ctx: &TurnContext,
+    tool_registry: &ToolRegistry,
+    cancel: &AtomicBool,
+) -> Result<(String, Option<String>)> {
+    let mut state = TurnState::Sampling;
+
+    loop {
+        state = match state {
+            TurnState::Sampling => {
+                let response = llm_step(adapter, client, api_key, base_url, model, thinking_enabled, &messages, ctx, cancel)?;
+                TurnState::Evaluating { response }
+            }
+            TurnState::Evaluating { response } => {
+                if cancel.load(Ordering::SeqCst) {
+                    TurnState::Interrupted { text: response.text, thinking: response.thinking }
+                } else if response.tool_calls.is_empty() {
+                    TurnState::Finalizing { text: response.text, thinking: response.thinking }
+                } else {
+                    store::add_assistant_tool_calls(
+                        store, &ctx.session_id,
+                        response.tool_calls.clone(),
+                        &response.text,
+                        response.thinking.as_deref(),
+                    )?;
+                    TurnState::Executing { response, cursor: 0 }
+                }
+            }
+            TurnState::Executing { response, cursor } => {
+                if cursor >= response.tool_calls.len() {
+                    messages = store.get(&ctx.session_id)?
+                        .ok_or_else(|| anyhow::anyhow!("Session not found after tool execution"))?
+                        .messages;
+                    TurnState::Sampling
+                } else {
+                    let tc = &response.tool_calls[cursor];
+                    debug!("Executing tool: {} id={} args={}", tc.function.name, tc.id, tc.function.arguments);
+                    let args_val: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null);
+
+                    write_notification(&Notification::new("chat.stream", Some(json!({
+                        "sessionId": ctx.session_id, "runId": ctx.run_id,
+                        "kind": "tool_call", "toolCallId": tc.id, "toolName": tc.function.name, "input": args_val,
+                    }))))?;
+
+                    let tool_result = if cancel.load(Ordering::SeqCst) {
+                        "[interrupted by user]".to_string()
+                    } else {
+                        match tool_registry.get(&tc.function.name) {
+                            Some(executor) => match executor.execute(args_val.clone(), cancel) {
+                                Ok(output) => output,
+                                Err(e) => format!("Tool error: {e}"),
+                            },
+                            None => format!("Unknown tool: {}", tc.function.name),
+                        }
+                    };
+
+                    debug!("Tool result for {}: {:.200}", tc.function.name, tool_result);
+                    write_notification(&Notification::new("chat.stream", Some(json!({
+                        "sessionId": ctx.session_id, "runId": ctx.run_id,
+                        "kind": "tool_result", "toolCallId": tc.id, "toolName": tc.function.name, "output": tool_result,
+                    }))))?;
+                    store::add_tool_result(store, &ctx.session_id, &tc.id, &tool_result)?;
+
+                    TurnState::Executing { response, cursor: cursor + 1 }
+                }
+            }
+            TurnState::Interrupted { text, thinking } => break Ok((text, thinking)),
+            TurnState::Finalizing { text, thinking } => break Ok((text, thinking)),
+        };
+    }
+}
+
+// ── One LLM call ───────────────────────────────────────────────────
+
 fn llm_step(
     adapter: &dyn ApiAdapter,
     client: &Client,
@@ -170,6 +211,7 @@ fn llm_step(
     thinking_enabled: bool,
     messages: &[store::Message],
     ctx: &TurnContext,
+    cancel: &AtomicBool,
 ) -> Result<LlmResponse> {
     let llm_msgs: Vec<LlmMessage> = messages.iter().map(|m| LlmMessage {
         role: m.role.clone(),
@@ -218,6 +260,7 @@ fn llm_step(
             }
         }
         line.clear();
+        if cancel.load(Ordering::SeqCst) { break; }
     }
 
     let body_str = String::from_utf8_lossy(&body_bytes);
@@ -226,3 +269,7 @@ fn llm_step(
 
     adapter.parse_stream(&body_str)
 }
+
+#[cfg(test)]
+#[path = "tests/chat_tests.rs"]
+mod tests;

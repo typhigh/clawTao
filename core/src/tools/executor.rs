@@ -1,5 +1,6 @@
 use super::spec::ToolSpec;
 use std::fmt;
+use std::sync::atomic::AtomicBool;
 
 /// Reasons a tool call can fail.
 /// `Execution` means the tool ran but produced an error.
@@ -28,7 +29,9 @@ pub trait ToolExecutor: Send + Sync {
 
     /// Execute this tool with the arguments parsed from the LLM's tool_call.
     /// `input` is the JSON value of `tool_calls[].function.arguments`.
-    fn execute(&self, input: serde_json::Value) -> Result<String, ToolError>;
+    /// `cancel` is set to true when the user interrupts the turn — tools
+    /// should check it periodically and return "[interrupted by user]" promptly.
+    fn execute(&self, input: serde_json::Value, cancel: &AtomicBool) -> Result<String, ToolError>;
 }
 
 #[cfg(test)]

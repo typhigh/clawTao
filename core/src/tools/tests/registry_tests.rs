@@ -12,7 +12,7 @@ struct MockTool {
 impl ToolExecutor for MockTool {
     fn name(&self) -> &str { self.name }
     fn spec(&self) -> ToolSpec { self.spec.clone() }
-    fn execute(&self, _input: serde_json::Value) -> Result<String, ToolError> {
+    fn execute(&self, _input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {
         Ok("mock result".into())
     }
 }

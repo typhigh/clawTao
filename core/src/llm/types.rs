@@ -10,7 +10,7 @@ pub struct LlmRequest {
 }
 
 /// Protocol-agnostic LLM response (accumulated from SSE stream).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LlmResponse {
     pub text: String,
     pub tool_calls: Vec<ToolCall>,

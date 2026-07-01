@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use super::*;
 
 #[test]
@@ -10,7 +11,7 @@ fn edit_replace_single_occurrence() {
         "path": tmp.to_str().unwrap(),
         "old_string": "hello",
         "new_string": "hi"
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
 
     assert_eq!(std::fs::read_to_string(&tmp).unwrap(), "hi world");
     std::fs::remove_file(&tmp).ok();
@@ -26,7 +27,7 @@ fn edit_multiple_occurrences_fails() {
         "path": tmp.to_str().unwrap(),
         "old_string": "aa",
         "new_string": "cc"
-    })).unwrap_err();
+    }), &AtomicBool::new(false)).unwrap_err();
 
     assert!(format!("{err}").contains("2 times"));
     std::fs::remove_file(&tmp).ok();
@@ -42,7 +43,7 @@ fn edit_not_found_fails() {
         "path": tmp.to_str().unwrap(),
         "old_string": "xyz",
         "new_string": "abc"
-    })).unwrap_err();
+    }), &AtomicBool::new(false)).unwrap_err();
 
     assert!(format!("{err}").contains("not found"));
     std::fs::remove_file(&tmp).ok();
@@ -59,7 +60,7 @@ fn edit_replace_all() {
         "old_string": "aa",
         "new_string": "xx",
         "replace_all": true
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
 
     assert_eq!(std::fs::read_to_string(&tmp).unwrap(), "xx bb xx cc xx");
     assert!(result.contains("3 replacement(s)"));
@@ -77,7 +78,7 @@ fn edit_replace_all_not_found_fails() {
         "old_string": "xyz",
         "new_string": "abc",
         "replace_all": true
-    })).unwrap_err();
+    }), &AtomicBool::new(false)).unwrap_err();
 
     assert!(format!("{err}").contains("not found"));
     std::fs::remove_file(&tmp).ok();

@@ -47,7 +47,7 @@ impl ToolExecutor for WebBrowserTool {
         )
     }
 
-    fn execute(&self, input: serde_json::Value) -> Result<String, ToolError> {
+    fn execute(&self, input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {
         let client = reqwest::blocking::Client::new();
         let resp = client.post(browser_server_url()?)
             .json(&input)

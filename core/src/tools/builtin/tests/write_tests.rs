@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use super::*;
 use crate::tools::executor::ToolError;
 
@@ -8,7 +9,7 @@ fn write_and_read_back() {
     let result = tool.execute(serde_json::json!({
         "path": tmp.to_str().unwrap(),
         "content": "test content"
-    }));
+    }), &AtomicBool::new(false));
     assert!(result.is_ok());
     assert!(result.unwrap().contains("bytes"));
 
@@ -20,7 +21,7 @@ fn write_and_read_back() {
 #[test]
 fn write_missing_content() {
     let tool = WriteTool;
-    let result = tool.execute(serde_json::json!({"path": "/tmp/test.txt"}));
+    let result = tool.execute(serde_json::json!({"path": "/tmp/test.txt"}), &AtomicBool::new(false));
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), ToolError::InvalidInput(_)));
 }

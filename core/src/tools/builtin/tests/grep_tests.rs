@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use super::*;
 
 #[test]
@@ -11,7 +12,7 @@ fn grep_finds_matches() {
     let result = tool.execute(serde_json::json!({
         "pattern": "hello",
         "path": dir.to_str().unwrap(),
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert!(result.contains("a.txt"));
     assert!(result.contains("b.txt"));
     assert!(result.contains("hello"));
@@ -28,7 +29,7 @@ fn grep_no_matches() {
     let result = tool.execute(serde_json::json!({
         "pattern": "xyz123",
         "path": dir.to_str().unwrap(),
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert!(result.contains("No matches"));
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -45,7 +46,7 @@ fn grep_with_include() {
         "pattern": "hello",
         "path": dir.to_str().unwrap(),
         "include": "*.rs",
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert!(result.contains("a.rs"));
     assert!(!result.contains("b.ts"));
     std::fs::remove_dir_all(&dir).ok();
@@ -54,7 +55,7 @@ fn grep_with_include() {
 #[test]
 fn grep_invalid_regex() {
     let tool = GrepTool;
-    let result = tool.execute(serde_json::json!({"pattern": "[invalid"}));
+    let result = tool.execute(serde_json::json!({"pattern": "[invalid"}), &AtomicBool::new(false));
     assert!(result.is_err());
 }
 
@@ -71,7 +72,7 @@ fn grep_skips_hidden_dirs() {
 
     let result = tool.execute(serde_json::json!({
         "pattern": "hello", "path": dir.to_str().unwrap(),
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert!(result.contains("src/c.txt"));
     assert!(!result.contains(".git"));
     assert!(!result.contains("node_modules"));
@@ -88,7 +89,7 @@ fn grep_on_single_file() {
 
     let result = tool.execute(serde_json::json!({
         "pattern": "TODO", "path": file.to_str().unwrap(),
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert!(result.contains("TODO"));
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -98,7 +99,7 @@ fn grep_path_not_found() {
     let tool = GrepTool;
     let result = tool.execute(serde_json::json!({
         "pattern": "x", "path": "/nonexistent/path"
-    }));
+    }), &AtomicBool::new(false));
     assert!(result.is_err());
 }
 
@@ -113,7 +114,7 @@ fn grep_truncation_on_many_matches() {
 
     let result = tool.execute(serde_json::json!({
         "pattern": "match", "path": dir.to_str().unwrap(),
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert!(result.contains("Found 120 matches"));
     assert!(result.contains("showing first 100"));
     std::fs::remove_dir_all(&dir).ok();

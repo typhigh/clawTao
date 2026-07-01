@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use super::*;
 use crate::tools::executor::ToolError;
 
@@ -6,7 +7,7 @@ fn read_existing_file() {
     let tool = ReadTool;
     let tmp = std::env::temp_dir().join("clawtao_test_read.txt");
     std::fs::write(&tmp, "hello world").unwrap();
-    let result = tool.execute(serde_json::json!({"path": tmp.to_str().unwrap()}));
+    let result = tool.execute(serde_json::json!({"path": tmp.to_str().unwrap()}), &AtomicBool::new(false));
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "hello world");
     std::fs::remove_file(&tmp).ok();
@@ -15,7 +16,7 @@ fn read_existing_file() {
 #[test]
 fn read_missing_file() {
     let tool = ReadTool;
-    let result = tool.execute(serde_json::json!({"path": "/nonexistent/file"}));
+    let result = tool.execute(serde_json::json!({"path": "/nonexistent/file"}), &AtomicBool::new(false));
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), ToolError::Execution(_)));
 }
@@ -23,7 +24,7 @@ fn read_missing_file() {
 #[test]
 fn read_missing_param() {
     let tool = ReadTool;
-    let result = tool.execute(serde_json::json!({}));
+    let result = tool.execute(serde_json::json!({}), &AtomicBool::new(false));
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), ToolError::InvalidInput(_)));
 }
@@ -39,7 +40,7 @@ fn read_with_offset() {
     let result = tool.execute(serde_json::json!({
         "path": tmp.to_str().unwrap(),
         "offset": 3
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert_eq!(result, "line3\nline4\nline5");
 
     std::fs::remove_file(&tmp).ok();
@@ -56,7 +57,7 @@ fn read_with_limit() {
     let result = tool.execute(serde_json::json!({
         "path": tmp.to_str().unwrap(),
         "limit": 2
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert!(result.starts_with("line1\nline2"));
     assert!(result.contains("Truncated"));
     assert!(result.contains("5 total lines"));
@@ -76,7 +77,7 @@ fn read_with_offset_and_limit() {
         "path": tmp.to_str().unwrap(),
         "offset": 2,
         "limit": 2
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert!(result.starts_with("b\nc"));
     assert!(result.contains("Truncated"));
     assert!(result.contains("lines 2-3"));
@@ -93,7 +94,7 @@ fn read_offset_out_of_range() {
     let result = tool.execute(serde_json::json!({
         "path": tmp.to_str().unwrap(),
         "offset": 10
-    })).unwrap();
+    }), &AtomicBool::new(false)).unwrap();
     assert!(result.contains("offset 10 is out of range"));
 
     std::fs::remove_file(&tmp).ok();

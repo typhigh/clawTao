@@ -29,7 +29,7 @@ impl ToolExecutor for GrepTool {
         )
     }
 
-    fn execute(&self, input: serde_json::Value) -> Result<String, ToolError> {
+    fn execute(&self, input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {
         let pattern = input.get("pattern").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidInput("missing 'pattern'".into()))?;
         let search_path = input.get("path").and_then(|v| v.as_str()).unwrap_or(".");

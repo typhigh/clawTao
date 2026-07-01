@@ -2,6 +2,7 @@ use crate::tools::executor::{ToolError, ToolExecutor};
 use crate::tools::spec::ToolSpec;
 use serde_json::json;
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 pub struct BashTool {
@@ -35,7 +36,7 @@ impl ToolExecutor for BashTool {
         )
     }
 
-    fn execute(&self, input: serde_json::Value) -> Result<String, ToolError> {
+    fn execute(&self, input: serde_json::Value, cancel: &AtomicBool) -> Result<String, ToolError> {
         let command = input.get("command").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidInput("missing 'command'".into()))?;
 
@@ -70,6 +71,10 @@ impl ToolExecutor for BashTool {
             .map_err(|e| ToolError::Execution(format!("Bash: {e}")))?;
         let start = std::time::Instant::now();
         let output = loop {
+            if cancel.load(Ordering::SeqCst) {
+                let _ = child.kill(); let _ = child.wait();
+                return Ok("[interrupted by user]".to_string());
+            }
             match child.try_wait() {
                 Ok(Some(_)) => break child.wait_with_output().map_err(|e| ToolError::Execution(format!("Bash: {e}")))?,
                 Ok(None) if start.elapsed() > timeout => {

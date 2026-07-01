@@ -21,6 +21,24 @@ pub fn route(
     }
 }
 
+/// Handle chat.interrupt: set the actor's cancel flag.
+pub fn chat_interrupt(
+    request: &Request,
+    registry: &crate::session_actor::SessionRegistry,
+) -> Result<()> {
+    let sid = jsonrpc::get_param(&request.params, "sessionId")?;
+    match registry.get_cancel(sid) {
+        Some(cancel) => {
+            cancel.store(true, std::sync::atomic::Ordering::SeqCst);
+            jsonrpc::write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
+        }
+        None => {
+            jsonrpc::write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
+        }
+    }
+    Ok(())
+}
+
 // ── Session ──────────────────────────────────────────────────────────────
 
 pub fn session_list(request: &Request, store: &dyn SessionStore) -> Result<()> {

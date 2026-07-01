@@ -13,6 +13,8 @@ const electronAPI = {
   chat: {
     send: (message: string, sessionId: string, model_key?: string) =>
       ipcRenderer.invoke('chat:send', { message, sessionId, model_key }),
+    interrupt: (sessionId: string) =>
+      ipcRenderer.invoke('chat:interrupt', { sessionId }),
   },
 
   // Session operations

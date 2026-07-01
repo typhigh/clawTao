@@ -23,7 +23,7 @@ impl ToolExecutor for WebFetchTool {
         )
     }
 
-    fn execute(&self, input: serde_json::Value) -> Result<String, ToolError> {
+    fn execute(&self, input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {
         let url = input.get("url").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidInput("missing 'url'".into()))?;
 

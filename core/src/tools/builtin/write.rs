@@ -30,7 +30,7 @@ impl ToolExecutor for WriteTool {
         )
     }
 
-    fn execute(&self, input: serde_json::Value) -> Result<String, ToolError> {
+    fn execute(&self, input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {
         let path = input
             .get("path")
             .and_then(|v| v.as_str())

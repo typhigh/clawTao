@@ -17,6 +17,7 @@ declare global {
           runId: string;
           message: Message;
         }>;
+        interrupt: (sessionId: string) => Promise<unknown>;
       };
       session: {
         list: () => Promise<Session[]>;
@@ -112,6 +113,7 @@ interface ChatState {
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
+  cancelRun: () => Promise<void>;
   setSessionModel: (sessionId: string, modelKey: string) => void;
   /** Single handler for all stream events — dispatches on `kind`. */
   handleStreamEvent: (ev: StreamEvent) => void;
@@ -293,6 +295,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
           return {};
       }
     });
+  },
+
+  cancelRun: async () => {
+    const sid = get().activeSessionId;
+    if (!sid) return;
+    try { await window.electronAPI.chat.interrupt(sid); } catch { /* ignore */ }
   },
 
   setSessionModel: (sessionId, modelKey) => {

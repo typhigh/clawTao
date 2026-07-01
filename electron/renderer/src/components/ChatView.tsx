@@ -27,12 +27,14 @@ interface Props {
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
     onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   };
+  streaming: boolean;
+  onCancel: () => void;
   modelOptions: ModelOption[];
   selectedModelKey: string;
   onSelectModel: (key: string) => void;
 }
 
-export function ChatView({ timeline, error, onClearError, hasActiveSession, onCreateSession, input, modelOptions, selectedModelKey, onSelectModel }: Props) {
+export function ChatView({ timeline, error, onClearError, hasActiveSession, onCreateSession, input, streaming, onCancel, modelOptions, selectedModelKey, onSelectModel }: Props) {
   const { t } = useTranslation();
 
   return (
@@ -50,6 +52,8 @@ export function ChatView({ timeline, error, onClearError, hasActiveSession, onCr
           </div>
           <InputArea
             {...input}
+            streaming={streaming}
+            onCancel={onCancel}
             modelOptions={modelOptions}
             selectedModelKey={selectedModelKey}
             onSelectModel={onSelectModel}
