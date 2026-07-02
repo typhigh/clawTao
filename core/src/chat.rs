@@ -143,6 +143,7 @@ fn run_state_machine(
             }
             TurnState::Evaluating { response } => {
                 if cancel.load(Ordering::SeqCst) {
+                    debug!("TurnState: Evaluating → Interrupted (cancel=true)");
                     TurnState::Interrupted { text: response.text, thinking: response.thinking }
                 } else if response.tool_calls.is_empty() {
                     TurnState::Finalizing { text: response.text, thinking: response.thinking }
@@ -271,7 +272,7 @@ fn llm_step(
             }
         }
         line.clear();
-        if cancel.load(Ordering::SeqCst) { break; }
+        if cancel.load(Ordering::SeqCst) { debug!("llm_step: SSE loop cancelled"); break; }
     }
 
     let body_str = String::from_utf8_lossy(&body_bytes);

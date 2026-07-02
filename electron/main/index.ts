@@ -127,7 +127,7 @@ function startRust() {
   rustProcess = spawn('cargo', ['run', '--manifest-path', manifestPath], {
     cwd: coreDir,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, RUST_BACKTRACE: '1', RUST_LOG: logLevel },
+    env: { ...process.env, RUST_BACKTRACE: '1', RUST_LOG: `clawtao=${logLevel}` },
   });
 
   const rl = readline.createInterface({ input: rustProcess.stdout!, crlfDelay: Infinity });

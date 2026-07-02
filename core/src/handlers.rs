@@ -27,12 +27,15 @@ pub fn chat_interrupt(
     registry: &crate::session_actor::SessionRegistry,
 ) -> Result<()> {
     let sid = jsonrpc::get_param(&request.params, "sessionId")?;
+    tracing::trace!("chat.interrupt: session={sid}");
     match registry.get_cancel(sid) {
         Some(cancel) => {
             cancel.store(true, std::sync::atomic::Ordering::SeqCst);
+            tracing::trace!("chat.interrupt: cancel flag set for session={sid}");
             jsonrpc::write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
         }
         None => {
+            tracing::trace!("chat.interrupt: no actor found for session={sid}");
             jsonrpc::write_response(&Response::success(request.id.clone(), json!({"ok": true})))?;
         }
     }
