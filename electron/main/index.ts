@@ -314,7 +314,7 @@ function setupIpc() {
 
 async function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1000, height: 700, minWidth: 600, minHeight: 400,
+    width: 1000, height: 700, minWidth: 800, minHeight: 400,
     webPreferences: { preload: path.join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false },
     title: 'ClawTao',
   });

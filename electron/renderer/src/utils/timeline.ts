@@ -94,6 +94,15 @@ export function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegmen
   for (const ev of events) {
     switch (ev.kind) {
       case 'started': case 'done': break;
+      case 'todo':
+        // Replace the previous todo segment — only latest is shown.
+        for (let i = segments.length - 1; i >= 0; i--) {
+          if (segments[i].kind === 'todo') { segments.splice(i, 1); break; }
+        }
+        if (ev.todos && ev.todos.length > 0) {
+          segments.push({ kind: 'todo', todos: ev.todos });
+        }
+        break;
       case 'thinking': thinkingBuf += ev.delta!; break;
       case 'text': flushThinking(); textBuf += ev.delta!; break;
       case 'tool_call':

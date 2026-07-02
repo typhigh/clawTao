@@ -34,11 +34,11 @@ html, body, #root {
 /* ── Sidebar ── */
 .sidebar {
   width: 270px;
+  flex-shrink: 0;
   background: white;
   border-right: 1px solid #ececec;
   display: flex;
   flex-direction: column;
-  min-width: 0;
 }
 
 .sidebar-spacer {
@@ -374,6 +374,7 @@ html, body, #root {
 
 .chat-area {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: white;
@@ -1604,3 +1605,44 @@ html, body, #root {
   color: #999;
 }
 .btn-icon:hover { background: #f0f0f0; color: #555; }
+
+/* ── Todo card (update_todo tool) ── */
+.todo-card {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 4px 0;
+}
+.todo-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.todo-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.todo-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  padding: 2px 0;
+}
+.todo-icon {
+  flex-shrink: 0;
+  font-size: 11px;
+  width: 16px;
+  text-align: center;
+}
+.todo-completed .todo-icon { color: #34c759; }
+.todo-completed .todo-step { color: #999; text-decoration: line-through; }
+.todo-in_progress .todo-icon { color: #007aff; }
+.todo-in_progress .todo-step { color: #1c1c1e; }
+.todo-pending .todo-icon { color: #ccc; }
+.todo-pending .todo-step { color: #999; }

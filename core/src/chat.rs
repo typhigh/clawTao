@@ -172,6 +172,17 @@ fn run_state_machine(
                         "kind": "tool_call", "toolCallId": tc.id, "toolName": tc.function.name, "input": args_val,
                     }))))?;
 
+                    // update_todo: send the todo list as a separate notification
+                    // for the frontend to render inline.
+                    if tc.function.name == "update_todo" {
+                        if let Some(todos) = args_val.get("todos") {
+                            write_notification(&Notification::new("chat.stream", Some(json!({
+                                "sessionId": ctx.session_id, "runId": ctx.run_id,
+                                "kind": "todo", "todos": todos,
+                            }))))?;
+                        }
+                    }
+
                     let tool_result = if cancel.load(Ordering::SeqCst) {
                         "[interrupted by user]".to_string()
                     } else {

@@ -10,7 +10,8 @@ export type AssistantSegment =
 export type TurnSegment =
   | { kind: 'text'; content: string }
   | { kind: 'toolPair'; id: string; toolName: string; toolInput: unknown; result: string | null; pending: boolean }
-  | { kind: 'thinking'; content: string };
+  | { kind: 'thinking'; content: string }
+  | { kind: 'todo'; todos: { step: string; status: string }[] };
 
 export type TimelineGroup =
   | { kind: 'user'; id: string; content: string; timestamp: number }

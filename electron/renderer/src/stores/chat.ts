@@ -89,7 +89,7 @@ export interface Session {
 export type StreamEvent = {
   sessionId: string;
   runId: string;
-  kind: 'started' | 'text' | 'thinking' | 'tool_call' | 'tool_result' | 'done';
+  kind: 'started' | 'text' | 'thinking' | 'todo' | 'tool_call' | 'tool_result' | 'done';
   // text / thinking
   delta?: string;
   // tool_call
@@ -98,6 +98,8 @@ export type StreamEvent = {
   input?: unknown;
   // tool_result
   output?: string;
+  // todo
+  todos?: { step: string; status: string }[];
 };
 
 // ── Store ─────────────────────────────────────────────────────────────
@@ -257,6 +259,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           };
         case 'text':
         case 'thinking':
+        case 'todo':
         case 'tool_call':
         case 'tool_result':
           return {

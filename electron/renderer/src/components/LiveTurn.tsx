@@ -4,6 +4,7 @@ import { normalizeMd } from '../utils/format';
 import { markdownComponents } from '../utils/markdown';
 import type { TurnSegment } from '../types/timeline';
 import { Thinking } from './Thinking';
+import { TodoView } from './TodoView';
 import { ToolPairView } from './ToolCard';
 
 /** Live turn: flat chronological segments, no fold. */
@@ -16,6 +17,9 @@ export function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[
         }
         if (seg.kind === 'thinking') {
           return <Thinking key={i} content={seg.content} forceOpen={isStreaming} />;
+        }
+        if (seg.kind === 'todo') {
+          return <TodoView key={i} todos={seg.todos} />;
         }
         return <ToolPairView key={seg.id} segment={seg} />;
       })}
