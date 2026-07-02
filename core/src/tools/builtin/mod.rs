@@ -14,7 +14,7 @@ pub use bash::BashTool;
 pub use edit::EditTool;
 pub use grep::GrepTool;
 pub use read::ReadTool;
-pub use todo::UpdateTodoTool;
+pub use todo::TodoWriteTool;
 pub use web_browser::WebBrowserTool;
 pub use web_fetch::WebFetchTool;
 pub use write::WriteTool;
@@ -28,5 +28,5 @@ pub fn register_all(registry: &mut ToolRegistry, bash_blocked_commands: Vec<Stri
     registry.register(Arc::new(WebBrowserTool));
     registry.register(Arc::new(WebFetchTool));
     registry.register(Arc::new(GrepTool));
-    registry.register(Arc::new(UpdateTodoTool));
+    registry.register(Arc::new(TodoWriteTool));
 }

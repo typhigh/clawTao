@@ -175,7 +175,7 @@ fn run_state_machine(
 
                     // update_todo: send the todo list as a separate notification
                     // for the frontend to render inline.
-                    if tc.function.name == "update_todo" {
+                    if tc.function.name == "TodoWrite" {
                         if let Some(todos) = args_val.get("todos") {
                             write_notification(&Notification::new("chat.stream", Some(json!({
                                 "sessionId": ctx.session_id, "runId": ctx.run_id,

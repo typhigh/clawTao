@@ -165,13 +165,15 @@ function startRust() {
   });
 }
 
-function sendRpc(method: string, params?: Record<string, unknown>): Promise<unknown> {
+function sendRpc(method: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
   return new Promise((resolve, reject) => {
     if (!rustProcess?.stdin) { reject(new Error('Rust not ready')); return; }
     const id = ++requestId;
     pendingRequests.set(id, { resolve, reject });
     rustProcess.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params: params || {} }) + '\n');
-    setTimeout(() => { if (pendingRequests.has(id)) { pendingRequests.delete(id); reject(new Error('timeout')); } }, 180000);
+    if (timeoutMs && timeoutMs > 0) {
+      setTimeout(() => { if (pendingRequests.has(id)) { pendingRequests.delete(id); reject(new Error('timeout')); } }, timeoutMs);
+    }
   });
 }
 
@@ -200,7 +202,7 @@ function setupIpc() {
     config.base_url = provider.base_url || '';
     config.model = model;
     config.api_protocol = provider.api_protocol || 'anthropic';
-    return sendRpc('chat.send', { ...p, config });
+    return sendRpc('chat.send', { ...p, config }, 0);
   });
 
   // config:get — reads from Electron-managed config.json + secrets.json.

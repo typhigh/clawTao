@@ -3,22 +3,25 @@ use crate::tools::spec::ToolSpec;
 use serde_json::json;
 use std::sync::atomic::AtomicBool;
 
-/// `update_todo` tool — ephemeral task list, per-turn only, not persisted.
-pub struct UpdateTodoTool;
+/// Ephemeral task list for the current turn. Not persisted.
+pub struct TodoWriteTool;
 
-impl ToolExecutor for UpdateTodoTool {
+impl ToolExecutor for TodoWriteTool {
     fn name(&self) -> &str {
-        "update_todo"
+        "TodoWrite"
     }
 
     fn spec(&self) -> ToolSpec {
         ToolSpec::new(
-            "update_todo",
-            "Create and update a task list for the current turn. Each item has a step description and a status: pending, in_progress, or completed. At most one step can be in_progress at a time.",
+            "TodoWrite",
+            "Create and update a prioritized task list for the current turn. \
+             Use this to plan and track your progress on complex multi-step tasks. \
+             Each item has a step description and a status. \
+             At most one step should be in_progress at a time. \
+             The list is ephemeral — it is not saved between turns.",
             json!({
                 "type": "object",
                 "properties": {
-                    "explanation": { "type": "string", "description": "Brief explanation of the changes" },
                     "todos": {
                         "type": "array",
                         "items": {
