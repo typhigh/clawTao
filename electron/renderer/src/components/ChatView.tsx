@@ -4,6 +4,7 @@ import { LiveTurnView } from './LiveTurn';
 import { AgentTurnView } from './AgentTurn';
 import { InputArea } from './InputArea';
 import type { TimelineGroup } from '../types/timeline';
+import type { ChatError } from '../stores/chat';
 
 export interface ModelOption {
   providerId: string;
@@ -14,7 +15,7 @@ export interface ModelOption {
 
 interface Props {
   timeline: TimelineGroup[];
-  error: string | null;
+  error: ChatError | null;
   onClearError: () => void;
   hasActiveSession: boolean;
   onCreateSession: () => void;
@@ -34,12 +35,35 @@ interface Props {
   onSelectModel: (key: string) => void;
 }
 
+/** Actions the user can take for non-retryable errors. */
+function errorAction(errorCode: string): string | null {
+  switch (errorCode) {
+    case 'UNAUTHORIZED':
+    case 'CONFIG_ERROR':
+      return 'Open Settings';
+    case 'CONTEXT_EXCEEDED':
+    case 'SESSION_ERROR':
+      return 'New Session';
+    default:
+      return null;
+  }
+}
+
 export function ChatView({ timeline, error, onClearError, hasActiveSession, onCreateSession, input, streaming, onCancel, modelOptions, selectedModelKey, onSelectModel }: Props) {
   const { t } = useTranslation();
 
   return (
     <main className="chat-area">
-      {error && <div className="error" onClick={onClearError}>{error}</div>}
+      {error && (
+        <div className={`error error--${error.errorCode.toLowerCase()}`}>
+          <span className="error-message">{error.message}</span>
+          {error.retryable && <button className="error-retry" onClick={(e) => { e.stopPropagation(); input.onSend(); }}>{t('retry')}</button>}
+          {!error.retryable && errorAction(error.errorCode) && (
+            <span className="error-action">{errorAction(error.errorCode)}</span>
+          )}
+          <button className="error-dismiss" onClick={onClearError} aria-label={t('close')}>✕</button>
+        </div>
+      )}
 
       {hasActiveSession ? (
         <>

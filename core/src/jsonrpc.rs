@@ -31,10 +31,27 @@ pub struct Response {
 }
 
 /// JSON-RPC 2.0 Error
+///
+/// Beyond the spec-mandated `code` and `message`, this carries two
+/// structured fields so the frontend can render differentiated
+/// recovery UI without parsing the human-readable message:
+///
+/// - `error_code`: stable machine-readable string ("UNAUTHORIZED", …)
+/// - `retryable`: whether the frontend should offer an auto-retry affordance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Error {
     pub code: i32,
     pub message: String,
+
+    /// Stable snake_case error code the frontend can switch on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+
+    /// Whether the error is transient and worth retrying automatically.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+
+    /// Optional additional structured data (for future extension).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
 }
@@ -58,7 +75,36 @@ impl Response {
             jsonrpc: "2.0".to_string(),
             id,
             result: None,
-            error: Some(Error { code, message: message.into(), data: None }),
+            error: Some(Error {
+                code,
+                message: message.into(),
+                error_code: None,
+                retryable: None,
+                data: None,
+            }),
+        }
+    }
+
+    /// Build an error response with structured `error_code` and `retryable`
+    /// fields that the frontend uses to render differentiated recovery UI.
+    pub fn error_with_code(
+        id: Option<Value>,
+        code: i32,
+        message: impl Into<String>,
+        error_code: impl Into<String>,
+        retryable: bool,
+    ) -> Self {
+        Self {
+            jsonrpc: "2.0".to_string(),
+            id,
+            result: None,
+            error: Some(Error {
+                code,
+                message: message.into(),
+                error_code: Some(error_code.into()),
+                retryable: Some(retryable),
+                data: None,
+            }),
         }
     }
 }

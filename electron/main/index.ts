@@ -140,7 +140,16 @@ function startRust() {
         if (p) { pendingRequests.delete(msg.id); p.resolve(msg.result); }
       } else if (msg.id != null && msg.error) {
         const p = pendingRequests.get(msg.id);
-        if (p) { pendingRequests.delete(msg.id); p.reject(new Error(msg.error.message)); }
+        if (p) {
+          pendingRequests.delete(msg.id);
+          const err = new Error(msg.error.message) as Error & {
+            errorCode?: string;
+            retryable?: boolean;
+          };
+          err.errorCode = msg.error.error_code ?? undefined;
+          err.retryable = msg.error.retryable ?? undefined;
+          p.reject(err);
+        }
       } else if (msg.method) {
         const channel = msg.method.replace(/\./g, ':');
         mainWindow?.webContents.send(channel, msg.params);

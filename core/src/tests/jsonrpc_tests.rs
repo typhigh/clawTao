@@ -54,3 +54,47 @@ fn deserialize_response_both_result_and_error_none() {
     assert!(resp.result.is_none());
     assert!(resp.error.is_none());
 }
+
+#[test]
+fn serialize_error_with_code() {
+    let resp = Response::error_with_code(
+        Some(Value::Number(1.into())),
+        -32603,
+        "Authentication failed",
+        "UNAUTHORIZED",
+        false,
+    );
+    let json = serde_json::to_string(&resp).unwrap();
+    assert!(json.contains(r#""error_code":"UNAUTHORIZED""#));
+    assert!(json.contains(r#""retryable":false"#));
+    assert!(json.contains(r#""code":-32603"#));
+    assert!(!json.contains(r#""result""#));
+}
+
+#[test]
+fn deserialize_error_with_code_roundtrip() {
+    let json = r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"boom","error_code":"NETWORK_ERROR","retryable":true}}"#;
+    let resp: Response = serde_json::from_str(json).unwrap();
+    let err = resp.error.unwrap();
+    assert_eq!(err.error_code.as_deref(), Some("NETWORK_ERROR"));
+    assert_eq!(err.retryable, Some(true));
+}
+
+#[test]
+fn deserialize_error_without_code_fields_backward_compat() {
+    let json = r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"old style"}}"#;
+    let resp: Response = serde_json::from_str(json).unwrap();
+    let err = resp.error.unwrap();
+    assert_eq!(err.message, "old style");
+    assert!(err.error_code.is_none());
+    assert!(err.retryable.is_none());
+}
+
+#[test]
+fn simple_error_omits_structured_fields() {
+    let resp = Response::error(None, -32600, "Invalid Request");
+    let json = serde_json::to_string(&resp).unwrap();
+    assert!(json.contains(r#""code":-32600"#));
+    assert!(!json.contains("error_code"));   // None, skipped
+    assert!(!json.contains("retryable"));    // None, skipped
+}

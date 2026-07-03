@@ -38,7 +38,7 @@ impl ApiAdapter for OpenAiAdapter {
     }
 
     fn parse_stream(&self, body: &str) -> Result<LlmResponse> {
-        let result = parse_sse_response(body);
+        let result = parse_sse_response(body)?;
         Ok(LlmResponse { text: result.text, tool_calls: result.tool_calls, thinking: None })
     }
 

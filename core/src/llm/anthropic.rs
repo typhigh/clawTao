@@ -1,8 +1,10 @@
 use super::adapter::{ApiAdapter, HttpRequest, StreamEvent};
 use super::types::{LlmMessage, LlmRequest, LlmResponse};
+use crate::error::ChatError;
 use crate::store::ToolCall;
 use anyhow::Result;
 use serde_json::{json, Value};
+use tracing::trace;
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
@@ -61,7 +63,10 @@ impl ApiAdapter for AnthropicAdapter {
                 continue;
             };
 
-            let Ok(event) = serde_json::from_str::<Value>(&data) else { continue; };
+            let Ok(event) = serde_json::from_str::<Value>(&data) else {
+                trace!("Anthropic SSE: skipping malformed data line");
+                continue;
+            };
             let ev_type = event["type"].as_str().unwrap_or("");
 
             match ev_type {
@@ -118,7 +123,18 @@ impl ApiAdapter for AnthropicAdapter {
                     }
                 }
                 "error" => {
-                    return Err(anyhow::anyhow!("Anthropic API error: {}", event["error"]["message"].as_str().unwrap_or("unknown")));
+                    let msg = event["error"]["message"]
+                        .as_str()
+                        .unwrap_or("unknown");
+                    let err_type = event["error"]["type"]
+                        .as_str()
+                        .unwrap_or("");
+                    let detail = if err_type.is_empty() {
+                        msg.to_string()
+                    } else {
+                        format!("{err_type}: {msg}")
+                    };
+                    return Err(anyhow::anyhow!(ChatError::BadRequest { detail }));
                 }
                 _ => {}
             }

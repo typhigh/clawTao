@@ -102,12 +102,29 @@ export type StreamEvent = {
   todos?: { step: string; status: string }[];
 };
 
+// ── Structured error ──────────────────────────────────────────────────
+
+/**
+ * Structured chat error surface.
+ *
+ * When the Rust backend rejects with a known error code, the main process
+ * attaches it to the Error as extra properties so the renderer can render
+ * differentiated recovery UI instead of a single generic banner.
+ */
+export interface ChatError {
+  message: string;
+  /** Stable snake_case code from the backend, e.g. "UNAUTHORIZED". */
+  errorCode: string;
+  /** Whether the error is transient and worth offering a retry affordance. */
+  retryable: boolean;
+}
+
 // ── Store ─────────────────────────────────────────────────────────────
 
 interface ChatState {
   sessions: Session[];
   activeSessionId: string | null;
-  error: string | null;
+  error: ChatError | null;
 
   // Actions
   loadSessions: () => Promise<void>;
@@ -128,6 +145,19 @@ const patchSession = (
   sessionId: string,
   fn: (s: Session) => Session,
 ) => sessions.map((s) => (s.id === sessionId ? fn(s) : s));
+
+/** Normalize any caught value into a structured `ChatError`. */
+function toChatError(err: unknown): ChatError {
+  if (err instanceof Error) {
+    const extra = err as Error & { errorCode?: string; retryable?: boolean };
+    return {
+      message: err.message,
+      errorCode: extra.errorCode ?? 'INTERNAL_ERROR',
+      retryable: extra.retryable ?? false,
+    };
+  }
+  return { message: String(err), errorCode: 'INTERNAL_ERROR', retryable: false };
+}
 
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions: [],
@@ -150,7 +180,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         await get().selectSession(sessions[0].id);
       }
     } catch (error) {
-      set({ error: `Failed to load sessions: ${error}` });
+      set({ error: toChatError(error) });
     }
   },
 
@@ -164,7 +194,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         activeSessionId: session.id,
       }));
     } catch (error) {
-      set({ error: `Failed to create session: ${error}` });
+      set({ error: toChatError(error) });
     }
   },
 
@@ -180,7 +210,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         activeSessionId: sessionId,
       }));
     } catch (error) {
-      set({ error: `Failed to load session: ${error}` });
+      set({ error: toChatError(error) });
     }
   },
 
@@ -200,14 +230,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         : state.activeSessionId;
       set({ sessions, activeSessionId });
     } catch (error) {
-      set({ error: `Failed to delete session: ${error}` });
+      set({ error: toChatError(error) });
     }
   },
 
   sendMessage: async (text: string) => {
     const { activeSessionId } = get();
     if (!activeSessionId) {
-      set({ error: 'No active session' });
+      set({ error: { message: 'No active session', errorCode: 'SESSION_ERROR', retryable: false } });
       return;
     }
 
@@ -233,7 +263,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // handleStreamEvent 'done' already reloaded via session.get; no second reload needed.
     } catch (error) {
       set((state) => ({
-        error: `Failed to send message: ${error}`,
+        error: toChatError(error),
         sessions: patchSession(state.sessions, activeSessionId, (s) => ({
           ...s,
           isStreaming: false,

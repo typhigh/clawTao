@@ -5,6 +5,7 @@ import {
   PROVIDER_TEMPLATES,
   SUGGESTED_MODELS,
   probeConnection,
+  useSettingsStore,
 } from '../stores/settings';
 import { SuggestPicker } from './SuggestPicker';
 import { TrashIcon } from './icons';
@@ -33,7 +34,7 @@ function rowDirty(cur: ProviderConfig, sav: ProviderConfig | undefined): boolean
   return false;
 }
 
-export function ProviderRow({ provider, config, isNew, hasSavedKey, onUpdate, onCancel, onSave, onRemove }: Props) {
+export function ProviderRow({ provider, isNew, hasSavedKey, onUpdate, onCancel, onSave, onRemove }: Props) {
   const { t } = useTranslation();
   const tmpl = PROVIDER_TEMPLATES[provider.id]!;
   const [open, setOpen] = useState(isNew);
@@ -42,7 +43,8 @@ export function ProviderRow({ provider, config, isNew, hasSavedKey, onUpdate, on
   type RowStatus = { status: 'idle' | 'ok' | 'error'; message: string };
   const [rowStatus, setRowStatus] = useState<RowStatus>({ status: 'idle', message: '' });
 
-  const sav = config.providers.find(p => p.id === provider.id);
+  const savedConfig = useSettingsStore(s => s.savedConfig);
+  const sav = savedConfig?.providers.find(p => p.id === provider.id);
   const dirty = rowDirty(provider, sav) || editingKey;
   const suggested = SUGGESTED_MODELS[provider.id] || [];
 

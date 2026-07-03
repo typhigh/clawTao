@@ -1,6 +1,7 @@
 //! chat.send handler — the agent turn loop.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
+use crate::error::ChatError;
 use crate::jsonrpc::{Notification, Response};
 use crate::llm::{ApiAdapter, AnthropicAdapter, LlmMessage, LlmRequest, OpenAiAdapter, UnifiedTool};
 use crate::llm::types::LlmResponse;
@@ -28,24 +29,26 @@ pub(crate) fn run_turn(
     client: &Client,
     cancel: &AtomicBool,
 ) -> Result<()> {
-    let message_text = get_param(&request.params, "message")?;
-    let session_id = get_param(&request.params, "sessionId")?;
+    let message_text = get_param(&request.params, "message")
+        .map_err(|e| anyhow::anyhow!(ChatError::BadRequest { detail: e.to_string() }))?;
+    let session_id = get_param(&request.params, "sessionId")
+        .map_err(|e| anyhow::anyhow!(ChatError::BadRequest { detail: e.to_string() }))?;
 
     let config = request.params.as_ref()
         .and_then(|p| p.get("config"))
-        .ok_or_else(|| anyhow::anyhow!("Missing config"))?;
+        .ok_or_else(|| anyhow::anyhow!(ChatError::Config { detail: "Missing config".into() }))?;
 
     let api_key = config["api_key"].as_str().filter(|s| !s.is_empty())
-        .ok_or_else(|| anyhow::anyhow!("API key not configured"))?;
+        .ok_or_else(|| anyhow::anyhow!(ChatError::Config { detail: "API key not configured".into() }))?;
     let base_url = config["base_url"].as_str()
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| anyhow::anyhow!("Missing config field: base_url"))?;
+        .ok_or_else(|| anyhow::anyhow!(ChatError::Config { detail: "Missing config field: base_url".into() }))?;
     let model = config["model"].as_str()
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| anyhow::anyhow!("Missing config field: model"))?;
+        .ok_or_else(|| anyhow::anyhow!(ChatError::Config { detail: "Missing config field: model".into() }))?;
     let protocol = config["api_protocol"].as_str()
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| anyhow::anyhow!("Missing config field: api_protocol"))?;
+        .ok_or_else(|| anyhow::anyhow!(ChatError::Config { detail: "Missing config field: api_protocol".into() }))?;
     let thinking_enabled = config["thinking_enabled"].as_bool().unwrap_or(false);
 
     let blocked: Vec<String> = config["bash_blocked_commands"]
@@ -58,7 +61,7 @@ pub(crate) fn run_turn(
     store::add_message(store, session_id, "user", message_text)?;
 
     let session = store.get(session_id)?
-        .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
+        .ok_or_else(|| anyhow::anyhow!(ChatError::Session { detail: "Session not found".into() }))?;
     let run_id = uuid::Uuid::new_v4().to_string();
 
     write_notification(&Notification::new("chat.stream", Some(json!({
@@ -160,7 +163,7 @@ fn run_state_machine(
             TurnState::Executing { response, cursor } => {
                 if cursor >= response.tool_calls.len() {
                     messages = store.get(&ctx.session_id)?
-                        .ok_or_else(|| anyhow::anyhow!("Session not found after tool execution"))?
+                        .ok_or_else(|| anyhow::anyhow!(ChatError::Session { detail: "Session not found after tool execution".into() }))?
                         .messages;
                     TurnState::Sampling
                 } else {
@@ -249,20 +252,42 @@ fn llm_step(
         resp = resp.header(k.as_str(), v.as_str());
     }
     let resp = resp.body(http.body.clone()).send()
-        .with_context(|| format!("Failed to reach {}", http.url))?;
+        .map_err(|e| map_network_error(e, &http.url))?;
 
-    debug!("LLM response: status={}", resp.status());
+    let status = resp.status();
+    debug!("LLM response: status={}", status);
 
     use std::io::{BufRead, BufReader};
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
     let mut body_bytes = Vec::new();
 
-    while reader.read_line(&mut line)? > 0 {
+    while reader.read_line(&mut line)
+        .map_err(|_| anyhow::anyhow!(ChatError::StreamDisconnected))? > 0
+    {
         body_bytes.extend_from_slice(line.as_bytes());
         if let Some(data) = line.trim().strip_prefix("data: ") {
             if data == "[DONE]" { line.clear(); continue; }
             if let Ok(event) = serde_json::from_str::<Value>(data) {
+                // ── Inline SSE error detection ──────────────────────
+                // Some providers send errors inside the SSE stream
+                // (e.g. Anthropic "error" type, OpenAI {"error": {...}}).
+                // Check before dispatching stream_events so the
+                // turn fails fast instead of silently ignoring the error.
+                if let Some(sse_err) = event.get("error") {
+                    let msg = sse_err.get("message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown API error");
+                    let err_type = sse_err.get("type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let detail = if err_type.is_empty() {
+                        msg.to_string()
+                    } else {
+                        format!("{err_type}: {msg}")
+                    };
+                    return Err(anyhow::anyhow!(ChatError::BadRequest { detail }));
+                }
                 for se in adapter.stream_events(&event) {
                     write_notification(&Notification::new("chat.stream", Some(json!({
                         "sessionId": ctx.session_id, "runId": ctx.run_id,
@@ -279,7 +304,67 @@ fn llm_step(
     debug!("LLM response body: {} bytes", body_bytes.len());
     trace!("LLM response body: {}", body_str);
 
+    // ── HTTP status check (after reading body) ────────────────────
+    if !status.is_success() {
+        return Err(anyhow::anyhow!(http_error_from_status(status.as_u16(), &body_str)));
+    }
+
     adapter.parse_stream(&body_str)
+}
+
+// ── Error mapping helpers ────────────────────────────────────────────
+
+/// Map a `reqwest::Error` to a `ChatError`, distinguishing timeouts from
+/// other network failures.
+pub(crate) fn map_network_error(e: reqwest::Error, url: &str) -> anyhow::Error {
+    if e.is_timeout() {
+        anyhow::anyhow!(ChatError::Timeout { seconds: 0 /* unknown */ })
+    } else if e.is_connect() {
+        anyhow::anyhow!(ChatError::Network {
+            detail: format!("Cannot connect to {url}: {e}")
+        })
+    } else if e.is_body() || e.is_decode() {
+        anyhow::anyhow!(ChatError::StreamDisconnected)
+    } else {
+        anyhow::anyhow!(ChatError::Network {
+            detail: format!("Request to {url} failed: {e}")
+        })
+    }
+}
+
+/// Map an HTTP status code + response body to a `ChatError`.
+pub(crate) fn http_error_from_status(status: u16, body: &str) -> ChatError {
+    let detail = extract_error_message(body).unwrap_or_else(|| {
+        body.chars().take(500).collect::<String>()
+    });
+
+    match status {
+        400 => ChatError::BadRequest { detail },
+        401 | 403 => ChatError::Unauthorized { detail },
+        429 => ChatError::RateLimited { retry_after_secs: None },
+        500 | 502 | 503 | 504 => ChatError::ServerOverloaded,
+        _ => ChatError::BadRequest { detail: format!("HTTP {status}: {detail}") },
+    }
+}
+
+/// Try to extract a human-readable error message from a JSON response body.
+fn extract_error_message(body: &str) -> Option<String> {
+    let val: Value = serde_json::from_str(body).ok()?;
+    let error = val.get("error")?;
+    // Prefer `error.message`, fall back to `error.type`
+    if let Some(msg) = error.get("message").and_then(|v| v.as_str()) {
+        let msg = msg.trim();
+        if !msg.is_empty() {
+            return Some(msg.to_string());
+        }
+    }
+    if let Some(typ) = error.get("type").and_then(|v| v.as_str()) {
+        let typ = typ.trim();
+        if !typ.is_empty() {
+            return Some(typ.to_string());
+        }
+    }
+    None
 }
 
 #[cfg(test)]

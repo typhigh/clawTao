@@ -139,6 +139,10 @@ pub(crate) fn actor_loop(
 }
 
 /// Production processor: delegates to chat::run_turn.
+///
+/// On error downcasts the anyhow chain for a `ChatError` so the JSON-RPC
+/// error response can carry structured metadata (`errorCode`, `retryable`,
+/// `suggestion`) that the frontend uses to render differentiated recovery UI.
 pub(crate) fn process_run_wrapper(
     client: &Client,
     store: &dyn SessionStore,
@@ -154,9 +158,27 @@ pub(crate) fn process_run_wrapper(
     };
     if let Err(e) = crate::chat::run_turn(&request, store, client, cancel) {
         error!("chat error: {e:#}");
-        let _ = crate::jsonrpc::write_response(&crate::jsonrpc::Response::error(
-            request.id, -32603, format!("Internal error: {e:#}"),
-        ));
+
+        // Try to extract structured error metadata.
+        if let Some(ce) = crate::error::downcast_chat_error(&e) {
+            let _ = crate::jsonrpc::write_response(
+                &crate::jsonrpc::Response::error_with_code(
+                    request.id,
+                    -32603,
+                    ce.user_message(),
+                    ce.code(),
+                    ce.is_retryable(),
+                ),
+            );
+        } else {
+            let _ = crate::jsonrpc::write_response(
+                &crate::jsonrpc::Response::error(
+                    request.id,
+                    -32603,
+                    format!("Internal error: {e:#}"),
+                ),
+            );
+        }
     }
 }
 

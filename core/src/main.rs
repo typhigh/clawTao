@@ -8,6 +8,7 @@
 //! are handled directly on the main thread.
 
 mod chat;
+mod error;
 mod handlers;
 mod jsonrpc;
 mod llm;
