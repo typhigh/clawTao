@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use crate::error::ChatError;
+use crate::error::downcast_chat_error;
 use crate::jsonrpc::{Notification, Response};
 use crate::llm::{ApiAdapter, AnthropicAdapter, LlmMessage, LlmRequest, OpenAiAdapter, UnifiedTool};
 use crate::llm::types::LlmResponse;
@@ -11,7 +12,8 @@ use crate::jsonrpc::{get_param, write_notification, write_response};
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tracing::{debug, trace};
+use std::time::Duration;
+use tracing::{debug, trace, warn};
 
 /// Immutable context for a single turn.
 pub(crate) struct TurnContext {
@@ -90,6 +92,7 @@ pub(crate) fn run_turn(
         store, adapter.as_ref(), client,
         api_key, base_url, model, thinking_enabled,
         session.messages, &ctx, &tool_registry, cancel,
+        None, // production: write to stdout only
     )?;
 
     // ── Finalize ─────────────────────────────────────────────────────
@@ -115,12 +118,33 @@ pub(crate) fn run_turn(
 
 // ── State machine ──────────────────────────────────────────────────
 
+const MAX_RETRIES: u32 = 3;
+
 enum TurnState {
-    Sampling,
-    Evaluating { response: LlmResponse },
-    Executing { response: LlmResponse, cursor: usize },
+    /// Waiting for the LLM to respond.
+    Waiting { retry_count: u32 },
+    /// Executing tool calls one by one.
+    Tooling { response: LlmResponse, cursor: usize },
+    /// Turn completed normally (text reply, no more tools).
+    Done { text: String, thinking: Option<String> },
+    /// User pressed cancel — preserve partial output.
     Interrupted { text: String, thinking: Option<String> },
-    Finalizing { text: String, thinking: Option<String> },
+    /// A retryable error occurred. Backoff, notify the frontend,
+    /// then transition back to `Waiting`.
+    Error { error: ChatError, retry_count: u32 },
+    /// Non-retryable error, or retries exhausted. Terminal.
+    Fatal { error: ChatError },
+}
+
+/// Exponential backoff with jitter for retryable errors.
+fn backoff(attempt: u32) -> Duration {
+    let ms = 200u64 * 2u64.pow(attempt.saturating_sub(1));
+    // Simple jitter: ±20 %
+    let jitter = (ms as f64 * 0.2) as u64;
+    let low = ms.saturating_sub(jitter);
+    let high = ms.saturating_add(jitter);
+    // Deterministic for tests, still varied in practice.
+    Duration::from_millis(if low < high { low + (high - low) / 2 } else { ms })
 }
 
 fn run_state_machine(
@@ -135,55 +159,93 @@ fn run_state_machine(
     ctx: &TurnContext,
     tool_registry: &ToolRegistry,
     cancel: &AtomicBool,
+    mut notif_collector: Option<&mut Vec<Notification>>,
 ) -> Result<(String, Option<String>)> {
-    let mut state = TurnState::Sampling;
+    let mut state = TurnState::Waiting { retry_count: 0 };
+
+    // Inline helper — avoids closure ownership issues inside the loop.
+    macro_rules! notify {
+        ($n:expr) => {{
+            let n = $n;
+            if let Some(ref mut col) = notif_collector {
+                col.push(n.clone());
+            }
+            write_notification(&n)?;
+        }};
+    }
 
     loop {
         state = match state {
-            TurnState::Sampling => {
-                let response = llm_step(adapter, client, api_key, base_url, model, thinking_enabled, &messages, ctx, cancel)?;
-                TurnState::Evaluating { response }
-            }
-            TurnState::Evaluating { response } => {
-                if cancel.load(Ordering::SeqCst) {
-                    debug!("TurnState: Evaluating → Interrupted (cancel=true)");
-                    TurnState::Interrupted { text: response.text, thinking: response.thinking }
-                } else if response.tool_calls.is_empty() {
-                    TurnState::Finalizing { text: response.text, thinking: response.thinking }
-                } else {
-                    store::add_assistant_tool_calls(
-                        store, &ctx.session_id,
-                        response.tool_calls.clone(),
-                        &response.text,
-                        response.thinking.as_deref(),
-                    )?;
-                    TurnState::Executing { response, cursor: 0 }
+            // ── Waiting: call the LLM ──────────────────────────────
+            TurnState::Waiting { retry_count } => {
+                match llm_step(adapter, client, api_key, base_url, model,
+                                thinking_enabled, &messages, ctx, cancel) {
+                    Ok(response) => {
+                        // LLM succeeded — reset retry counter for the
+                        // next round (tool → back to Waiting).
+                        if cancel.load(Ordering::SeqCst) {
+                            TurnState::Interrupted {
+                                text: response.text,
+                                thinking: response.thinking,
+                            }
+                        } else if response.tool_calls.is_empty() {
+                            TurnState::Done {
+                                text: response.text,
+                                thinking: response.thinking,
+                            }
+                        } else {
+                            store::add_assistant_tool_calls(
+                                store, &ctx.session_id,
+                                response.tool_calls.clone(),
+                                &response.text,
+                                response.thinking.as_deref(),
+                            )?;
+                            TurnState::Tooling { response, cursor: 0 }
+                        }
+                    }
+                    Err(e) => {
+                        let ce = downcast_chat_error(&e)
+                            .cloned()
+                            .unwrap_or_else(|| ChatError::Internal {
+                                detail: format!("{e:#}"),
+                            });
+                        if ce.is_retryable() && retry_count < MAX_RETRIES {
+                            TurnState::Error { error: ce, retry_count }
+                        } else {
+                            TurnState::Fatal { error: ce }
+                        }
+                    }
                 }
             }
-            TurnState::Executing { response, cursor } => {
+
+            // ── Tooling: execute tool calls sequentially ───────────
+            TurnState::Tooling { response, cursor } => {
                 if cursor >= response.tool_calls.len() {
                     messages = store.get(&ctx.session_id)?
-                        .ok_or_else(|| anyhow::anyhow!(ChatError::Session { detail: "Session not found after tool execution".into() }))?
+                        .ok_or_else(|| anyhow::anyhow!(ChatError::Session {
+                            detail: "Session not found after tool execution".into()
+                        }))?
                         .messages;
-                    TurnState::Sampling
+                    TurnState::Waiting { retry_count: 0 }
                 } else {
                     let tc = &response.tool_calls[cursor];
-                    debug!("Executing tool: {} id={} args={}", tc.function.name, tc.id, tc.function.arguments);
-                    let args_val: Value = serde_json::from_str(&tc.function.arguments).unwrap_or(Value::Null);
+                    debug!("Executing tool: {} id={} args={}",
+                           tc.function.name, tc.id, tc.function.arguments);
+                    let args_val: Value = serde_json::from_str(&tc.function.arguments)
+                        .unwrap_or(Value::Null);
 
-                    write_notification(&Notification::new("chat.stream", Some(json!({
+                    notify!(Notification::new("chat.stream", Some(json!({
                         "sessionId": ctx.session_id, "runId": ctx.run_id,
-                        "kind": "tool_call", "toolCallId": tc.id, "toolName": tc.function.name, "input": args_val,
-                    }))))?;
+                        "kind": "tool_call", "toolCallId": tc.id,
+                        "toolName": tc.function.name, "input": args_val,
+                    }))));
 
-                    // update_todo: send the todo list as a separate notification
-                    // for the frontend to render inline.
                     if tc.function.name == "TodoWrite" {
                         if let Some(todos) = args_val.get("todos") {
-                            write_notification(&Notification::new("chat.stream", Some(json!({
+                            notify!(Notification::new("chat.stream", Some(json!({
                                 "sessionId": ctx.session_id, "runId": ctx.run_id,
                                 "kind": "todo", "todos": todos,
-                            }))))?;
+                            }))));
                         }
                     }
 
@@ -200,17 +262,40 @@ fn run_state_machine(
                     };
 
                     debug!("Tool result for {}: {:.200}", tc.function.name, tool_result);
-                    write_notification(&Notification::new("chat.stream", Some(json!({
+                    notify!(Notification::new("chat.stream", Some(json!({
                         "sessionId": ctx.session_id, "runId": ctx.run_id,
-                        "kind": "tool_result", "toolCallId": tc.id, "toolName": tc.function.name, "output": tool_result,
-                    }))))?;
+                        "kind": "tool_result", "toolCallId": tc.id,
+                        "toolName": tc.function.name, "output": tool_result,
+                    }))));
                     store::add_tool_result(store, &ctx.session_id, &tc.id, &tool_result)?;
 
-                    TurnState::Executing { response, cursor: cursor + 1 }
+                    TurnState::Tooling { response, cursor: cursor + 1 }
                 }
             }
+
+            // ── Error: retryable — backoff then retry ──────────────
+            TurnState::Error { error, retry_count } => {
+                let next = retry_count + 1;
+                let delay = backoff(next);
+                warn!("LLM error (attempt {}/{}): {} — retrying in {:?}",
+                      next, MAX_RETRIES, error.user_message(), delay);
+                notify!(Notification::new("chat.stream", Some(json!({
+                    "sessionId": ctx.session_id, "runId": ctx.run_id,
+                    "kind": "stream_error",
+                    "errorCode": error.code(),
+                    "message": format!("Reconnecting... {}/{}", next, MAX_RETRIES),
+                    "retryable": true,
+                }))));
+                std::thread::sleep(delay);
+                TurnState::Waiting { retry_count: next }
+            }
+
+            // ── Terminal states ────────────────────────────────────
+            TurnState::Done { text, thinking } => break Ok((text, thinking)),
             TurnState::Interrupted { text, thinking } => break Ok((text, thinking)),
-            TurnState::Finalizing { text, thinking } => break Ok((text, thinking)),
+            TurnState::Fatal { error } => {
+                break Err(anyhow::anyhow!(error));
+            }
         };
     }
 }

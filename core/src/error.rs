@@ -16,7 +16,7 @@ use std::fmt;
 /// Every variant maps to a stable `errorCode` string that the
 /// frontend uses to choose between "show retry button" / "prompt
 /// for API key" / "display fatal error" etc.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum ChatError {
     // ── Network / transport (retryable) ──────────────────────────
