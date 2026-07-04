@@ -58,12 +58,8 @@
     "bashTitle": "Bash",
     "globalConfig": "Глобальная настройка",
     "logLevel": {
-      "label": "Уровень логирования",
-      "error": "Error",
-      "warn": "Warn",
-      "info": "Info",
-      "debug": "Debug",
-      "trace": "Trace"
+      "label": "Уровень лога",
+      "description": "Детализация бэкенд-логов для диагностики."
     },
     "bashBlockedCommands": "Запрещённые Bash команды (по одной на строку)",
     "bashTimeout": "Таймаут Bash",
@@ -81,8 +77,12 @@
     "enterNewKey": "Введите новый API ключ...",
     "enterModelId": "Введите ID модели",
     "language": {
-      "label": "Язык"
-    }
+      "label": "Язык",
+      "description": "Язык интерфейса приложения."
+    },
+    "defaultModel": "Модель по умолчанию",
+    "providersDescription": "Настройка API-провайдеров и доступных моделей.",
+    "defaultModelDescription": "Модель для новых сессий, если ни одна не выбрана."
   },
   "common": {
     "auto": "(авто)",

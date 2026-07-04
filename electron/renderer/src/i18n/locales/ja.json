@@ -59,11 +59,7 @@
     "globalConfig": "全体設定",
     "logLevel": {
       "label": "ログレベル",
-      "error": "Error",
-      "warn": "Warn",
-      "info": "Info",
-      "debug": "Debug",
-      "trace": "Trace"
+      "description": "トラブルシューティングのためのバックエンドログの詳細度を制御します。"
     },
     "bashBlockedCommands": "Bash禁止コマンド（1行ずつ）",
     "bashTimeout": "Bashタイムアウト",
@@ -81,8 +77,12 @@
     "enterNewKey": "新しいAPIキーを入力...",
     "enterModelId": "モデルIDを入力",
     "language": {
-      "label": "言語"
-    }
+      "label": "言語",
+      "description": "アプリケーションインターフェースの表示言語。"
+    },
+    "defaultModel": "デフォルトモデル",
+    "providersDescription": "APIプロバイダーと利用可能なモデルを設定します。",
+    "defaultModelDescription": "モデルが選択されていない場合に新しいセッションで使用されるモデル。"
   },
   "common": {
     "auto": "（自動）",

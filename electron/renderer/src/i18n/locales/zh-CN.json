@@ -63,11 +63,7 @@
     "globalConfig": "全局配置",
     "logLevel": {
       "label": "日志级别",
-      "error": "Error",
-      "warn": "Warn",
-      "info": "Info",
-      "debug": "Debug",
-      "trace": "Trace"
+      "description": "控制后端日志详细程度，用于问题排查。"
     },
     "bashBlockedCommands": "Bash 禁用命令（每行一个）",
     "bashTimeout": "Bash 超时",
@@ -85,8 +81,12 @@
     "enterNewKey": "输入新 API Key…",
     "enterModelId": "输入模型 ID",
     "language": {
-      "label": "语言"
-    }
+      "label": "语言",
+      "description": "应用程序界面的显示语言。"
+    },
+    "defaultModel": "默认模型",
+    "providersDescription": "配置 API 供应商及其可用模型。",
+    "defaultModelDescription": "新建会话时使用的默认模型。"
   },
   "common": {
     "auto": "（自动）",

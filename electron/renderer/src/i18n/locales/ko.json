@@ -59,11 +59,7 @@
     "globalConfig": "전역 설정",
     "logLevel": {
       "label": "로그 레벨",
-      "error": "Error",
-      "warn": "Warn",
-      "info": "Info",
-      "debug": "Debug",
-      "trace": "Trace"
+      "description": "문제 해결을 위한 백엔드 로그 상세도를 제어합니다."
     },
     "bashBlockedCommands": "Bash 차단 명령어 (한 줄씩)",
     "bashTimeout": "Bash 타임아웃",
@@ -81,8 +77,12 @@
     "enterNewKey": "새 API 키 입력...",
     "enterModelId": "모델 ID 입력",
     "language": {
-      "label": "언어"
-    }
+      "label": "언어",
+      "description": "애플리케이션 인터페이스의 표시 언어입니다."
+    },
+    "defaultModel": "기본 모델",
+    "providersDescription": "API 제공업체와 사용 가능한 모델을 구성합니다.",
+    "defaultModelDescription": "모델이 선택되지 않은 경우 새 세션에 사용되는 모델입니다."
   },
   "common": {
     "auto": "(자동)",

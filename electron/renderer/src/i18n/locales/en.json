@@ -59,11 +59,7 @@
     "globalConfig": "Global config",
     "logLevel": {
       "label": "Log Level",
-      "error": "Error",
-      "warn": "Warn",
-      "info": "Info",
-      "debug": "Debug",
-      "trace": "Trace"
+      "description": "Controls backend log verbosity for troubleshooting."
     },
     "bashBlockedCommands": "Bash Blocked Commands (one per line)",
     "bashTimeout": "Bash Timeout",
@@ -81,8 +77,12 @@
     "enterNewKey": "Enter new API key...",
     "enterModelId": "Enter model ID",
     "language": {
-      "label": "Language"
-    }
+      "label": "Language",
+      "description": "Display language for the application interface."
+    },
+    "defaultModel": "Default Model",
+    "providersDescription": "Configure API providers and their available models.",
+    "defaultModelDescription": "Model used for new sessions when none is selected."
   },
   "common": {
     "auto": "(auto)",

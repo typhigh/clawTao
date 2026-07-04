@@ -48,6 +48,7 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
     <div className="settings-view">
       <div className="settings-view-body">
         <div className="settings-section-label">{t('settings.providers')}</div>
+        <div className="settings-description">{t('settings.providersDescription')}</div>
         <ul className="settings-provider-rows">
           {config.providers.map(provider => {
             const tmpl = PROVIDER_TEMPLATES[provider.id];
@@ -81,28 +82,34 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
           </div>
         )}
 
-        <DefaultModelSelector config={config} onChange={(next) => replace(next)} />
-
         <div className="settings-inline-group">
-          <div className="settings-inline-row">
-            <label className="settings-inline-label">{t('settings.logLevel.label')}</label>
-            <span className="settings-inline-select-wrap">
-              <select className="settings-inline-select" value={config.log_level} onChange={async (e) => {
-                const next = { ...config, log_level: e.target.value };
-                replace(next);
-                try { await save(next); } catch { /* ignore */ }
-              }}>
-                <option value="error">Error</option>
-                <option value="warn">Warn</option>
-                <option value="info">Info</option>
-                <option value="debug">Debug</option>
-                <option value="trace">Trace</option>
-              </select>
-            </span>
+          <DefaultModelSelector config={config} onChange={(next) => replace(next)} />
+
+          <div>
+            <div className="settings-inline-row">
+              <label className="settings-inline-label">{t('settings.logLevel.label')}</label>
+              <span className="settings-inline-select-wrap">
+                <select className="settings-inline-select" value={config.log_level} onChange={async (e) => {
+                  const next = { ...config, log_level: e.target.value };
+                  replace(next);
+                  try { await save(next); } catch { /* ignore */ }
+                }}>
+                  <option value="error">Error</option>
+                  <option value="warn">Warn</option>
+                  <option value="info">Info</option>
+                  <option value="debug">Debug</option>
+                  <option value="trace">Trace</option>
+                </select>
+              </span>
+            </div>
+            <div className="settings-description">{t('settings.logLevel.description')}</div>
           </div>
-          <div className="settings-inline-row">
-            <label className="settings-inline-label">{t('settings.language.label')}</label>
-            <LanguageSwitcher />
+          <div>
+            <div className="settings-inline-row">
+              <label className="settings-inline-label">{t('settings.language.label')}</label>
+              <LanguageSwitcher />
+            </div>
+            <div className="settings-description">{t('settings.language.description')}</div>
           </div>
         </div>
       </div>
@@ -111,6 +118,7 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
 }
 
 function DefaultModelSelector({ config, onChange }: { config: LlmConfig; onChange: (next: LlmConfig) => void }) {
+  const { t } = useTranslation();
   const options: ModelOption[] = useMemo(() => {
     const opts: ModelOption[] = [];
     for (const p of config.providers) {
@@ -124,18 +132,21 @@ function DefaultModelSelector({ config, onChange }: { config: LlmConfig; onChang
   if (options.length === 0) return null;
 
   return (
-    <div className="settings-inline-row">
-      <label className="settings-inline-label">Default Model</label>
-      <span className="settings-inline-select-wrap">
-        <select
-          className="settings-inline-select"
-          value={config.default_model_id}
-          onChange={(e) => onChange({ ...config, default_model_id: e.target.value })}
-        >
-          <option value="">(none)</option>
-          {options.map(o => <option key={o.key} value={o.key}>{o.model}</option>)}
-        </select>
-      </span>
+    <div>
+      <div className="settings-inline-row">
+        <label className="settings-inline-label">{t('settings.defaultModel')}</label>
+        <span className="settings-inline-select-wrap">
+          <select
+            className="settings-inline-select"
+            value={config.default_model_id}
+            onChange={(e) => onChange({ ...config, default_model_id: e.target.value })}
+          >
+            <option value="">(none)</option>
+            {options.map(o => <option key={o.key} value={o.key}>{o.model}</option>)}
+          </select>
+        </span>
+      </div>
+      <div className="settings-description">{t('settings.defaultModelDescription')}</div>
     </div>
   );
 }

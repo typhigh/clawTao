@@ -59,11 +59,7 @@
     "globalConfig": "Config globale",
     "logLevel": {
       "label": "Niveau de log",
-      "error": "Error",
-      "warn": "Warn",
-      "info": "Info",
-      "debug": "Debug",
-      "trace": "Trace"
+      "description": "Contrôle la verbosité des logs backend pour le dépannage."
     },
     "bashBlockedCommands": "Commandes Bash bloquées (une par ligne)",
     "bashTimeout": "Délai d'expiration Bash",
@@ -81,8 +77,12 @@
     "enterNewKey": "Saisir une nouvelle clé API...",
     "enterModelId": "Saisir l'ID du modèle",
     "language": {
-      "label": "Langue"
-    }
+      "label": "Langue",
+      "description": "Langue d'affichage de l'interface."
+    },
+    "defaultModel": "Modèle par défaut",
+    "providersDescription": "Configurer les fournisseurs API et leurs modèles disponibles.",
+    "defaultModelDescription": "Modèle utilisé pour les nouvelles sessions si aucun n'est sélectionné."
   },
   "common": {
     "auto": "(auto)",
