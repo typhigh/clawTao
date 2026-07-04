@@ -141,7 +141,6 @@ function DefaultModelSelector({ config, onChange }: { config: AppConfig; onChang
             value={config.llm.default_model_id}
             onChange={(e) => onChange({ ...config, llm: { ...config.llm, default_model_id: e.target.value } })}
           >
-            <option value="">(none)</option>
             {options.map(o => <option key={o.key} value={o.key}>{o.model}</option>)}
           </select>
         </span>
