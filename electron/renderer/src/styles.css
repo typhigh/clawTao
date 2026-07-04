@@ -1158,6 +1158,13 @@ html, body, #root {
 }
 
 /* ── Settings view (replaces dialog) ── */
+.settings-view-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 0 4px 0;
+  flex-shrink: 0;
+}
+
 .settings-view {
   flex: 1;
   display: flex;

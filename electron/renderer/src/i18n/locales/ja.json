@@ -20,7 +20,8 @@
     "createSession": "セッションを作成",
     "selectModel": "モデルを選択",
     "noModelsConfigured": "モデル未設定（設定から追加してください）",
-    "thinking": "思考"
+    "thinking": "思考",
+    "back": "戻る"
   },
   "tool": {
     "input": "入力",

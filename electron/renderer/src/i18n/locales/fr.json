@@ -20,7 +20,8 @@
     "createSession": "Créer une session",
     "selectModel": "Sélectionner un modèle",
     "noModelsConfigured": "Aucun modèle configuré (allez dans Paramètres)",
-    "thinking": "Réflexion"
+    "thinking": "Réflexion",
+    "back": "Retour"
   },
   "tool": {
     "input": "Entrée",

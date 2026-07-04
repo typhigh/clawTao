@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useSettingsStore,
@@ -11,6 +11,7 @@ import type { ModelOption } from './ChatView';
 
 export function SettingsView({ onBack }: { onBack?: () => void }) {
   const { t } = useTranslation();
+  const [backHover, setBackHover] = useState(false);
   const config = useSettingsStore(s => s.config);
   const savedConfig = useSettingsStore(s => s.savedConfig);
   const load = useSettingsStore(s => s.load);
@@ -46,6 +47,37 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
 
   return (
     <div className="settings-view">
+      <div className="settings-view-header">
+        <button
+          type="button"
+          className="settings-back-btn"
+          onClick={onBack}
+          onMouseEnter={() => setBackHover(true)}
+          onMouseLeave={() => setBackHover(false)}
+          title={t('chat.back')}
+          aria-label={t('chat.back')}
+          style={{
+            appearance: 'none',
+            WebkitAppearance: 'none',
+            background: backHover ? '#f3f3f3' : 'transparent',
+            border: '1px solid transparent',
+            color: backHover ? '#1c1c1e' : '#555',
+            borderRadius: '6px',
+            padding: '4px 8px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            font: 'inherit',
+            fontSize: '12px',
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          <span style={{ fontSize: '14px' }}>{t('chat.back')}</span>
+        </button>
+      </div>
       <div className="settings-view-body">
         <div className="settings-section-label">{t('settings.providers')}</div>
         <div className="settings-description">{t('settings.providersDescription')}</div>

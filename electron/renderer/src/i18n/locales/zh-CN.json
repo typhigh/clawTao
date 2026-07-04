@@ -12,7 +12,8 @@
     "createSession": "新建会话",
     "selectModel": "选择模型",
     "noModelsConfigured": "暂未配置模型（请到设置添加）",
-    "thinking": "思考"
+    "thinking": "思考",
+    "back": "返回"
   },
   "tool": {
     "input": "输入",

@@ -20,7 +20,8 @@
     "createSession": "Create a session",
     "selectModel": "Select model",
     "noModelsConfigured": "No models configured (go to Settings)",
-    "thinking": "Thinking"
+    "thinking": "Thinking",
+    "back": "Back"
   },
   "tool": {
     "input": "Input",

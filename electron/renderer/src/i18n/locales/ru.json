@@ -20,7 +20,8 @@
     "createSession": "Создать сессию",
     "selectModel": "Выберите модель",
     "noModelsConfigured": "Модели не настроены (перейдите в Настройки)",
-    "thinking": "Мышление"
+    "thinking": "Мышление",
+    "back": "Назад"
   },
   "tool": {
     "input": "Ввод",
