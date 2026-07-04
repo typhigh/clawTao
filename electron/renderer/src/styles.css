@@ -759,6 +759,13 @@ html, body, #root {
   color: #555;
   cursor: pointer;
   font-family: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.code-block-wrapper:hover .code-block-copy {
+  opacity: 1;
+  pointer-events: auto;
 }
 .code-block-copy:hover { background: #f0f0f0; border-color: #999; }
 
