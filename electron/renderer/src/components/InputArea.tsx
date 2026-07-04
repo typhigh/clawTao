@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SendIcon } from './icons';
+import { SendIcon, ThinkingIcon } from './icons';
 
 interface ModelOption {
   providerId: string;
@@ -22,13 +23,17 @@ interface Props {
   selectedModelKey: string;
   onSelectModel: (key: string) => void;
   disabledModel?: boolean;
+  thinkingEnabled: boolean;
+  onToggleThinking: () => void;
 }
 
 export function InputArea({
   value, onChange, onSend, onCancel, disabled, streaming, sendDisabled, textareaRef, onKeyDown,
   modelOptions, selectedModelKey, onSelectModel, disabledModel,
+  thinkingEnabled, onToggleThinking,
 }: Props) {
   const { t } = useTranslation();
+  const [thinkingHover, setThinkingHover] = useState(false);
 
   const btnDisabled = !value.trim() || disabled || sendDisabled;
 
@@ -45,23 +50,53 @@ export function InputArea({
             onKeyDown={onKeyDown}
             disabled={disabled}
           />
-          <select
-            className="input-model-select input-model-select-inline"
-            value={selectedModelKey}
-            onChange={(e) => onSelectModel(e.target.value)}
-            disabled={disabledModel || modelOptions.length === 0}
-            title={t('chat.selectModel')}
-          >
-            {modelOptions.length === 0 ? (
-              <option value="">{t('chat.noModelsConfigured')}</option>
-            ) : (
-              modelOptions.map(opt => (
-                <option key={opt.key} value={opt.key}>
-                  {opt.providerId === 'custom' ? `${opt.providerName} / ${opt.model}` : opt.model}
-                </option>
-              ))
-            )}
-          </select>
+          <div className="input-bottom-row">
+            <select
+              className="input-model-select input-model-select-inline"
+              value={selectedModelKey}
+              onChange={(e) => onSelectModel(e.target.value)}
+              disabled={disabledModel || modelOptions.length === 0}
+              title={t('chat.selectModel')}
+            >
+              {modelOptions.length === 0 ? (
+                <option value="">{t('chat.noModelsConfigured')}</option>
+              ) : (
+                modelOptions.map(opt => (
+                  <option key={opt.key} value={opt.key}>
+                    {opt.providerId === 'custom' ? `${opt.providerName} / ${opt.model}` : opt.model}
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              type="button"
+              className={'input-thinking-toggle input-thinking-toggle-inline' + (thinkingEnabled ? ' on' : '')}
+              onClick={onToggleThinking}
+              onMouseEnter={() => setThinkingHover(true)}
+              onMouseLeave={() => setThinkingHover(false)}
+              title={t('chat.thinking')}
+              aria-pressed={thinkingEnabled}
+              disabled={disabled}
+              style={{
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                background: thinkingHover && !disabled ? '#f3f3f3' : 'transparent',
+                color: thinkingEnabled ? '#1c1c1e' : '#999',
+                border: '1px solid transparent',
+                borderRadius: '6px',
+                width: '26px',
+                height: '26px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: 1,
+              }}
+            >
+              <ThinkingIcon active={thinkingEnabled} />
+            </button>
+          </div>
           {streaming ? (
             <button
               type="submit"

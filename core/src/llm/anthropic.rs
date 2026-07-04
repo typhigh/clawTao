@@ -34,6 +34,8 @@ impl ApiAdapter for AnthropicAdapter {
         }
         if req.thinking_enabled {
             body["thinking"] = json!({"type": "adaptive"});
+        } else {
+            body["thinking"] = json!({"type": "disabled"});
         }
 
         Ok(HttpRequest {

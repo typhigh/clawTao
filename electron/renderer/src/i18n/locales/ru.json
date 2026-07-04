@@ -19,7 +19,8 @@
     "noSession": "Сессия не выбрана",
     "createSession": "Создать сессию",
     "selectModel": "Выберите модель",
-    "noModelsConfigured": "Модели не настроены (перейдите в Настройки)"
+    "noModelsConfigured": "Модели не настроены (перейдите в Настройки)",
+    "thinking": "Мышление"
   },
   "tool": {
     "input": "Ввод",

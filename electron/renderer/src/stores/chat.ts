@@ -13,7 +13,7 @@ declare global {
   interface Window {
     electronAPI: {
       chat: {
-        send: (message: string, sessionId: string, model_key?: string) => Promise<{
+        send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean) => Promise<{
           runId: string;
           message: Message;
         }>;
@@ -73,6 +73,8 @@ export interface Session {
   currentRunId?: string | null;
   /** Per-session model selection — "providerId/modelName" format. */
   model_key?: string;
+  /** Per-session thinking toggle state. */
+  thinking_enabled?: boolean;
 }
 
 // ── Unified stream event ──────────────────────────────────────────────
@@ -131,9 +133,10 @@ interface ChatState {
   createSession: () => Promise<void>;
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, thinkingEnabled?: boolean) => Promise<void>;
   cancelRun: () => Promise<void>;
   setSessionModel: (sessionId: string, modelKey: string) => void;
+  setSessionThinking: (sessionId: string, enabled: boolean) => void;
   /** Single handler for all stream events — dispatches on `kind`. */
   handleStreamEvent: (ev: StreamEvent) => void;
   clearError: () => void;
@@ -169,9 +172,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const sessions = await window.electronAPI.session.list();
       // Restore session model preferences from localStorage.
       let saved: Record<string, string> = {};
+      let savedThinking: Record<string, boolean> = {};
       try { saved = JSON.parse(localStorage.getItem('clawtao-session-models') || '{}'); } catch {}
+      try { savedThinking = JSON.parse(localStorage.getItem('clawtao-session-thinking') || '{}'); } catch {}
       for (const s of sessions) {
         if (saved[s.id]) s.model_key = saved[s.id];
+        if (typeof savedThinking[s.id] === 'boolean') s.thinking_enabled = savedThinking[s.id];
       }
       set({ sessions });
       if (sessions.length === 0) {
@@ -190,7 +196,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Inherit the default model so the session works immediately.
       const defaultModel = (useSettingsStore as any)?.getState?.()?.config?.llm?.default_model_id || '';
       set((state) => ({
-        sessions: [{ ...session, model_key: defaultModel || undefined }, ...state.sessions],
+        sessions: [{ ...session, model_key: defaultModel || undefined, thinking_enabled: true }, ...state.sessions],
         activeSessionId: session.id,
       }));
     } catch (error) {
@@ -205,7 +211,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sessions: state.sessions.map((s) => {
           if (s.id !== sessionId) return s;
           // Preserve live streaming state — session.get doesn't carry it.
-          return { ...session, currentTurn: s.currentTurn, isStreaming: s.isStreaming, currentRunId: s.currentRunId, model_key: s.model_key };
+          return { ...session, currentTurn: s.currentTurn, isStreaming: s.isStreaming, currentRunId: s.currentRunId, model_key: s.model_key, thinking_enabled: s.thinking_enabled };
         }),
         activeSessionId: sessionId,
       }));
@@ -229,12 +235,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ? (sessions[0]?.id || null)
         : state.activeSessionId;
       set({ sessions, activeSessionId });
+      // Clean up persisted preferences.
+      try {
+        const saved = JSON.parse(localStorage.getItem('clawtao-session-models') || '{}');
+        delete saved[sessionId];
+        localStorage.setItem('clawtao-session-models', JSON.stringify(saved));
+        const savedT = JSON.parse(localStorage.getItem('clawtao-session-thinking') || '{}');
+        delete savedT[sessionId];
+        localStorage.setItem('clawtao-session-thinking', JSON.stringify(savedT));
+      } catch {}
     } catch (error) {
       set({ error: toChatError(error) });
     }
   },
 
-  sendMessage: async (text: string) => {
+  sendMessage: async (text: string, thinkingEnabled?: boolean) => {
     const { activeSessionId } = get();
     if (!activeSessionId) {
       set({ error: { message: 'No active session', errorCode: 'SESSION_ERROR', retryable: false } });
@@ -259,7 +274,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       const session = get().sessions.find(s => s.id === activeSessionId);
-      await window.electronAPI.chat.send(text, activeSessionId, session?.model_key);
+      await window.electronAPI.chat.send(text, activeSessionId, session?.model_key, thinkingEnabled);
       // handleStreamEvent 'done' already reloaded via session.get; no second reload needed.
     } catch (error) {
       set((state) => ({
@@ -345,6 +360,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const saved = JSON.parse(localStorage.getItem('clawtao-session-models') || '{}');
       saved[sessionId] = modelKey;
       localStorage.setItem('clawtao-session-models', JSON.stringify(saved));
+    } catch {}
+  },
+
+  setSessionThinking: (sessionId, enabled) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) => s.id === sessionId ? { ...s, thinking_enabled: enabled } : s),
+    }));
+    // Persist across restarts.
+    try {
+      const saved = JSON.parse(localStorage.getItem('clawtao-session-thinking') || '{}');
+      saved[sessionId] = enabled;
+      localStorage.setItem('clawtao-session-thinking', JSON.stringify(saved));
     } catch {}
   },
 

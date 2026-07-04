@@ -19,7 +19,8 @@
     "noSession": "No session selected",
     "createSession": "Create a session",
     "selectModel": "Select model",
-    "noModelsConfigured": "No models configured (go to Settings)"
+    "noModelsConfigured": "No models configured (go to Settings)",
+    "thinking": "Thinking"
   },
   "tool": {
     "input": "Input",

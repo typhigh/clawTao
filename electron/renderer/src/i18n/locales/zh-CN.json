@@ -11,7 +11,8 @@
     "noSession": "暂无会话",
     "createSession": "新建会话",
     "selectModel": "选择模型",
-    "noModelsConfigured": "暂未配置模型（请到设置添加）"
+    "noModelsConfigured": "暂未配置模型（请到设置添加）",
+    "thinking": "思考"
   },
   "tool": {
     "input": "输入",

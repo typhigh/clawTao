@@ -27,6 +27,8 @@ interface Props {
     sendDisabled?: boolean;
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
     onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+    thinkingEnabled: boolean;
+    onToggleThinking: () => void;
   };
   streaming: boolean;
   onCancel: () => void;

@@ -11,8 +11,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 const electronAPI = {
   // Chat operations
   chat: {
-    send: (message: string, sessionId: string, model_key?: string) =>
-      ipcRenderer.invoke('chat:send', { message, sessionId, model_key }),
+    send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean) =>
+      ipcRenderer.invoke('chat:send', { message, sessionId, model_key, thinking_enabled }),
     interrupt: (sessionId: string) =>
       ipcRenderer.invoke('chat:interrupt', { sessionId }),
   },

@@ -198,7 +198,7 @@ function setupIpc() {
   );
 
   // chat.send — resolve per-session model_key to provider/model/api_key.
-  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string }) => {
+  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string; thinking_enabled?: boolean }) => {
     const config: any = readConfig();
     const key = p.model_key || config.llm?.default_model_id || '';
     if (!key) return Promise.reject(new Error('No model selected.'));
@@ -213,7 +213,7 @@ function setupIpc() {
       base_url: provider.base_url || '',
       model,
       api_protocol: provider.api_protocol || 'anthropic',
-      thinking_enabled: config.llm?.thinking_enabled || false,
+      thinking_enabled: !!p.thinking_enabled,
       bash_blocked_commands: config.bash?.blocked_commands || [],
       bash_timeout_secs: config.bash?.timeout_secs ?? null,
     };

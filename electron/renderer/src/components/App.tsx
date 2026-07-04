@@ -55,6 +55,14 @@ function App() {
     useChatStore.getState().setSessionModel(activeSessionId, key);
   };
 
+  const handleToggleThinking = () => {
+    if (!activeSessionId) return;
+    const cur = useChatStore.getState().sessions.find(s => s.id === activeSessionId);
+    useChatStore.getState().setSessionThinking(activeSessionId, !(cur?.thinking_enabled ?? true));
+  };
+
+  const thinkingEnabled: boolean = sessions.find(s => s.id === activeSessionId)?.thinking_enabled ?? true;
+
   const handleOpenSettings = () => {
     // Clear the active session highlight while in settings so the sidebar
     // shows settings as the only "active" entry.
@@ -73,7 +81,7 @@ function App() {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${2 * 24}px`;
     }
-    await useChatStore.getState().sendMessage(text);
+    await useChatStore.getState().sendMessage(text, thinkingEnabled);
   };
 
   // Auto-grow textarea
@@ -140,7 +148,7 @@ function App() {
             onCreateSession={createSession}
             streaming={isStreaming}
             onCancel={() => useChatStore.getState().cancelRun()}
-            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming, textareaRef, onKeyDown: handleKeyDown }}
+            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming, textareaRef, onKeyDown: handleKeyDown, thinkingEnabled, onToggleThinking: handleToggleThinking }}
             modelOptions={modelOptions}
             selectedModelKey={selectedModelKey}
             onSelectModel={handleSelectModel}

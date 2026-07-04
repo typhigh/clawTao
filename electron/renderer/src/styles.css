@@ -880,12 +880,45 @@ html, body, #root {
   flex: 1;
 }
 
-.input-model-select-inline {
+.input-bottom-row {
   position: absolute;
-  left: 12px;
-  bottom: 8px;
+  left: 10px;
+  bottom: 6px;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.input-model-select-inline {
   background: transparent;
+}
+
+.input-thinking-toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #999;
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.input-thinking-toggle-inline:hover:not(:disabled) {
+  color: #1c1c1e;
+  background: #f3f3f3;
+}
+.input-thinking-toggle-inline.on {
+  color: #1c1c1e;
+}
+.input-thinking-toggle-inline:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .input-send-btn {

@@ -81,3 +81,33 @@ export function SendIcon() {
     </svg>
   );
 }
+
+/** Lightbulb icon — used for the "thinking" toggle in the input area. (Lucide)
+ *  `active` overlays a light-yellow lightning bolt when extended thinking is on. */
+export function ThinkingIcon({ active = false }: { active?: boolean } = {}) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M15 14c.2-1 .7-1.7 1.5-2.5C17.7 10.2 18 9 18 8a6 6 0 0 0-12 0c0 1 .3 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      {active && (
+        <path
+          d="M12.5 6 L9.5 13 L12 13 L11 17.5 L14.5 10.5 L12 10.5 L13 6 Z"
+          fill="#e0a800"
+          stroke="none"
+        />
+      )}
+    </svg>
+  );
+}
