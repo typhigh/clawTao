@@ -1,4 +1,6 @@
 {
+  "copy": "コピー",
+  "copied": "コピー済み",
   "sidebar": {
     "configuration": "⚙️ 設定",
     "sessions": "セッション",

@@ -35,17 +35,17 @@ function getSavedLang(): SupportedLang {
 
 i18n.use(initReactI18next).init({
   resources: {
-    'zh-CN': zhCN,
-    en,
-    ja,
-    ru,
-    fr,
-    ko,
+    'zh-CN': { translation: zhCN },
+    en: { translation: en },
+    ja: { translation: ja },
+    ru: { translation: ru },
+    fr: { translation: fr },
+    ko: { translation: ko },
   },
+  defaultNS: 'translation',
   lng: getSavedLang(),
   fallbackLng: DEFAULT_LANG,
   nsSeparator: '.',
-  keySeparator: false,
   interpolation: {
     escapeValue: false, // React already escapes
   },

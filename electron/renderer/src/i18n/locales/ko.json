@@ -1,4 +1,6 @@
 {
+  "copy": "복사",
+  "copied": "복사됨",
   "sidebar": {
     "configuration": "⚙️ 설정",
     "sessions": "세션",

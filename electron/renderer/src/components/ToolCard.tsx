@@ -73,6 +73,7 @@ export function ToolCard({ toolName, toolInput, result, pending }: {
 // ── SegmentView + ToolPairView ───────────────────────────────────────
 
 export function SegmentView({ segment }: { segment: AssistantSegment }) {
+  const { t } = useTranslation();
   if (segment.kind === 'toolPair') {
     return <ToolCard toolName={segment.toolName} toolInput={segment.toolInput} result={segment.result} pending={segment.pending} />;
   }

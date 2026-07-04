@@ -1,4 +1,6 @@
 {
+  "copy": "Копировать",
+  "copied": "Скопировано",
   "sidebar": {
     "configuration": "⚙️ Конфигурация",
     "sessions": "Сессии",

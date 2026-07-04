@@ -689,8 +689,9 @@ html, body, #root {
 .thinking-body p:last-child  { margin-bottom: 0; }
 
 .thinking-body pre {
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: #fafafa;
+  color: #1c1c1e;
+  border: 1px solid #ececec;
   padding: 8px 10px;
   border-radius: 6px;
   overflow-x: auto;
@@ -733,8 +734,9 @@ html, body, #root {
 }
 .agent-turn-conclusion pre,
 .turn-text pre {
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: #fafafa;
+  color: #1c1c1e;
+  border: 1px solid #ececec;
   padding: 10px 12px;
   border-radius: 6px;
   overflow-x: auto;
@@ -742,6 +744,23 @@ html, body, #root {
   line-height: 1.45;
   margin: 6px 0;
 }
+
+.code-block-wrapper { position: relative; }
+.code-block-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #555;
+  cursor: pointer;
+  font-family: inherit;
+}
+.code-block-copy:hover { background: #f0f0f0; border-color: #999; }
 
 .agent-turn-conclusion code,
 .turn-text code {
