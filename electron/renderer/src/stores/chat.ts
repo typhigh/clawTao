@@ -26,7 +26,7 @@ declare global {
         delete: (sessionId: string) => Promise<unknown>;
       };
       config: {
-        get: () => Promise<{ provider: string; api_key: string; base_url: string; model: string; log_level: string; bash_blocked_commands: string[] }>;
+        get: () => Promise<unknown>;
         set: (c: unknown) => Promise<unknown>;
         probe: (p: { base_url: string; model: string; api_key: string; api_protocol: string }) => Promise<{ ok: boolean; error?: string }>;
       };
@@ -188,7 +188,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const session = await window.electronAPI.session.create();
       // Inherit the default model so the session works immediately.
-      const defaultModel = (useSettingsStore as any)?.getState?.()?.config?.default_model_id || '';
+      const defaultModel = (useSettingsStore as any)?.getState?.()?.config?.llm?.default_model_id || '';
       set((state) => ({
         sessions: [{ ...session, model_key: defaultModel || undefined }, ...state.sessions],
         activeSessionId: session.id,

@@ -1,9 +1,8 @@
 /**
- * Settings Store — persisted LLM configuration.
+ * Settings Store — persisted application configuration.
  *
- * Single source of truth for all chat sessions. A user maintains a list of
- * providers, each with its own credentials and model list, plus an active
- * provider/model pair that the chat uses.
+ * Single source of truth for all chat sessions. Split into sub-objects
+ * so llm / bash / global settings don't interleave in a flat namespace.
  */
 import { create } from 'zustand';
 
@@ -33,41 +32,50 @@ export const SUGGESTED_MODELS: Record<string, string[]> = {
 
 /** A user-configured provider entry. */
 export interface ProviderConfig {
-  id: string;        // template id (deepseek/minimax/custom)
+  id: string;
   api_key: string;
   base_url: string;
   api_protocol: 'anthropic' | 'openai';
-  models: string[];  // user-added model names
+  models: string[];
 }
 
-export interface LlmConfig {
-  providers: ProviderConfig[];
-  default_model_id: string;
+// ── AppConfig (was LlmConfig) ──────────────────────────────────────────
+
+export interface AppConfig {
+  llm: {
+    providers: ProviderConfig[];
+    default_model_id: string;
+  };
   log_level: string;
-  bash_blocked_commands: string[];
-  bash_timeout_secs: number | null;
+  bash: {
+    blocked_commands: string[];
+    timeout_secs: number | null;
+  };
 }
 
 interface SettingsState {
-  config: LlmConfig | null;     // current (possibly edited) state — UI source of truth
-  savedConfig: LlmConfig | null; // last persisted version — used to revert dirty edits
+  config: AppConfig | null;
+  savedConfig: AppConfig | null;
   loaded: boolean;
   load: () => Promise<void>;
-  save: (c: LlmConfig) => Promise<void>;
-  replace: (c: LlmConfig) => void;
+  save: (c: AppConfig) => Promise<void>;
+  replace: (c: AppConfig) => void;
   removeProvider: (id: string) => Promise<void>;
 }
 
 /** Ensure default_model_id references a valid model. If not, pick the first available. */
-function ensureDefaultModel(c: LlmConfig): LlmConfig {
-  if (c.default_model_id) {
-    const [pid, ...rest] = c.default_model_id.split('/');
+function ensureDefaultModel(c: AppConfig): AppConfig {
+  if (c.llm.default_model_id) {
+    const [pid, ...rest] = c.llm.default_model_id.split('/');
     const m = rest.join('/');
-    const provider = c.providers.find(p => p.id === pid);
-    if (provider && provider.models.includes(m)) return c; // still valid
+    const provider = c.llm.providers.find(p => p.id === pid);
+    if (provider && provider.models.includes(m)) return c;
   }
-  const first = c.providers.find(p => p.models.length > 0);
-  return { ...c, default_model_id: first ? `${first.id}/${first.models[0]}` : '' };
+  const first = c.llm.providers.find(p => p.models.length > 0);
+  return {
+    ...c,
+    llm: { ...c.llm, default_model_id: first ? `${first.id}/${first.models[0]}` : '' },
+  };
 }
 
 /** Probe an LLM API endpoint via Electron main process (respects system proxy). */
@@ -79,13 +87,11 @@ export async function probeConnection(
 }
 
 /** Build a fresh empty config — no providers until the user adds one. */
-export function emptyConfig(): LlmConfig {
+export function emptyConfig(): AppConfig {
   return {
-    providers: [],
-    default_model_id: '',
+    llm: { providers: [], default_model_id: '' },
     log_level: 'info',
-    bash_blocked_commands: [],
-    bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
+    bash: { blocked_commands: [], timeout_secs: DEFAULT_BASH_TIMEOUT_SECS },
   };
 }
 
@@ -96,7 +102,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   load: async () => {
     try {
-      const config = await window.electronAPI.config.get() as unknown as LlmConfig;
+      const config = await window.electronAPI.config.get() as unknown as AppConfig;
       set({ config, savedConfig: config, loaded: true });
     } catch {
       const e = emptyConfig();
@@ -104,34 +110,41 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
   },
 
-  save: async (c: LlmConfig) => {
-    // Ensure default_model_id is set if providers have models.
-    if (!c.default_model_id) {
-      const firstWithModel = c.providers.find(p => p.models.length > 0);
-      if (firstWithModel) c.default_model_id = `${firstWithModel.id}/${firstWithModel.models[0]}`;
+  save: async (c: AppConfig) => {
+    if (!c.llm.default_model_id) {
+      const firstWithModel = c.llm.providers.find(p => p.models.length > 0);
+      if (firstWithModel) {
+        c = {
+          ...c,
+          llm: { ...c.llm, default_model_id: `${firstWithModel.id}/${firstWithModel.models[0]}` },
+        };
+      }
     }
     await window.electronAPI.config.set(c as unknown as Record<string, unknown>);
-    const config = await window.electronAPI.config.get() as unknown as LlmConfig;
+    const config = await window.electronAPI.config.get() as unknown as AppConfig;
     set({ config, savedConfig: config });
   },
 
-  replace: (c: LlmConfig) => set({ config: ensureDefaultModel(c) }),
+  replace: (c: AppConfig) => set({ config: ensureDefaultModel(c) }),
 
   removeProvider: async (id: string) => {
     const cur = get().config;
     if (!cur) return;
-    // Drop the provider and fix default_model_id BEFORE null-ing api_key
-    // (api_key: null is a signal to Electron to delete the stored key).
     const withoutRemoved = ensureDefaultModel({
       ...cur,
-      providers: cur.providers.filter(p => p.id !== id),
+      llm: { ...cur.llm, providers: cur.llm.providers.filter(p => p.id !== id) },
     });
     const withNullKey = {
       ...withoutRemoved,
-      providers: withoutRemoved.providers.map(p => p.id === id ? { ...p, api_key: null } : p),
+      llm: {
+        ...withoutRemoved.llm,
+        providers: withoutRemoved.llm.providers.map(
+          p => p.id === id ? { ...p, api_key: null as unknown as string } : p,
+        ),
+      },
     };
     await window.electronAPI.config.set(withNullKey as unknown as Record<string, unknown>);
-    const fresh = await window.electronAPI.config.get() as unknown as LlmConfig;
+    const fresh = await window.electronAPI.config.get() as unknown as AppConfig;
     set({ config: fresh, savedConfig: fresh });
   },
 }));

@@ -24,15 +24,18 @@ import { useSettingsStore, emptyConfig, PROVIDER_TEMPLATES } from '../stores/set
 
 function makeConfig() {
   return {
-    providers: [
-      { id: 'deepseek', api_key: 'sk-ds**ef', base_url: PROVIDER_TEMPLATES.deepseek.base_url, api_protocol: 'anthropic' as const, models: ['deepseek-v4-pro'] },
-      { id: 'minimax',  api_key: 'sk-mn**ef', base_url: PROVIDER_TEMPLATES.minimax.base_url,  api_protocol: 'anthropic' as const, models: ['MiniMax-M3'] },
-    ],
-    active_provider_id: 'minimax',
-    active_model_id: 'MiniMax-M3',
+    llm: {
+      providers: [
+        { id: 'deepseek', api_key: 'sk-ds**ef', base_url: PROVIDER_TEMPLATES.deepseek.base_url, api_protocol: 'anthropic' as const, models: ['deepseek-v4-pro'] },
+        { id: 'minimax',  api_key: 'sk-mn**ef', base_url: PROVIDER_TEMPLATES.minimax.base_url,  api_protocol: 'anthropic' as const, models: ['MiniMax-M3'] },
+      ],
+      default_model_id: '',
+    },
     log_level: 'info',
-    bash_blocked_commands: ['rm -rf /'],
-    bash_timeout_secs: DEFAULT_BASH_TIMEOUT_SECS, default_model_id: '',
+    bash: {
+      blocked_commands: ['rm -rf /'],
+      timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,
+    },
   };
 }
 
@@ -91,7 +94,7 @@ describe('settings store', () => {
     await useSettingsStore.getState().save(newConfig);
 
     expect(mockConfigApi.set).toHaveBeenCalled();
-    expect(useSettingsStore.getState().config?.providers[0].api_key).toBe(maskedConfig.providers[0].api_key);
+    expect(useSettingsStore.getState().config?.llm.providers[0].api_key).toBe(maskedConfig.llm.providers[0].api_key);
   });
 
 });

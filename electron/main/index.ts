@@ -200,27 +200,30 @@ function setupIpc() {
   // chat.send — resolve per-session model_key to provider/model/api_key.
   ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string }) => {
     const config: any = readConfig();
-    const key = p.model_key || config.default_model_id || '';
+    const key = p.model_key || config.llm?.default_model_id || '';
     if (!key) return Promise.reject(new Error('No model selected.'));
     const [providerId, ...rest] = key.split('/');
     const model = rest.join('/');
-    const provider = config.providers?.find((pr: any) => pr.id === providerId);
+    const provider = config.llm?.providers?.find((pr: any) => pr.id === providerId);
     if (!provider) return Promise.reject(new Error(`Provider not found: ${providerId}`));
 
-    config.api_key = readEncryptedKey(providerId) || '';
-    config.base_url = provider.base_url || '';
-    config.model = model;
-    config.api_protocol = provider.api_protocol || 'anthropic';
-    return sendRpc('chat.send', { ...p, config }, 0);
+    // Assemble a flat config object for the Rust backend.
+    const flatConfig: Record<string, unknown> = {
+      api_key: readEncryptedKey(providerId) || '',
+      base_url: provider.base_url || '',
+      model,
+      api_protocol: provider.api_protocol || 'anthropic',
+      thinking_enabled: config.llm?.thinking_enabled || false,
+      bash_blocked_commands: config.bash?.blocked_commands || [],
+      bash_timeout_secs: config.bash?.timeout_secs ?? null,
+    };
+    return sendRpc('chat.send', { ...p, config: flatConfig }, 0);
   });
 
-  // config:get — reads from Electron-managed config.json + secrets.json.
-  // Schema is the new multi-provider shape only. Per-provider: we set
-  // `providers[i].api_key` to a masked string and never expose plaintext
-  // to the renderer.
+  // config:get — reads Electron config.json + secrets.json, attaches masked api_key.
   ipcMain.handle('config:get', () => {
     const config: any = readConfig();
-    config.providers = (config.providers || []).map((p: any) => {
+    const providers = (config.llm?.providers || []).map((p: any) => {
       const plain = readEncryptedKey(p.id);
       return {
         ...p,
@@ -228,15 +231,13 @@ function setupIpc() {
         has_api_key: !!plain,
       };
     });
-    return config;
+    return { ...config, llm: { ...config.llm, providers } };
   });
 
   // config:set — writes to Electron config.json + secrets.json.
-  // cfg.providers[i].api_key: masked (with '*') or undefined means "don't change".
-  // Plaintext (no '*') means "set this provider's key to that value".
-  // Explicit null means "remove this provider's key".
   ipcMain.handle('config:set', (_e, cfg: Record<string, unknown>) => {
-    const providers = cfg.providers as any[] | undefined;
+    const llm = cfg.llm as any;
+    const providers = llm?.providers as any[] | undefined;
     if (Array.isArray(providers)) {
       providers.forEach(p => {
         if (p.api_key === null) {
@@ -251,12 +252,10 @@ function setupIpc() {
         if (k && !k.includes('*')) {
           writeEncryptedKey(k, p.id);
         }
-        // masked or empty/missing => leave secrets untouched
       });
     }
 
-    // If log_level changed, push it to the running Rust process so tracing
-    // updates without an app restart.
+    // Push log_level change to the running Rust process.
     const newLevel = cfg.log_level as string | undefined;
     if (newLevel) {
       try {

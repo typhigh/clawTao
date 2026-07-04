@@ -32,7 +32,7 @@ function App() {
 
   // First-run with no api_key anywhere → land in settings.
   useEffect(() => {
-    if (loaded && config && (config.providers.length === 0 || config.providers.every(p => !p.api_key))) {
+    if (loaded && config && (config.llm.providers.length === 0 || config.llm.providers.every(p => !p.api_key))) {
       setView('settings');
     }
   }, [loaded, config]);
@@ -40,7 +40,7 @@ function App() {
   const modelOptions: ModelOption[] = useMemo(() => {
     if (!config) return [];
     const opts: ModelOption[] = [];
-    for (const p of config.providers) {
+    for (const p of config.llm.providers) {
       const tmpl = PROVIDER_TEMPLATES[p.id];
       const name = tmpl?.name || p.id;
       for (const m of p.models) {
@@ -116,7 +116,7 @@ function App() {
     ...(live ? [{ kind: 'liveTurn' as const, id: 'live-turn', segments: live.segments, isStreaming: live.isStreaming }] : []),
   ], [historicalGroups, live]);
 
-  const selectedModelKey = activeSession?.model_key || config?.default_model_id || modelOptions[0]?.key || '';
+  const selectedModelKey = activeSession?.model_key || config?.llm?.default_model_id || modelOptions[0]?.key || '';
 
   return (
     <div className="app">

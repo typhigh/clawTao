@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { LlmConfig, ProviderConfig } from '../stores/settings';
+import type { AppConfig, ProviderConfig } from '../stores/settings';
 import {
   PROVIDER_TEMPLATES,
   SUGGESTED_MODELS,
@@ -12,7 +12,7 @@ import { TrashIcon } from './icons';
 
 interface Props {
   provider: ProviderConfig;
-  config: LlmConfig;
+  config: AppConfig;
   isNew: boolean;
   hasSavedKey: boolean;
   onUpdate: (patch: Partial<ProviderConfig>) => void;
@@ -44,7 +44,7 @@ export function ProviderRow({ provider, isNew, hasSavedKey, onUpdate, onCancel, 
   const [rowStatus, setRowStatus] = useState<RowStatus>({ status: 'idle', message: '' });
 
   const savedConfig = useSettingsStore(s => s.savedConfig);
-  const sav = savedConfig?.providers.find(p => p.id === provider.id);
+  const sav = savedConfig?.llm.providers.find(p => p.id === provider.id);
   const dirty = rowDirty(provider, sav) || editingKey;
   const suggested = SUGGESTED_MODELS[provider.id] || [];
 

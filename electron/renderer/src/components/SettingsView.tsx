@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useSettingsStore,
-  LlmConfig, ProviderConfig,
+  AppConfig, ProviderConfig,
   PROVIDER_TEMPLATES,
 } from '../stores/settings';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -23,26 +23,26 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
   if (!config) return null;
 
   const handleAddProvider = (id: string) => {
-    if (config.providers.some(p => p.id === id)) return;
+    if (config.llm.providers.some(p => p.id === id)) return;
     const tmpl = PROVIDER_TEMPLATES[id];
     if (!tmpl) return;
     const np: ProviderConfig = { id: tmpl.id, api_key: '', base_url: tmpl.base_url, api_protocol: tmpl.api_protocol, models: [] };
-    replace({ ...config, providers: [...config.providers, np] });
+    replace({ ...config, llm: { ...config.llm, providers: [...config.llm.providers, np] } });
   };
 
   const handleCancel = (id: string) => {
-    const saved = savedConfig?.providers.find(p => p.id === id);
+    const saved = savedConfig?.llm.providers.find(p => p.id === id);
     if (saved) {
-      replace({ ...config, providers: config.providers.map(p => p.id === id ? { ...saved, api_key: saved.api_key } : p) });
+      replace({ ...config, llm: { ...config.llm, providers: config.llm.providers.map(p => p.id === id ? { ...saved, api_key: saved.api_key } : p) } });
     } else {
-      const remaining = config.providers.filter(p => p.id !== id);
-      replace({ ...config, providers: remaining });
+      const remaining = config.llm.providers.filter(p => p.id !== id);
+      replace({ ...config, llm: { ...config.llm, providers: remaining } });
     }
   };
 
-  const handleSave = async (cfg: LlmConfig) => { await save(cfg); };
+  const handleSave = async (cfg: AppConfig) => { await save(cfg); };
 
-  const availableToAdd = Object.values(PROVIDER_TEMPLATES).filter(tmpl => !config.providers.some(p => p.id === tmpl.id));
+  const availableToAdd = Object.values(PROVIDER_TEMPLATES).filter(tmpl => !config.llm.providers.some(p => p.id === tmpl.id));
 
   return (
     <div className="settings-view">
@@ -50,11 +50,11 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
         <div className="settings-section-label">{t('settings.providers')}</div>
         <div className="settings-description">{t('settings.providersDescription')}</div>
         <ul className="settings-provider-rows">
-          {config.providers.map(provider => {
+          {config.llm.providers.map(provider => {
             const tmpl = PROVIDER_TEMPLATES[provider.id];
             if (!tmpl) return null;
-            const isNew = !savedConfig?.providers.some(p => p.id === provider.id);
-            const saved = savedConfig?.providers.find(p => p.id === provider.id);
+            const isNew = !savedConfig?.llm.providers.some(p => p.id === provider.id);
+            const saved = savedConfig?.llm.providers.find(p => p.id === provider.id);
             const hasSavedKey = !isNew && !!(saved?.api_key);
 
             return (
@@ -64,7 +64,7 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
                 config={config}
                 isNew={isNew}
                 hasSavedKey={hasSavedKey}
-                onUpdate={(patch) => replace({ ...config, providers: config.providers.map(p => p.id === provider.id ? { ...p, ...patch } : p) })}
+                onUpdate={(patch) => replace({ ...config, llm: { ...config.llm, providers: config.llm.providers.map(p => p.id === provider.id ? { ...p, ...patch } : p) } })}
                 onCancel={() => handleCancel(provider.id)}
                 onSave={() => handleSave(config)}
                 onRemove={() => removeProvider(provider.id)}
@@ -117,17 +117,17 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
   );
 }
 
-function DefaultModelSelector({ config, onChange }: { config: LlmConfig; onChange: (next: LlmConfig) => void }) {
+function DefaultModelSelector({ config, onChange }: { config: AppConfig; onChange: (next: AppConfig) => void }) {
   const { t } = useTranslation();
   const options: ModelOption[] = useMemo(() => {
     const opts: ModelOption[] = [];
-    for (const p of config.providers) {
+    for (const p of config.llm.providers) {
       for (const m of p.models) {
         opts.push({ providerId: p.id, providerName: p.id, model: m, key: `${p.id}/${m}` });
       }
     }
     return opts;
-  }, [config.providers]);
+  }, [config.llm.providers]);
 
   if (options.length === 0) return null;
 
@@ -138,8 +138,8 @@ function DefaultModelSelector({ config, onChange }: { config: LlmConfig; onChang
         <span className="settings-inline-select-wrap">
           <select
             className="settings-inline-select"
-            value={config.default_model_id}
-            onChange={(e) => onChange({ ...config, default_model_id: e.target.value })}
+            value={config.llm.default_model_id}
+            onChange={(e) => onChange({ ...config, llm: { ...config.llm, default_model_id: e.target.value } })}
           >
             <option value="">(none)</option>
             {options.map(o => <option key={o.key} value={o.key}>{o.model}</option>)}
