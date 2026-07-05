@@ -255,9 +255,15 @@ fn run_state_machine(
                         match tool_registry.get(&tc.function.name) {
                             Some(executor) => match executor.execute(args_val.clone(), cancel) {
                                 Ok(output) => output,
-                                Err(e) => format!("Tool error: {e}"),
+                                Err(e) => {
+                                    warn!("Tool {} failed: {e}", tc.function.name);
+                                    format!("Tool error: {e}")
+                                }
                             },
-                            None => format!("Unknown tool: {}", tc.function.name),
+                            None => {
+                                warn!("Unknown tool requested: {}", tc.function.name);
+                                format!("Unknown tool: {}", tc.function.name)
+                            }
                         }
                     };
 
