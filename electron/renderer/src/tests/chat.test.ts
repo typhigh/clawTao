@@ -223,6 +223,8 @@ describe('chat store', () => {
     const s1 = state.sessions.find(s => s.id === 's1')!;
     expect(s1.isStreaming).toBe(false);
     expect(s1.messages.filter(m => m.role === 'user')).toHaveLength(0);
-    expect(state.error).toContain('Failed to send message');
+    expect(state.error).not.toBeNull();
+    expect(state.error!.message).toBe('network');
+    expect(state.error!.errorCode).toBe('INTERNAL_ERROR');
   });
 });

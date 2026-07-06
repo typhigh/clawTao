@@ -126,8 +126,8 @@ fn try_route(
     filter: &FilterHandle,
 ) {
     if request.method == "config.set_log_level" {
-        let level = jsonrpc::get_param_opt(&request.params, "level").unwrap_or_else(|| "info");
-        match EnvFilter::try_new(&level) {
+        let level = jsonrpc::get_param_opt(&request.params, "level").unwrap_or("info");
+        match EnvFilter::try_new(level) {
             Ok(f) => {
                 if filter.reload(f).is_ok() {
                     info!("Log level set to: {level}");
