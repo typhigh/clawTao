@@ -1,4 +1,4 @@
-import type { StreamEvent } from '../stores/chat';
+import type { ImageAttachment, StreamEvent } from '../stores/chat';
 
 export type AssistantSegment =
   | { kind: 'text'; id: string; content: string; timestamp: number }
@@ -14,6 +14,6 @@ export type TurnSegment =
   | { kind: 'todo'; todos: { step: string; status: string }[] };
 
 export type TimelineGroup =
-  | { kind: 'user'; id: string; content: string; timestamp: number }
+  | { kind: 'user'; id: string; content: string; timestamp: number; images?: ImageAttachment[] }
   | { kind: 'agentTurn'; id: string; segments: AssistantSegment[]; conclusion: string | null; isStreaming: boolean }
   | { kind: 'liveTurn'; id: string; segments: TurnSegment[]; isStreaming: boolean };

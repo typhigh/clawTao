@@ -29,6 +29,8 @@ interface Props {
     onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
     thinkingEnabled: boolean;
     onToggleThinking: () => void;
+    images?: import('../stores/chat').ImageAttachment[];
+    onImagesChange?: (imgs: import('../stores/chat').ImageAttachment[]) => void;
   };
   streaming: boolean;
   onCancel: () => void;
@@ -71,7 +73,7 @@ export function ChatView({ timeline, error, onClearError, hasActiveSession, onCr
         <>
           <div className="messages">
             {timeline.map((group) => {
-              if (group.kind === 'user') return <UserMessageView key={group.id} content={group.content} />;
+              if (group.kind === 'user') return <UserMessageView key={group.id} content={group.content} images={group.images} />;
               if (group.kind === 'liveTurn') return <LiveTurnView key="live-turn" segments={group.segments} isStreaming={group.isStreaming} />;
               return <AgentTurnView key={`${group.id}-done`} segments={group.segments} conclusion={group.conclusion} />;
             })}

@@ -13,7 +13,10 @@
     "selectModel": "选择模型",
     "noModelsConfigured": "暂未配置模型（请到设置添加）",
     "thinking": "思考",
-    "back": "返回"
+    "back": "返回",
+    "attachImage": {
+      "attachImage": "添加图片"
+    }
   },
   "tool": {
     "input": "输入",

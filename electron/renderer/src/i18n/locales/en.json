@@ -21,7 +21,10 @@
     "selectModel": "Select model",
     "noModelsConfigured": "No models configured (go to Settings)",
     "thinking": "Thinking",
-    "back": "Back"
+    "back": "Back",
+    "attachImage": {
+      "attachImage": "Attach image"
+    }
   },
   "tool": {
     "input": "Input",

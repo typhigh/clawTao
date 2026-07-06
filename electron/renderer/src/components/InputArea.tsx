@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SendIcon, ThinkingIcon } from './icons';
+import { SendIcon, ThinkingIcon, UploadIcon } from './icons';
+import type { ImageAttachment } from '../stores/chat';
+
+const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
 interface ModelOption {
   providerId: string;
@@ -25,15 +28,52 @@ interface Props {
   disabledModel?: boolean;
   thinkingEnabled: boolean;
   onToggleThinking: () => void;
+  images?: ImageAttachment[];
+  onImagesChange?: (imgs: ImageAttachment[]) => void;
+}
+
+async function fileToImage(f: File): Promise<ImageAttachment | null> {
+  if (!SUPPORTED_IMAGE_TYPES.includes(f.type)) return null;
+  const buf = await f.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return { base64: btoa(binary), mediaType: f.type };
 }
 
 export function InputArea({
   value, onChange, onSend, onCancel, disabled, streaming, sendDisabled, textareaRef, onKeyDown,
   modelOptions, selectedModelKey, onSelectModel, disabledModel,
   thinkingEnabled, onToggleThinking,
+  images, onImagesChange,
 }: Props) {
   const { t } = useTranslation();
   const [thinkingHover, setThinkingHover] = useState(false);
+  const [imageHover, setImageHover] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const addImages = async (files: FileList | File[]) => {
+    const results: ImageAttachment[] = [];
+    for (const f of files) {
+      const img = await fileToImage(f);
+      if (img) results.push(img);
+    }
+    if (results.length > 0) onImagesChange?.([...(images || []), ...results]);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.files;
+    if (items?.length) { e.preventDefault(); addImages(items); }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer?.files.length) addImages(e.dataTransfer.files);
+  };
+
+  const removeImage = (i: number) => {
+    onImagesChange?.((images || []).filter((_, idx) => idx !== i));
+  };
 
   const btnDisabled = !value.trim() || disabled || sendDisabled;
 
@@ -48,9 +88,49 @@ export function InputArea({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={onKeyDown}
+            onPaste={handlePaste}
             disabled={disabled}
           />
+          {/* Image thumbnails */}
+          {(images?.length || 0) > 0 && (
+            <div className="input-images-preview" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
+              {images!.map((img, i) => (
+                <div key={i} className="input-image-thumb">
+                  <img src={`data:${img.mediaType};base64,${img.base64}`} alt="" />
+                  <button className="input-image-remove" onClick={() => removeImage(i)}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Hidden file input */}
+          <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden
+            onChange={(e) => { if (e.target.files) addImages(e.target.files); e.target.value = ''; }} />
           <div className="input-bottom-row">
+            <button
+              type="button"
+              className="input-image-btn"
+              title={t('chat.attachImage')}
+              onClick={() => fileInputRef.current?.click()}
+              onMouseEnter={() => setImageHover(true)}
+              onMouseLeave={() => setImageHover(false)}
+              style={{
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                background: imageHover ? '#f0f0f0' : 'transparent',
+                border: '1px solid transparent',
+                color: '#555',
+                borderRadius: '6px',
+                width: '26px',
+                height: '26px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                font: 'inherit',
+                cursor: 'pointer',
+                opacity: disabled ? 0.4 : 1,
+              }}
+            ><UploadIcon /></button>
             <select
               className="input-model-select input-model-select-inline"
               value={selectedModelKey}

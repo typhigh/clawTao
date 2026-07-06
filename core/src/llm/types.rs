@@ -1,5 +1,12 @@
 use crate::store::ToolCall;
 
+/// Image content attached to a message (user upload or tool output).
+#[derive(Debug, Clone)]
+pub struct ImageContent {
+    pub base64: String,
+    pub media_type: String, // "image/png" | "image/jpeg" | "image/gif" | "image/webp"
+}
+
 /// Protocol-agnostic LLM request.
 pub struct LlmRequest {
     pub system: String,
@@ -14,19 +21,18 @@ pub struct LlmRequest {
 pub struct LlmResponse {
     pub text: String,
     pub tool_calls: Vec<ToolCall>,
-    /// Accumulated thinking text. Persisted so it can be replayed in
-    /// multi-turn conversations (providers require thinking blocks to be
-    /// sent back unchanged on subsequent turns).
+    /// Accumulated thinking text.
     pub thinking: Option<String>,
 }
 
 /// Internal message representation.
+#[derive(Debug, Clone)]
 pub struct LlmMessage {
     pub role: String,
     pub content: String,
+    pub images: Option<Vec<ImageContent>>,
     pub tool_calls: Option<Vec<ToolCall>>,
     pub tool_call_id: Option<String>,
-    /// Thinking text for this assistant message, replayed back to the model.
     pub thinking: Option<String>,
 }
 

@@ -1,5 +1,5 @@
 use super::adapter::{ApiAdapter, HttpRequest, StreamEvent};
-use super::types::{LlmRequest, LlmResponse};
+use super::types::{LlmMessage, LlmRequest, LlmResponse};
 use crate::sse::parse_sse_response;
 use anyhow::Result;
 use serde_json::json;
@@ -15,9 +15,9 @@ impl ApiAdapter for OpenAiAdapter {
             "role": "system", "content": req.system,
         }))
         .chain(req.messages.iter().map(|m| match m.role.as_str() {
-            "tool" => json!({"role": "tool", "tool_call_id": m.tool_call_id, "content": m.content}),
+            "tool" => json!({"role": "tool", "tool_call_id": m.tool_call_id, "content": openai_content(m)}),
             "assistant" if m.tool_calls.is_some() => json!({"role": "assistant", "content": null, "tool_calls": m.tool_calls}),
-            _ => json!({"role": m.role, "content": m.content}),
+            _ => json!({"role": m.role, "content": openai_content(m)}),
         }))
         .collect();
 
@@ -60,6 +60,26 @@ impl ApiAdapter for OpenAiAdapter {
             }
         }
         out
+    }
+}
+
+/// Build OpenAI content value — plain string for text-only messages,
+/// array of `[image_url, text]` blocks when images are attached.
+fn openai_content(msg: &LlmMessage) -> serde_json::Value {
+    if let Some(ref images) = msg.images {
+        let mut parts: Vec<serde_json::Value> = Vec::new();
+        for img in images {
+            parts.push(json!({
+                "type": "image_url",
+                "image_url": {"url": format!("data:{};base64,{}", img.media_type, img.base64)}
+            }));
+        }
+        if !msg.content.is_empty() {
+            parts.push(json!({"type": "text", "text": msg.content}));
+        }
+        serde_json::Value::Array(parts)
+    } else {
+        json!(msg.content)
     }
 }
 

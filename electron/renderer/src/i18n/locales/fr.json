@@ -21,7 +21,10 @@
     "selectModel": "Sélectionner un modèle",
     "noModelsConfigured": "Aucun modèle configuré (allez dans Paramètres)",
     "thinking": "Réflexion",
-    "back": "Retour"
+    "back": "Retour",
+    "attachImage": {
+      "attachImage": "Joindre image"
+    }
   },
   "tool": {
     "input": "Entrée",

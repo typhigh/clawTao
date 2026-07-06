@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useChatStore } from '../stores/chat';
+import { useChatStore, ImageAttachment } from '../stores/chat';
 import { useSettingsStore, PROVIDER_TEMPLATES } from '../stores/settings';
 import { SettingsView } from './SettingsView';
 import { Sidebar } from './Sidebar';
@@ -22,6 +22,7 @@ function App() {
   const { config, loaded, load: loadConfig } = useSettingsStore();
   const [view, setView] = useState<View>('chat');
   const [inputValue, setInputValue] = useState('');
+  const [images, setImages] = useState<ImageAttachment[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     loadSessions();
@@ -81,7 +82,9 @@ function App() {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${2 * 24}px`;
     }
-    await useChatStore.getState().sendMessage(text, thinkingEnabled);
+    const imgs = images.length > 0 ? [...images] : undefined;
+    setImages([]);
+    await useChatStore.getState().sendMessage(text, thinkingEnabled, imgs as any);
   };
 
   // Auto-grow textarea
@@ -148,7 +151,7 @@ function App() {
             onCreateSession={createSession}
             streaming={isStreaming}
             onCancel={() => useChatStore.getState().cancelRun()}
-            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming, textareaRef, onKeyDown: handleKeyDown, thinkingEnabled, onToggleThinking: handleToggleThinking }}
+            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming, textareaRef, onKeyDown: handleKeyDown, thinkingEnabled, onToggleThinking: handleToggleThinking, images, onImagesChange: setImages }}
             modelOptions={modelOptions}
             selectedModelKey={selectedModelKey}
             onSelectModel={handleSelectModel}

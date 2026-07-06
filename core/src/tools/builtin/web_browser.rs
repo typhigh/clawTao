@@ -58,6 +58,10 @@ impl ToolExecutor for WebBrowserTool {
         let result: serde_json::Value = resp.json().map_err(|e| ToolError::Execution(format!("Parse error: {e}")))?;
 
         if result.get("ok").and_then(|v| v.as_bool()) == Some(true) {
+            // Screenshot: return base64 PNG with marker so chat.rs can extract it.
+            if let Some(b64) = result.get("screenshot").and_then(|v| v.as_str()) {
+                return Ok(format!("[SCREENSHOT]\n{b64}"));
+            }
             if let Some(text) = result.get("text").and_then(|v| v.as_str()) {
                 Ok(text.to_string())
             } else if let Some(title) = result.get("title").and_then(|v| v.as_str()) {

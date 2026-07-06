@@ -198,7 +198,7 @@ function setupIpc() {
   );
 
   // chat.send — resolve per-session model_key to provider/model/api_key.
-  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string; thinking_enabled?: boolean }) => {
+  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string; thinking_enabled?: boolean; images?: { base64: string; mediaType: string }[] }) => {
     const config: any = readConfig();
     const key = p.model_key || config.llm?.default_model_id || '';
     if (!key) return Promise.reject(new Error('No model selected.'));
@@ -217,7 +217,7 @@ function setupIpc() {
       bash_blocked_commands: config.bash?.blocked_commands || [],
       bash_timeout_secs: config.bash?.timeout_secs ?? null,
     };
-    return sendRpc('chat.send', { ...p, config: flatConfig }, 0);
+    return sendRpc('chat.send', { message: p.message, sessionId: p.sessionId, images: p.images, config: flatConfig }, 0);
   });
 
   // config:get — reads Electron config.json + secrets.json, attaches masked api_key.
@@ -311,6 +311,16 @@ function setupIpc() {
       console.log('[config:probe] fetch error', { url, error: String(e) });
       return { ok: false, error: String(e) };
     }
+  });
+
+  // image:get — read an image file from disk and return base64.
+  ipcMain.handle('image:get', async (_e, p: { path: string }) => {
+    try {
+      const data = fs.readFileSync(p.path);
+      const ext = path.extname(p.path).toLowerCase();
+      const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }[ext] || 'image/png';
+      return { ok: true, base64: data.toString('base64'), mediaType: mime };
+    } catch (e) { return { ok: false, error: String(e) }; }
   });
 
   // Open external URL in the system default browser.

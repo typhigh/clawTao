@@ -11,8 +11,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 const electronAPI = {
   // Chat operations
   chat: {
-    send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean) =>
-      ipcRenderer.invoke('chat:send', { message, sessionId, model_key, thinking_enabled }),
+    send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean, images?: { base64: string; mediaType: string }[]) =>
+      ipcRenderer.invoke('chat:send', { message, sessionId, model_key, thinking_enabled, images }),
     interrupt: (sessionId: string) =>
       ipcRenderer.invoke('chat:interrupt', { sessionId }),
   },
@@ -36,6 +36,11 @@ const electronAPI = {
     get: () => ipcRenderer.invoke('config:get'),
     set: (c: unknown) => ipcRenderer.invoke('config:set', c),
     probe: (p: { base_url: string; model: string; api_key: string; api_protocol: string; provider_id?: string | null }) => ipcRenderer.invoke('config:probe', p),
+  },
+
+  // Image helpers (read from disk)
+  image: {
+    get: (p: { path: string }) => ipcRenderer.invoke('image:get', p) as Promise<{ ok: boolean; base64?: string; mediaType?: string }>,
   },
 
   // Shell helpers (open URL in system default browser)

@@ -72,7 +72,7 @@ fn tools() -> ToolRegistry {
 }
 
 fn ctx(sid: &str, rid: &str) -> TurnContext {
-    TurnContext { session_id: sid.into(), run_id: rid.into(), system_prompt: String::new(), tools: vec![] }
+    TurnContext { session_id: sid.into(), run_id: rid.into(), system_prompt: String::new(), tools: vec![], user_images: None }
 }
 
 /// Start an HTTP server that returns a **sequence** of status lines.

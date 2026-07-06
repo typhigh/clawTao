@@ -13,7 +13,7 @@ declare global {
   interface Window {
     electronAPI: {
       chat: {
-        send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean) => Promise<{
+        send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean, images?: ImageAttachment[]) => Promise<{
           runId: string;
           message: Message;
         }>;
@@ -32,6 +32,9 @@ declare global {
       };
       /** Unified stream listener — all turn events arrive through this single channel. */
       onStreamEvent: (callback: (params: StreamEvent) => void) => void;
+      image: {
+        get: (p: { path: string }) => Promise<{ ok: boolean; base64?: string; mediaType?: string }>;
+      };
       /** Open URL in system default browser (not Electron's built-in one). */
       shell: {
         openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>;
@@ -50,6 +53,10 @@ export interface Message {
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   thinking?: string;
+  /** Images attached to this message (user uploads, ephemeral). */
+  images?: ImageAttachment[];
+  /** Filesystem paths to persisted images. */
+  image_paths?: string[];
 }
 
 export interface ToolCall {
@@ -104,6 +111,13 @@ export type StreamEvent = {
   todos?: { step: string; status: string }[];
 };
 
+// ── Image attachment ──────────────────────────────────────────────────
+
+export interface ImageAttachment {
+  base64: string;
+  mediaType: string; // "image/png" | "image/jpeg" | "image/gif" | "image/webp"
+}
+
 // ── Structured error ──────────────────────────────────────────────────
 
 /**
@@ -133,7 +147,7 @@ interface ChatState {
   createSession: () => Promise<void>;
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
-  sendMessage: (text: string, thinkingEnabled?: boolean) => Promise<void>;
+  sendMessage: (text: string, thinkingEnabled?: boolean, images?: ImageAttachment[]) => Promise<void>;
   cancelRun: () => Promise<void>;
   setSessionModel: (sessionId: string, modelKey: string) => void;
   setSessionThinking: (sessionId: string, enabled: boolean) => void;
@@ -148,6 +162,21 @@ const patchSession = (
   sessionId: string,
   fn: (s: Session) => Session,
 ) => sessions.map((s) => (s.id === sessionId ? fn(s) : s));
+
+/** Load images from filesystem paths into base64 for display. */
+async function loadImagesForSession(session: Session): Promise<Session> {
+  for (const msg of session.messages) {
+    if (msg.image_paths?.length && !msg.images?.length) {
+      const imgs: ImageAttachment[] = [];
+      for (const p of msg.image_paths) {
+        const r = await window.electronAPI.image.get({ path: p });
+        if (r.ok && r.base64) imgs.push({ base64: r.base64, mediaType: r.mediaType || 'image/png' });
+      }
+      if (imgs.length) msg.images = imgs;
+    }
+  }
+  return session;
+}
 
 /** Normalize any caught value into a structured `ChatError`. */
 function toChatError(err: unknown): ChatError {
@@ -178,6 +207,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       for (const s of sessions) {
         if (saved[s.id]) s.model_key = saved[s.id];
         if (typeof savedThinking[s.id] === 'boolean') s.thinking_enabled = savedThinking[s.id];
+        await loadImagesForSession(s);
       }
       set({ sessions });
       if (sessions.length === 0) {
@@ -206,11 +236,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   selectSession: async (sessionId: string) => {
     try {
-      const session = await window.electronAPI.session.get(sessionId);
+      let session = await window.electronAPI.session.get(sessionId);
+      session = await loadImagesForSession(session);
       set((state) => ({
         sessions: state.sessions.map((s) => {
           if (s.id !== sessionId) return s;
-          // Preserve live streaming state — session.get doesn't carry it.
           return { ...session, currentTurn: s.currentTurn, isStreaming: s.isStreaming, currentRunId: s.currentRunId, model_key: s.model_key, thinking_enabled: s.thinking_enabled };
         }),
         activeSessionId: sessionId,
@@ -249,7 +279,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (text: string, thinkingEnabled?: boolean) => {
+  sendMessage: async (text: string, thinkingEnabled?: boolean, images?: ImageAttachment[]) => {
     const { activeSessionId } = get();
     if (!activeSessionId) {
       set({ error: { message: 'No active session', errorCode: 'SESSION_ERROR', retryable: false } });
@@ -261,6 +291,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       role: 'user',
       content: text,
       timestamp: Date.now(),
+      images: images && images.length > 0 ? images : undefined,
     };
     set((state) => ({
       error: null,
@@ -274,7 +305,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       const session = get().sessions.find(s => s.id === activeSessionId);
-      await window.electronAPI.chat.send(text, activeSessionId, session?.model_key, thinkingEnabled);
+      await window.electronAPI.chat.send(text, activeSessionId, session?.model_key, thinkingEnabled, images);
       // handleStreamEvent 'done' already reloaded via session.get; no second reload needed.
     } catch (error) {
       set((state) => ({
@@ -314,8 +345,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
             })),
           };
         case 'done':
-          // Append 'done' event, then async-reload from Rust.
+          // Preserve user-uploaded images from the temp user message.
+          const tempUserImages = (state.sessions
+            .find(s => s.id === sid)?.messages || [])
+            .filter(m => m.id.startsWith('tmp-') && m.role === 'user')
+            .flatMap(m => m.images || []);
+          // Async-reload from Rust, then merge preserved images.
           window.electronAPI.session.get(sid).then((session) => {
+            if (tempUserImages.length > 0) {
+              const msgs = [...session.messages];
+              for (let i = msgs.length - 1; i >= 0; i--) {
+                if (msgs[i].role === 'user') { msgs[i] = { ...msgs[i], images: tempUserImages }; break; }
+              }
+              session.messages = msgs;
+            }
             set((s2) => ({
               sessions: patchSession(s2.sessions, sid, () => ({
                 ...session,

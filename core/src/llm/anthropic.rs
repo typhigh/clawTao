@@ -221,9 +221,24 @@ impl AnthropicAdapter {
         out
     }
 
-    /// User or system message → `[{type: "text", text: "..."}]`
+    /// User or system message. When images are attached, they become
+    /// `{"type": "image", "source": ...}` blocks before the text block.
     fn build_text_message(msg: &LlmMessage) -> Value {
-        json!({"role": msg.role, "content": [{"type": "text", "text": msg.content}]})
+        if let Some(ref images) = msg.images {
+            let mut blocks: Vec<Value> = Vec::new();
+            for img in images {
+                blocks.push(json!({
+                    "type": "image",
+                    "source": {"type": "url", "url": format!("data:{};base64,{}", img.media_type, img.base64)}
+                }));
+            }
+            if !msg.content.is_empty() {
+                blocks.push(json!({"type": "text", "text": msg.content}));
+            }
+            json!({"role": msg.role, "content": blocks})
+        } else {
+            json!({"role": msg.role, "content": [{"type": "text", "text": msg.content}]})
+        }
     }
 
     /// Assistant text reply with optional thinking block.
@@ -270,7 +285,21 @@ impl AnthropicAdapter {
     /// message, not in N separate user messages.
     fn build_tool_results(msgs: &[LlmMessage]) -> Value {
         let blocks: Vec<Value> = msgs.iter().map(|tm| {
-            json!({"type": "tool_result", "tool_use_id": tm.tool_call_id, "content": tm.content})
+            if let Some(ref images) = tm.images {
+                let mut content_blocks: Vec<Value> = Vec::new();
+                for img in images {
+                    content_blocks.push(json!({
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": img.media_type, "data": img.base64}
+                    }));
+                }
+                if !tm.content.is_empty() {
+                    content_blocks.push(json!({"type": "text", "text": tm.content}));
+                }
+                json!({"type": "tool_result", "tool_use_id": tm.tool_call_id, "content": content_blocks})
+            } else {
+                json!({"type": "tool_result", "tool_use_id": tm.tool_call_id, "content": tm.content})
+            }
         }).collect();
         json!({"role": "user", "content": blocks})
     }

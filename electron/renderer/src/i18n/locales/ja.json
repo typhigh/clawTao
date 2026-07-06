@@ -21,7 +21,10 @@
     "selectModel": "モデルを選択",
     "noModelsConfigured": "モデル未設定（設定から追加してください）",
     "thinking": "思考",
-    "back": "戻る"
+    "back": "戻る",
+    "attachImage": {
+      "attachImage": "画像を添付"
+    }
   },
   "tool": {
     "input": "入力",

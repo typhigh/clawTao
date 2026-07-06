@@ -31,10 +31,13 @@ impl SqliteSessionStore {
                 tool_calls TEXT,
                 tool_call_id TEXT,
                 thinking TEXT,
-                timestamp INTEGER NOT NULL
+                timestamp INTEGER NOT NULL,
+                image_paths TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);"
         )?;
+        // Migration: add image_paths to old DBs that don't have it.
+        conn.execute_batch("ALTER TABLE messages ADD COLUMN image_paths TEXT;").ok();
         Ok(Self { conn: Mutex::new(conn) })
     }
 }
@@ -60,15 +63,17 @@ impl SessionStore for SqliteSessionStore {
         }).ok();
         let Some(mut session) = session else { return Ok(None) };
         let mut msg_stmt = conn.prepare(
-            "SELECT id, role, content, tool_calls, tool_call_id, thinking, timestamp
+            "SELECT id, role, content, tool_calls, tool_call_id, thinking, timestamp, image_paths
              FROM messages WHERE session_id = ?1 ORDER BY timestamp"
         )?;
         let msgs = msg_stmt.query_map(rusqlite::params![id], |row| {
             let tool_calls: Option<String> = row.get(3)?;
+            let image_paths: Option<String> = row.get(7)?;
             Ok(Message {
                 id: row.get(0)?, role: row.get(1)?, content: row.get(2)?,
                 tool_calls: tool_calls.and_then(|s| serde_json::from_str(&s).ok()),
                 tool_call_id: row.get(4)?, thinking: row.get(5)?, timestamp: row.get(6)?,
+                image_paths: image_paths.and_then(|s| serde_json::from_str(&s).ok()),
             })
         })?;
         for msg in msgs { session.messages.push(msg?); }
@@ -107,10 +112,11 @@ fn add_message_inner(conn: &Connection, session_id: &str, msg: &Message) -> Resu
         "UPDATE sessions SET title = CASE WHEN title = '' THEN ?2 ELSE title END WHERE id = ?1",
         rusqlite::params![session_id, title_preview],
     )?;
+    let image_paths_json = msg.image_paths.as_ref().and_then(|p| serde_json::to_string(p).ok());
     conn.execute(
-        "INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, thinking, timestamp)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        rusqlite::params![msg.id, session_id, msg.role, msg.content, tool_calls_json, msg.tool_call_id, msg.thinking, msg.timestamp],
+        "INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, thinking, timestamp, image_paths)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        rusqlite::params![msg.id, session_id, msg.role, msg.content, tool_calls_json, msg.tool_call_id, msg.thinking, msg.timestamp, image_paths_json],
     )?;
     conn.execute(
         "UPDATE sessions SET updated_at = MAX(updated_at, ?1) WHERE id = ?2",

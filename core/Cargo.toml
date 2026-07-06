@@ -18,6 +18,7 @@ dirs = "5.0"
 regex = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 scraper = "0.20"
+base64 = "0.22"
 
 [profile.release]
 strip = true

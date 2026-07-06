@@ -26,7 +26,7 @@ export function buildHistoricalTurns(messages: Message[]): TimelineGroup[] {
   for (const msg of messages) {
     if (msg.role === 'user') {
       flushTurn();
-      groups.push({ kind: 'user', id: msg.id, content: msg.content, timestamp: msg.timestamp });
+      groups.push({ kind: 'user', id: msg.id, content: msg.content, timestamp: msg.timestamp, images: msg.images });
     } else if (msg.role === 'assistant') {
       if (msg.tool_calls && msg.tool_calls.length > 0) {
         if (!currentTurn) currentTurn = [];

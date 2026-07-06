@@ -21,6 +21,7 @@ pub(crate) struct TurnContext {
     run_id: String,
     system_prompt: String,
     tools: Vec<UnifiedTool>,
+    user_images: Option<Vec<crate::llm::types::ImageContent>>,
 }
 
 /// Entry point for a single chat turn. Sets up the adapter, tool registry,
@@ -35,6 +36,16 @@ pub(crate) fn run_turn(
         .map_err(|e| anyhow::anyhow!(ChatError::BadRequest { detail: e.to_string() }))?;
     let session_id = get_param(&request.params, "sessionId")
         .map_err(|e| anyhow::anyhow!(ChatError::BadRequest { detail: e.to_string() }))?;
+
+    // Parse user-uploaded images from the request.
+    let user_images = parse_user_images(&request.params);
+
+    // Save user-uploaded images to workspace filesystem.
+    let image_paths: Vec<String> = if let Some(ref imgs) = user_images {
+        save_user_images(session_id, imgs)
+    } else {
+        vec![]
+    };
 
     let config = request.params.as_ref()
         .and_then(|p| p.get("config"))
@@ -60,7 +71,11 @@ pub(crate) fn run_turn(
     let mut tool_registry = ToolRegistry::new();
     tools::builtin::register_all(&mut tool_registry, blocked, bash_timeout);
 
-    store::add_message(store, session_id, "user", message_text)?;
+    if image_paths.is_empty() {
+        store::add_message(store, session_id, "user", message_text)?;
+    } else {
+        store::add_user_message_with_images(store, session_id, message_text, image_paths)?;
+    }
 
     let session = store.get(session_id)?
         .ok_or_else(|| anyhow::anyhow!(ChatError::Session { detail: "Session not found".into() }))?;
@@ -86,6 +101,7 @@ pub(crate) fn run_turn(
         run_id,
         system_prompt: crate::system_prompt::build(&tool_registry),
         tools,
+        user_images,
     };
 
     let (final_content, final_thinking) = run_state_machine(
@@ -319,13 +335,46 @@ fn llm_step(
     ctx: &TurnContext,
     cancel: &AtomicBool,
 ) -> Result<LlmResponse> {
-    let llm_msgs: Vec<LlmMessage> = messages.iter().map(|m| LlmMessage {
-        role: m.role.clone(),
-        content: m.content.clone(),
-        tool_calls: m.tool_calls.clone(),
-        tool_call_id: m.tool_call_id.clone(),
-        thinking: m.thinking.clone(),
+    let mut llm_msgs: Vec<LlmMessage> = messages.iter().map(|m| {
+        let (content, images) = if m.content.starts_with("[SCREENSHOT]\n") {
+            let b64 = m.content.strip_prefix("[SCREENSHOT]\n").unwrap_or("");
+            (
+                "Screenshot captured.".to_string(),
+                Some(vec![crate::llm::types::ImageContent {
+                    base64: b64.to_string(),
+                    media_type: "image/png".to_string(),
+                }]),
+            )
+        } else {
+            (m.content.clone(), None)
+        };
+        // Load historical images from filesystem paths.
+        let mut imgs = images;
+        if imgs.is_none() {
+            if let Some(ref paths) = m.image_paths {
+                let loaded = load_images_from_paths(paths);
+                if !loaded.is_empty() { imgs = Some(loaded); }
+            }
+        }
+        LlmMessage {
+            role: m.role.clone(),
+            content,
+            images: imgs,
+            tool_calls: m.tool_calls.clone(),
+            tool_call_id: m.tool_call_id.clone(),
+            thinking: m.thinking.clone(),
+        }
     }).collect();
+
+    // Attach user-uploaded images to the last user message of this turn.
+    if let Some(ref imgs) = ctx.user_images {
+        if let Some(last_user) = llm_msgs.iter_mut().rev().find(|m| m.role == "user") {
+            match last_user.images {
+                Some(ref mut existing) => existing.extend(imgs.iter().cloned()),
+                None => last_user.images = Some(imgs.clone()),
+            }
+        }
+    }
 
     let http = adapter.build(&LlmRequest {
         system: ctx.system_prompt.clone(),
@@ -436,6 +485,70 @@ pub(crate) fn http_error_from_status(status: u16, body: &str) -> ChatError {
         500 | 502 | 503 | 504 => ChatError::ServerOverloaded,
         _ => ChatError::BadRequest { detail: format!("HTTP {status}: {detail}") },
     }
+}
+
+/// Save user-uploaded images to `<cwd>/.clawtao/images/` and return the file paths.
+fn save_user_images(session_id: &str, images: &[crate::llm::types::ImageContent]) -> Vec<String> {
+    use base64::Engine;
+    let dir = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join(".clawtao").join("images");
+    let _ = std::fs::create_dir_all(&dir);
+    let mut paths = Vec::new();
+    for img in images {
+        let ext = match img.media_type.as_str() {
+            "image/jpeg" => "jpg",
+            "image/gif" => "gif",
+            "image/webp" => "webp",
+            _ => "png",
+        };
+        let fname = format!("{}_{}.{ext}", session_id, uuid::Uuid::new_v4());
+        let path = dir.join(&fname);
+        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&img.base64) {
+            if std::fs::write(&path, &bytes).is_ok() {
+                paths.push(path.to_string_lossy().to_string());
+            }
+        }
+    }
+    paths
+}
+
+/// Load images from filesystem paths and encode as base64 for the LLM request.
+fn load_images_from_paths(paths: &[String]) -> Vec<crate::llm::types::ImageContent> {
+    use base64::Engine;
+    let mut out = Vec::new();
+    for p in paths {
+        if let Ok(bytes) = std::fs::read(p) {
+            let media_type = match std::path::Path::new(p).extension().and_then(|e| e.to_str()) {
+                Some("jpg") | Some("jpeg") => "image/jpeg",
+                Some("gif") => "image/gif",
+                Some("webp") => "image/webp",
+                _ => "image/png",
+            };
+            out.push(crate::llm::types::ImageContent {
+                base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
+                media_type: media_type.to_string(),
+            });
+        }
+    }
+    out
+}
+
+/// Parse user-uploaded images from the JSON-RPC params.
+fn parse_user_images(params: &Option<Value>) -> Option<Vec<crate::llm::types::ImageContent>> {
+    let arr = params.as_ref()?.get("images")?.as_array()?;
+    let mut out = Vec::new();
+    for img in arr {
+        let base64 = img.get("base64")?.as_str()?;
+        let media_type = img.get("media_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("image/png");
+        out.push(crate::llm::types::ImageContent {
+            base64: base64.to_string(),
+            media_type: media_type.to_string(),
+        });
+    }
+    if out.is_empty() { None } else { Some(out) }
 }
 
 /// Try to extract a human-readable error message from a JSON response body.

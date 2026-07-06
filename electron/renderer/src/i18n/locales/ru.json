@@ -21,7 +21,10 @@
     "selectModel": "Выберите модель",
     "noModelsConfigured": "Модели не настроены (перейдите в Настройки)",
     "thinking": "Мышление",
-    "back": "Назад"
+    "back": "Назад",
+    "attachImage": {
+      "attachImage": "Прикрепить"
+    }
   },
   "tool": {
     "input": "Ввод",

@@ -22,7 +22,7 @@ fn basic_request() -> LlmRequest {
             content: "hello".into(),
             tool_calls: None,
             tool_call_id: None,
-            thinking: None,
+            images: None, thinking: None,
         }],
         tools: vec![],
         thinking_enabled: false,
@@ -79,7 +79,7 @@ fn build_maps_tool_role() {
             content: "file contents here".into(),
             tool_calls: None,
             tool_call_id: Some("call_abc".into()),
-            thinking: None,
+            images: None, thinking: None,
         }],
         ..basic_request()
     };
@@ -109,7 +109,7 @@ fn build_maps_assistant_with_tool_calls() {
                 },
             }]),
             tool_call_id: None,
-            thinking: None,
+            images: None, thinking: None,
         }],
         ..basic_request()
     };

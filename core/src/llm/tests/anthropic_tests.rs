@@ -22,7 +22,7 @@ fn basic_request() -> LlmRequest {
             content: "hello".into(),
             tool_calls: None,
             tool_call_id: None,
-            thinking: None,
+            images: None, thinking: None,
         }],
         tools: vec![],
         thinking_enabled: false,
@@ -106,7 +106,7 @@ fn build_assistant_tool_calls_to_tool_use_blocks() {
                 content: "read /tmp/x".into(),
                 tool_calls: None,
                 tool_call_id: None,
-                thinking: None,
+                images: None, thinking: None,
             },
             LlmMessage {
                 role: "assistant".into(),
@@ -120,7 +120,7 @@ fn build_assistant_tool_calls_to_tool_use_blocks() {
                     },
                 }]),
                 tool_call_id: None,
-                thinking: None,
+                images: None, thinking: None,
             },
         ],
         ..basic_request()
@@ -150,7 +150,7 @@ fn build_tool_result_to_tool_result_block() {
             content: "file contents".into(),
             tool_calls: None,
             tool_call_id: Some("toolu_02".into()),
-            thinking: None,
+            images: None, thinking: None,
         }],
         ..basic_request()
     };
@@ -178,7 +178,7 @@ fn build_parallel_tool_results_merged_into_single_user_message() {
                 content: "read two files".into(),
                 tool_calls: None,
                 tool_call_id: None,
-                thinking: None,
+                images: None, thinking: None,
             },
             // Assistant message with 2 parallel tool_use blocks
             LlmMessage {
@@ -197,7 +197,7 @@ fn build_parallel_tool_results_merged_into_single_user_message() {
                     },
                 ]),
                 tool_call_id: None,
-                thinking: None,
+                images: None, thinking: None,
             },
             // Tool result 1 (separate message in DB)
             LlmMessage {
@@ -205,7 +205,7 @@ fn build_parallel_tool_results_merged_into_single_user_message() {
                 content: "content A".into(),
                 tool_calls: None,
                 tool_call_id: Some("call_00".into()),
-                thinking: None,
+                images: None, thinking: None,
             },
             // Tool result 2 (separate message in DB)
             LlmMessage {
@@ -213,7 +213,7 @@ fn build_parallel_tool_results_merged_into_single_user_message() {
                 content: "content B".into(),
                 tool_calls: None,
                 tool_call_id: Some("call_01".into()),
-                thinking: None,
+                images: None, thinking: None,
             },
         ],
         ..basic_request()
@@ -261,7 +261,7 @@ fn build_multiple_parallel_tool_calls() {
                 },
             ]),
             tool_call_id: None,
-            thinking: None,
+            images: None, thinking: None,
         }],
         ..basic_request()
     };
@@ -312,7 +312,7 @@ fn build_plain_user_message_block_format() {
             content: "plain text".into(),
             tool_calls: None,
             tool_call_id: None,
-            thinking: None,
+            images: None, thinking: None,
         }],
         ..basic_request()
     };

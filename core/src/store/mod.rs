@@ -38,6 +38,9 @@ pub struct Message {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
     pub timestamp: i64,
+    /// Filesystem paths to attached images (user uploads). Not base64.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_paths: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +64,7 @@ pub fn new_msg(role: &str, content: &str) -> Message {
         tool_call_id: None,
         thinking: None,
         timestamp: chrono::Utc::now().timestamp_millis(),
+        image_paths: None,
     }
 }
 
@@ -78,6 +82,16 @@ pub fn new_session() -> Session {
 /// Add a plain user/assistant message to a session.
 pub fn add_message(store: &dyn SessionStore, session_id: &str, role: &str, content: &str) -> Result<Message> {
     let msg = new_msg(role, content);
+    store.add_message(session_id, &msg)?;
+    Ok(msg)
+}
+
+/// Add a user message with attached image paths.
+pub fn add_user_message_with_images(
+    store: &dyn SessionStore, session_id: &str, content: &str, image_paths: Vec<String>,
+) -> Result<Message> {
+    let mut msg = new_msg("user", content);
+    msg.image_paths = Some(image_paths);
     store.add_message(session_id, &msg)?;
     Ok(msg)
 }

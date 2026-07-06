@@ -8,7 +8,7 @@ fn make_store() -> JsonSessionStore {
 }
 
 fn msg(id: &str, role: &str, content: &str) -> Message {
-    Message { id: id.into(), role: role.into(), content: content.into(), tool_calls: None, tool_call_id: None, thinking: None, timestamp: 1000 }
+    Message { id: id.into(), role: role.into(), content: content.into(), tool_calls: None, tool_call_id: None, thinking: None, timestamp: 1000, image_paths: None }
 }
 
 #[test]
