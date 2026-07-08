@@ -1,16 +1,16 @@
 use super::executor::ToolExecutor;
 use super::spec::ToolSpec;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Central registry for all available tools.
 pub struct ToolRegistry {
-    tools: HashMap<String, Arc<dyn ToolExecutor>>,
+    tools: BTreeMap<String, Arc<dyn ToolExecutor>>,
 }
 
 impl ToolRegistry {
     pub fn new() -> Self {
-        Self { tools: HashMap::new() }
+        Self { tools: BTreeMap::new() }
     }
 
     pub fn register(&mut self, tool: Arc<dyn ToolExecutor>) {
@@ -21,7 +21,7 @@ impl ToolRegistry {
         self.tools.get(name)
     }
 
-    /// All tool specs for sending to LLM.
+    /// All tool specs for sending to LLM (stable order by name).
     pub fn list_specs(&self) -> Vec<ToolSpec> {
         self.tools.values().map(|t| t.spec()).collect()
     }
