@@ -102,7 +102,7 @@
     "defaultWorkspace": "Default Workspace",
     "defaultWorkspaceDescription": "Directory for new sessions. Can be overridden per session.",
     "workspaces": "Workspaces",
-    "workspacesDescription": "Directories for sandboxed Bash execution. Selecting a workspace enables sandboxing.",
+    "workspacesDescription": "Tool execution environment. Selecting a workspace restricts file writes to that directory.",
     "addWorkspace": "Add workspace",
     "removeWorkspace": "Remove workspace"
   },

@@ -102,7 +102,7 @@
     "defaultWorkspace": "Рабочая папка",
     "defaultWorkspaceDescription": "Каталог для новых сессий. Можно изменить для каждой сессии.",
     "workspaces": "Рабочие папки",
-    "workspacesDescription": "Каталоги для sandbox Bash. Выбор включает sandbox.",
+    "workspacesDescription": "Среда выполнения инструментов. Выбор ограничивает запись файлов этим каталогом.",
     "addWorkspace": "Добавить",
     "removeWorkspace": "Удалить"
   },

@@ -102,7 +102,7 @@
     "defaultWorkspace": "デフォルトワークスペース",
     "defaultWorkspaceDescription": "新規セッションのディレクトリ。セッションごとに変更可能。",
     "workspaces": "ワークスペース",
-    "workspacesDescription": "サンドボックス Bash 実行のディレクトリ。選択でサンドボックス有効。",
+    "workspacesDescription": "ツール実行環境。選択でファイル書き込みがそのディレクトリに制限されます。",
     "addWorkspace": "ワークスペース追加",
     "removeWorkspace": "ワークスペース削除"
   },

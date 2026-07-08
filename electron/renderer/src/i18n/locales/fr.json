@@ -102,7 +102,7 @@
     "defaultWorkspace": "Espace par défaut",
     "defaultWorkspaceDescription": "Répertoire pour les nouvelles sessions. Modifiable par session.",
     "workspaces": "Espaces de travail",
-    "workspacesDescription": "Répertoires pour l'exécution Bash en sandbox. La sélection active le sandbox.",
+    "workspacesDescription": "Environnement d'exécution. La sélection restreint les écritures fichier à ce répertoire.",
     "addWorkspace": "Ajouter espace",
     "removeWorkspace": "Supprimer espace"
   },

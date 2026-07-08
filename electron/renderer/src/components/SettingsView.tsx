@@ -114,36 +114,38 @@ export function SettingsView({ onBack }: { onBack?: () => void }) {
           </div>
         )}
 
-        <div className="settings-section-label" style={{ marginTop: 24 }}>{t('settings.workspaces')}</div>
-        <div className="settings-description">{t('settings.workspacesDescription')}</div>
-        {config.workspaces.length > 0 && (
-          <ul className="settings-workspace-list">
-            {config.workspaces.map((ws, i) => (
-              <li key={ws.path} className="settings-workspace-row">
-                <span className="settings-workspace-label">{ws.label}</span>
-                <span className="settings-workspace-path">{ws.path}</span>
-                <button className="settings-workspace-remove" onClick={async () => {
-                  const next = { ...config, workspaces: config.workspaces.filter((_, j) => j !== i) };
-                  replace(next);
-                  await save(next);
-                }} title={t('settings.removeWorkspace')}>✕</button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="settings-add-provider">
-          <button className="btn" onClick={async () => {
-            const dirPath = await window.electronAPI.dialog.openDirectory();
-            if (!dirPath) return;
-            const label = dirPath.split('/').pop() || dirPath;
-            const next = { ...config, workspaces: [...config.workspaces, { path: dirPath, label }] };
-            replace(next);
-            await save(next);
-          }}>{t('settings.addWorkspace')}</button>
-        </div>
-
         <div className="settings-inline-group">
           <DefaultModelSelector config={config} onChange={(next) => replace(next)} />
+
+          <div className="settings-inline-row">
+            <label className="settings-inline-label">{t('settings.workspaces')}</label>
+          </div>
+          <div className="settings-description">{t('settings.workspacesDescription')}</div>
+          {config.workspaces.length > 0 && (
+            <ul className="settings-workspace-list">
+              {config.workspaces.map((ws, i) => (
+                <li key={ws.path} className="settings-workspace-row">
+                  <span className="settings-workspace-label">{ws.label}</span>
+                  <span className="settings-workspace-path">{ws.path}</span>
+                  <button className="settings-workspace-remove" onClick={async () => {
+                    const next = { ...config, workspaces: config.workspaces.filter((_, j) => j !== i) };
+                    replace(next);
+                    await save(next);
+                  }} title={t('settings.removeWorkspace')}>✕</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="settings-add-provider">
+            <button className="btn" onClick={async () => {
+              const dirPath = await window.electronAPI.dialog.openDirectory();
+              if (!dirPath) return;
+              const label = dirPath.split('/').pop() || dirPath;
+              const next = { ...config, workspaces: [...config.workspaces, { path: dirPath, label }] };
+              replace(next);
+              await save(next);
+            }}>{t('settings.addWorkspace')}</button>
+          </div>
 
           <div>
             <div className="settings-inline-row">

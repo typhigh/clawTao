@@ -106,7 +106,7 @@
     "defaultWorkspace": "默认工作区",
     "defaultWorkspaceDescription": "新建会话的默认目录，每个会话可单独修改。",
     "workspaces": "工作区",
-    "workspacesDescription": "沙箱 Bash 执行的目录。选择工作区即启用沙箱。",
+    "workspacesDescription": "工具执行环境——选择工作区后，文件写操作限制在该目录内。",
     "addWorkspace": "添加工作区",
     "removeWorkspace": "移除工作区"
   },
