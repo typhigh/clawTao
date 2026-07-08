@@ -22,6 +22,7 @@ pub(crate) struct TurnContext {
     system_prompt: String,
     tools: Vec<UnifiedTool>,
     user_images: Option<Vec<crate::llm::types::ImageContent>>,
+    sandbox_rules: crate::tools::builtin::SandboxRules,
 }
 
 /// Entry point for a single chat turn. Sets up the adapter, tool registry,
@@ -91,7 +92,11 @@ pub(crate) fn run_turn(
     warn!("Turn sandbox: workspace_dir={}, mode={:?}",
           workspace_dir, sandbox_mode);
     let sandbox_cfg = tools::builtin::SandboxConfig::new(&workspace_dir, sandbox_mode);
-    let sandbox_active = sandbox_cfg.is_active();
+    let sandbox_rules = if sandbox_cfg.is_active() {
+        tools::builtin::SandboxRules::new(&sandbox_cfg.workspace_dir)
+    } else {
+        tools::builtin::SandboxRules::off()
+    };
     let mut tool_registry = ToolRegistry::new();
     tools::builtin::register_all(&mut tool_registry, sandbox_cfg, bash_timeout);
 
@@ -115,9 +120,10 @@ pub(crate) fn run_turn(
     let ctx = TurnContext {
         session_id: session_id.to_string(),
         run_id,
-        system_prompt: crate::system_prompt::build(&tool_registry, sandbox_active.then_some(workspace_dir.as_str())),
+        system_prompt: crate::system_prompt::build(&tool_registry, sandbox_rules.active.then_some(workspace_dir.as_str())),
         tools,
         user_images,
+        sandbox_rules,
     };
 
     let (final_content, final_thinking) = run_state_machine(
@@ -283,20 +289,22 @@ fn run_state_machine(
 
                     let tool_result = if cancel.load(Ordering::SeqCst) {
                         "[interrupted by user]".to_string()
-                    } else {
-                        match tool_registry.get(&tc.function.name) {
-                            Some(executor) => match executor.execute(args_val.clone(), cancel) {
+                    } else if let Some(executor) = tool_registry.get(&tc.function.name) {
+                        // ── Sandbox check ──────────────────────────
+                        if let Err(msg) = executor.check_sandbox(&args_val, &ctx.sandbox_rules) {
+                            format!("Sandbox denied: {msg}")
+                        } else {
+                            match executor.execute(args_val.clone(), cancel) {
                                 Ok(output) => output,
                                 Err(e) => {
                                     warn!("Tool {} failed: {e}", tc.function.name);
                                     format!("Tool error: {e}")
                                 }
-                            },
-                            None => {
-                                warn!("Unknown tool requested: {}", tc.function.name);
-                                format!("Unknown tool: {}", tc.function.name)
                             }
                         }
+                    } else {
+                        warn!("Unknown tool requested: {}", tc.function.name);
+                        format!("Unknown tool: {}", tc.function.name)
                     };
 
                     debug!("Tool result for {}: {:.200}", tc.function.name, tool_result);

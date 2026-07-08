@@ -51,7 +51,6 @@ impl ToolExecutor for BashTool {
 
         // ── Build the command: optionally wrap with sandbox-exec ──────────
         let mut cmd = if self.sandbox.is_active() {
-            let profile = SandboxProfile::generate(&self.sandbox);
             warn!("Sandbox: workspace={}, mode={:?}",
                   self.sandbox.workspace_dir, self.sandbox.mode);
             match SandboxProfile::wrap_command(&self.sandbox, command) {

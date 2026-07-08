@@ -1,4 +1,5 @@
 use super::spec::ToolSpec;
+use crate::tools::builtin::sandbox::SandboxRules;
 use std::fmt;
 use std::sync::atomic::AtomicBool;
 
@@ -28,10 +29,13 @@ pub trait ToolExecutor: Send + Sync {
     fn spec(&self) -> ToolSpec;
 
     /// Execute this tool with the arguments parsed from the LLM's tool_call.
-    /// `input` is the JSON value of `tool_calls[].function.arguments`.
-    /// `cancel` is set to true when the user interrupts the turn — tools
-    /// should check it periodically and return "[interrupted by user]" promptly.
     fn execute(&self, input: serde_json::Value, cancel: &AtomicBool) -> Result<String, ToolError>;
+
+    /// Check whether this tool invocation violates sandbox rules.
+    /// Default: no restriction. Override in tools that write files.
+    fn check_sandbox(&self, _input: &serde_json::Value, _rules: &SandboxRules) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

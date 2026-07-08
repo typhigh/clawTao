@@ -15,7 +15,7 @@ pub use bash::BashTool;
 pub use edit::EditTool;
 pub use grep::GrepTool;
 pub use read::ReadTool;
-pub use sandbox::{SandboxConfig, SandboxMode};
+pub use sandbox::{SandboxConfig, SandboxMode, SandboxRules};
 pub use todo::TodoWriteTool;
 pub use web_browser::WebBrowserTool;
 pub use web_fetch::WebFetchTool;

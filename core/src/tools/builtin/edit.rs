@@ -1,3 +1,4 @@
+use crate::tools::builtin::sandbox::SandboxRules;
 use crate::tools::executor::{ToolError, ToolExecutor};
 use crate::tools::spec::ToolSpec;
 use serde_json::json;
@@ -36,6 +37,11 @@ impl ToolExecutor for EditTool {
                 "required": ["path", "old_string", "new_string"]
             }),
         )
+    }
+
+    fn check_sandbox(&self, input: &serde_json::Value, rules: &SandboxRules) -> Result<(), String> {
+        let path = input.get("path").and_then(|v| v.as_str()).unwrap_or("");
+        rules.path_is_allowed(path)
     }
 
     fn execute(&self, input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {

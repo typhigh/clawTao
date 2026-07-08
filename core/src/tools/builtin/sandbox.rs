@@ -192,6 +192,48 @@ impl SandboxConfig {
     }
 }
 
+/// Sandbox rules shared across all tools in a single turn.
+#[derive(Debug, Clone)]
+pub struct SandboxRules {
+    pub active: bool,
+    pub workspace_dir: String,
+}
+
+impl SandboxRules {
+    pub fn off() -> Self {
+        Self { active: false, workspace_dir: String::new() }
+    }
+
+    pub fn new(workspace_dir: &str) -> Self {
+        Self { active: !workspace_dir.is_empty(), workspace_dir: workspace_dir.to_string() }
+    }
+
+    pub fn path_is_allowed(&self, raw_path: &str) -> Result<(), String> {
+        if !self.active || self.workspace_dir.is_empty() {
+            return Ok(());
+        }
+        // Reject relative paths with `..` that escape the workspace.
+        if !std::path::Path::new(raw_path).is_absolute()
+            && raw_path.split('/').any(|s| s == "..")
+        {
+            return Err(format!("path {raw_path} escapes workspace {}", self.workspace_dir));
+        }
+        let resolved = if std::path::Path::new(raw_path).is_absolute() {
+            raw_path.to_string()
+        } else {
+            std::path::Path::new(&self.workspace_dir)
+                .join(raw_path)
+                .to_string_lossy()
+                .to_string()
+        };
+        if resolved.starts_with(&self.workspace_dir) {
+            Ok(())
+        } else {
+            Err(format!("path {raw_path} (→ {resolved}) is outside workspace {}", self.workspace_dir))
+        }
+    }
+}
+
 /// Generated SBPL profile.
 pub struct SandboxProfile {
     sbpl: String,
@@ -380,3 +422,7 @@ mod tests {
         let _ = std::fs::remove_file(&bad_file);
     }
 }
+
+#[cfg(test)]
+#[path = "tests/sandbox_tests.rs"]
+mod sandbox_tests;
