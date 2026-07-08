@@ -37,6 +37,9 @@ interface Props {
   modelOptions: ModelOption[];
   selectedModelKey: string;
   onSelectModel: (key: string) => void;
+  workspaceOptions?: import('../stores/settings').WorkspaceEntry[];
+  selectedWorkspace?: string;
+  onSelectWorkspace?: (wsPath: string) => void;
 }
 
 /** Actions the user can take for non-retryable errors. */
@@ -53,7 +56,7 @@ function errorAction(errorCode: string): string | null {
   }
 }
 
-export function ChatView({ timeline, error, onClearError, hasActiveSession, onCreateSession, input, streaming, onCancel, modelOptions, selectedModelKey, onSelectModel }: Props) {
+export function ChatView({ timeline, error, onClearError, hasActiveSession, onCreateSession, input, streaming, onCancel, modelOptions, selectedModelKey, onSelectModel, workspaceOptions, selectedWorkspace, onSelectWorkspace }: Props) {
   const { t } = useTranslation();
 
   return (
@@ -85,6 +88,9 @@ export function ChatView({ timeline, error, onClearError, hasActiveSession, onCr
             modelOptions={modelOptions}
             selectedModelKey={selectedModelKey}
             onSelectModel={onSelectModel}
+            workspaceOptions={workspaceOptions}
+            selectedWorkspace={selectedWorkspace}
+            onSelectWorkspace={onSelectWorkspace}
           />
         </>
       ) : (

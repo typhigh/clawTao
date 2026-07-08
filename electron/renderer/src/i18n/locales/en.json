@@ -24,7 +24,9 @@
     "back": "Back",
     "attachImage": {
       "attachImage": "Attach image"
-    }
+    },
+    "selectWorkspace": "Select workspace",
+    "noWorkspace": "No sandbox"
   },
   "tool": {
     "input": "Input",
@@ -89,7 +91,20 @@
     },
     "defaultModel": "Default Model",
     "providersDescription": "Configure API providers and their available models.",
-    "defaultModelDescription": "Model used for new sessions when none is selected."
+    "defaultModelDescription": "Model used for new sessions when none is selected.",
+    "sandboxMode": {
+      "label": "Sandbox Mode",
+      "description": "Restricts Bash tool access. Workspace-only limits writes to the session directory.",
+      "off": "Off",
+      "workspaceOnly": "Workspace Only",
+      "strict": "Strict"
+    },
+    "defaultWorkspace": "Default Workspace",
+    "defaultWorkspaceDescription": "Directory for new sessions. Can be overridden per session.",
+    "workspaces": "Workspaces",
+    "workspacesDescription": "Directories for sandboxed Bash execution. Selecting a workspace enables sandboxing.",
+    "addWorkspace": "Add workspace",
+    "removeWorkspace": "Remove workspace"
   },
   "common": {
     "auto": "(auto)",

@@ -63,14 +63,16 @@ pub(crate) fn run_turn(
         .filter(|s| !s.is_empty())
         .ok_or_else(|| anyhow::anyhow!(ChatError::Config { detail: "Missing config field: api_protocol".into() }))?;
     let thinking_enabled = config["thinking_enabled"].as_bool().unwrap_or(false);
-
-    let blocked: Vec<String> = config["bash_blocked_commands"]
-        .as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-        .unwrap_or_default();
     let bash_timeout = config["bash_timeout_secs"].as_u64();
-    let mut tool_registry = ToolRegistry::new();
-    tools::builtin::register_all(&mut tool_registry, blocked, bash_timeout);
 
+    // Read sandbox mode from config.
+    let sandbox_mode = match config.get("sandbox_mode").and_then(|v| v.as_str()).unwrap_or("workspace_only") {
+        "off" => tools::builtin::SandboxMode::Off,
+        "strict" => tools::builtin::SandboxMode::Strict,
+        _ => tools::builtin::SandboxMode::WorkspaceOnly,
+    };
+
+    // Store the user message first so subsequent store.get() includes it.
     if image_paths.is_empty() {
         store::add_message(store, session_id, "user", message_text)?;
     } else {
@@ -79,6 +81,20 @@ pub(crate) fn run_turn(
 
     let session = store.get(session_id)?
         .ok_or_else(|| anyhow::anyhow!(ChatError::Session { detail: "Session not found".into() }))?;
+
+    let workspace_dir = config.get("workspace_dir")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| workspace_dir_for_session(session_id));
+
+    warn!("Turn sandbox: workspace_dir={}, mode={:?}",
+          workspace_dir, sandbox_mode);
+    let sandbox_cfg = tools::builtin::SandboxConfig::new(&workspace_dir, sandbox_mode);
+    let sandbox_active = sandbox_cfg.is_active();
+    let mut tool_registry = ToolRegistry::new();
+    tools::builtin::register_all(&mut tool_registry, sandbox_cfg, bash_timeout);
+
     let run_id = uuid::Uuid::new_v4().to_string();
 
     write_notification(&Notification::new("chat.stream", Some(json!({
@@ -99,7 +115,7 @@ pub(crate) fn run_turn(
     let ctx = TurnContext {
         session_id: session_id.to_string(),
         run_id,
-        system_prompt: crate::system_prompt::build(&tool_registry),
+        system_prompt: crate::system_prompt::build(&tool_registry, sandbox_active.then_some(workspace_dir.as_str())),
         tools,
         user_images,
     };
@@ -569,6 +585,25 @@ fn extract_error_message(body: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Derive the default workspace directory for a session.
+///
+/// Uses `CLAWTAO_WORKSPACE_ROOT` env var if set, otherwise falls back to
+/// `{data_local_dir}/clawtao/workspaces/{session_id}`.
+fn workspace_dir_for_session(session_id: &str) -> String {
+    let root = std::env::var("CLAWTAO_WORKSPACE_ROOT").unwrap_or_else(|_| {
+        dirs::data_local_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("clawtao")
+            .join("workspaces")
+            .to_string_lossy()
+            .to_string()
+    });
+    std::path::Path::new(&root)
+        .join(session_id)
+        .to_string_lossy()
+        .to_string()
 }
 
 #[cfg(test)]

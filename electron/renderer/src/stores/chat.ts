@@ -82,8 +82,9 @@ export interface Session {
   model_key?: string;
   /** Per-session thinking toggle state. */
   thinking_enabled?: boolean;
+  /** Per-session workspace directory for sandboxed Bash execution. */
+  workspace_dir?: string;
 }
-
 // ── Unified stream event ──────────────────────────────────────────────
 
 /**
@@ -150,6 +151,7 @@ interface ChatState {
   sendMessage: (text: string, thinkingEnabled?: boolean, images?: ImageAttachment[]) => Promise<void>;
   cancelRun: () => Promise<void>;
   setSessionModel: (sessionId: string, modelKey: string) => void;
+  setSessionWorkspace: (sessionId: string, workspaceDir: string) => void;
   setSessionThinking: (sessionId: string, enabled: boolean) => void;
   /** Single handler for all stream events — dispatches on `kind`. */
   handleStreamEvent: (ev: StreamEvent) => void;
@@ -202,11 +204,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Restore session model preferences from localStorage.
       let saved: Record<string, string> = {};
       let savedThinking: Record<string, boolean> = {};
+      let savedWorkspace: Record<string, string> = {};
       try { saved = JSON.parse(localStorage.getItem('clawtao-session-models') || '{}'); } catch {}
       try { savedThinking = JSON.parse(localStorage.getItem('clawtao-session-thinking') || '{}'); } catch {}
+      try { savedWorkspace = JSON.parse(localStorage.getItem('clawtao-session-workspaces') || '{}'); } catch {}
       for (const s of sessions) {
         if (saved[s.id]) s.model_key = saved[s.id];
         if (typeof savedThinking[s.id] === 'boolean') s.thinking_enabled = savedThinking[s.id];
+        if (savedWorkspace[s.id]) s.workspace_dir = savedWorkspace[s.id];
         await loadImagesForSession(s);
       }
       set({ sessions });
@@ -241,7 +246,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((state) => ({
         sessions: state.sessions.map((s) => {
           if (s.id !== sessionId) return s;
-          return { ...session, currentTurn: s.currentTurn, isStreaming: s.isStreaming, currentRunId: s.currentRunId, model_key: s.model_key, thinking_enabled: s.thinking_enabled };
+          return { ...session, currentTurn: s.currentTurn, isStreaming: s.isStreaming, currentRunId: s.currentRunId, model_key: s.model_key, thinking_enabled: s.thinking_enabled, workspace_dir: s.workspace_dir };
         }),
         activeSessionId: sessionId,
       }));
@@ -273,6 +278,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const savedT = JSON.parse(localStorage.getItem('clawtao-session-thinking') || '{}');
         delete savedT[sessionId];
         localStorage.setItem('clawtao-session-thinking', JSON.stringify(savedT));
+        const savedW = JSON.parse(localStorage.getItem('clawtao-session-workspaces') || '{}');
+        delete savedW[sessionId];
+        localStorage.setItem('clawtao-session-workspaces', JSON.stringify(savedW));
       } catch {}
     } catch (error) {
       set({ error: toChatError(error) });
@@ -305,7 +313,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       const session = get().sessions.find(s => s.id === activeSessionId);
-      await window.electronAPI.chat.send(text, activeSessionId, session?.model_key, thinkingEnabled, images);
+      await window.electronAPI.chat.send(text, activeSessionId, session?.model_key, thinkingEnabled, images, session?.workspace_dir);
       // handleStreamEvent 'done' already reloaded via session.get; no second reload needed.
     } catch (error) {
       set((state) => ({
@@ -365,6 +373,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 isStreaming: false,
                 currentTurn: [],
                 model_key: s2.sessions.find(x => x.id === sid)?.model_key,
+                workspace_dir: s2.sessions.find(x => x.id === sid)?.workspace_dir,
               })),
             }));
           }).catch(() => {
@@ -398,11 +407,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       sessions: state.sessions.map((s) => s.id === sessionId ? { ...s, model_key: modelKey } : s),
     }));
-    // Persist across restarts.
     try {
       const saved = JSON.parse(localStorage.getItem('clawtao-session-models') || '{}');
       saved[sessionId] = modelKey;
       localStorage.setItem('clawtao-session-models', JSON.stringify(saved));
+    } catch {}
+  },
+
+  setSessionWorkspace: (sessionId, workspaceDir) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) => s.id === sessionId ? { ...s, workspace_dir: workspaceDir || undefined } : s),
+    }));
+    try {
+      const saved = JSON.parse(localStorage.getItem('clawtao-session-workspaces') || '{}');
+      if (workspaceDir) saved[sessionId] = workspaceDir; else delete saved[sessionId];
+      localStorage.setItem('clawtao-session-workspaces', JSON.stringify(saved));
     } catch {}
   },
 

@@ -16,7 +16,9 @@
     "back": "返回",
     "attachImage": {
       "attachImage": "添加图片"
-    }
+    },
+    "selectWorkspace": "选择工作区",
+    "noWorkspace": "无沙箱"
   },
   "tool": {
     "input": "输入",
@@ -93,7 +95,20 @@
     },
     "defaultModel": "默认模型",
     "providersDescription": "配置 API 供应商及其可用模型。",
-    "defaultModelDescription": "新建会话时使用的默认模型。"
+    "defaultModelDescription": "新建会话时使用的默认模型。",
+    "sandboxMode": {
+      "label": "沙箱模式",
+      "description": "限制 Bash 工具访问。Workspace Only 仅允许写入会话目录。",
+      "off": "关闭",
+      "workspaceOnly": "仅工作区",
+      "strict": "严格"
+    },
+    "defaultWorkspace": "默认工作区",
+    "defaultWorkspaceDescription": "新建会话的默认目录，每个会话可单独修改。",
+    "workspaces": "工作区",
+    "workspacesDescription": "沙箱 Bash 执行的目录。选择工作区即启用沙箱。",
+    "addWorkspace": "添加工作区",
+    "removeWorkspace": "移除工作区"
   },
   "common": {
     "auto": "（自动）",

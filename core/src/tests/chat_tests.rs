@@ -67,7 +67,7 @@ fn store() -> impl SessionStore {
 
 fn tools() -> ToolRegistry {
     let mut tr = ToolRegistry::new();
-    tools::builtin::register_all(&mut tr, vec![], Some(30));
+    tools::builtin::register_all(&mut tr, tools::builtin::SandboxConfig::off(), Some(30));
     tr
 }
 

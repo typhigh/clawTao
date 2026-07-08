@@ -24,7 +24,9 @@
     "back": "Retour",
     "attachImage": {
       "attachImage": "Joindre image"
-    }
+    },
+    "selectWorkspace": "Sélectionner espace",
+    "noWorkspace": "Pas de sandbox"
   },
   "tool": {
     "input": "Entrée",
@@ -89,7 +91,20 @@
     },
     "defaultModel": "Modèle par défaut",
     "providersDescription": "Configurer les fournisseurs API et leurs modèles disponibles.",
-    "defaultModelDescription": "Modèle utilisé pour les nouvelles sessions si aucun n'est sélectionné."
+    "defaultModelDescription": "Modèle utilisé pour les nouvelles sessions si aucun n'est sélectionné.",
+    "sandboxMode": {
+      "label": "Mode Sandbox",
+      "description": "Restreint l'accès Bash. Workspace Only limite l'écriture au répertoire de session.",
+      "off": "Désactivé",
+      "workspaceOnly": "Espace de travail",
+      "strict": "Strict"
+    },
+    "defaultWorkspace": "Espace par défaut",
+    "defaultWorkspaceDescription": "Répertoire pour les nouvelles sessions. Modifiable par session.",
+    "workspaces": "Espaces de travail",
+    "workspacesDescription": "Répertoires pour l'exécution Bash en sandbox. La sélection active le sandbox.",
+    "addWorkspace": "Ajouter espace",
+    "removeWorkspace": "Supprimer espace"
   },
   "common": {
     "auto": "(auto)",

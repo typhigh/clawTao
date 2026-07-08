@@ -11,8 +11,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 const electronAPI = {
   // Chat operations
   chat: {
-    send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean, images?: { base64: string; mediaType: string }[]) =>
-      ipcRenderer.invoke('chat:send', { message, sessionId, model_key, thinking_enabled, images }),
+    send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean, images?: { base64: string; mediaType: string }[], workspace_dir?: string) =>
+      ipcRenderer.invoke('chat:send', { message, sessionId, model_key, thinking_enabled, images, workspace_dir }),
     interrupt: (sessionId: string) =>
       ipcRenderer.invoke('chat:interrupt', { sessionId }),
   },
@@ -36,6 +36,11 @@ const electronAPI = {
     get: () => ipcRenderer.invoke('config:get'),
     set: (c: unknown) => ipcRenderer.invoke('config:set', c),
     probe: (p: { base_url: string; model: string; api_key: string; api_protocol: string; provider_id?: string | null }) => ipcRenderer.invoke('config:probe', p),
+  },
+
+  // Native dialogs
+  dialog: {
+    openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   },
 
   // Image helpers (read from disk)

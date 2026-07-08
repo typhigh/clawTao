@@ -39,7 +39,14 @@ export interface ProviderConfig {
   models: string[];
 }
 
-// ── AppConfig (was LlmConfig) ──────────────────────────────────────────
+// ── Workspace ────────────────────────────────────────────────────────
+
+export interface WorkspaceEntry {
+  path: string;
+  label: string;   // display name, defaults to last path segment
+}
+
+// ── AppConfig ──────────────────────────────────────────────────────────
 
 export interface AppConfig {
   llm: {
@@ -47,6 +54,7 @@ export interface AppConfig {
     default_model_id: string;
   };
   log_level: string;
+  workspaces: WorkspaceEntry[];
   bash: {
     blocked_commands: string[];
     timeout_secs: number | null;
@@ -91,6 +99,7 @@ export function emptyConfig(): AppConfig {
   return {
     llm: { providers: [], default_model_id: '' },
     log_level: 'info',
+    workspaces: [],
     bash: { blocked_commands: [], timeout_secs: DEFAULT_BASH_TIMEOUT_SECS },
   };
 }

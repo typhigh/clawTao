@@ -30,6 +30,11 @@ interface Props {
   onToggleThinking: () => void;
   images?: ImageAttachment[];
   onImagesChange?: (imgs: ImageAttachment[]) => void;
+  /** Per-session workspace directory (sandbox root). */
+  workspaceDir?: string;
+  workspaceOptions?: import('../stores/settings').WorkspaceEntry[];
+  selectedWorkspace?: string;
+  onSelectWorkspace?: (wsPath: string) => void;
 }
 
 async function fileToImage(f: File): Promise<ImageAttachment | null> {
@@ -46,6 +51,7 @@ export function InputArea({
   modelOptions, selectedModelKey, onSelectModel, disabledModel,
   thinkingEnabled, onToggleThinking,
   images, onImagesChange,
+  workspaceDir, workspaceOptions, selectedWorkspace, onSelectWorkspace,
 }: Props) {
   const { t } = useTranslation();
   const [thinkingHover, setThinkingHover] = useState(false);
@@ -176,6 +182,20 @@ export function InputArea({
             >
               <ThinkingIcon active={thinkingEnabled} />
             </button>
+            {(workspaceOptions?.length || 0) > 0 ? (
+              <select className="input-model-select input-model-select-inline"
+                value={selectedWorkspace || ''}
+                onChange={(e) => onSelectWorkspace?.(e.target.value)}
+                title={t('chat.selectWorkspace')}
+                style={{ maxWidth: '120px' }}>
+                <option value="">{t('chat.noWorkspace')}</option>
+                {workspaceOptions!.map(ws => (
+                  <option key={ws.path} value={ws.path}>{ws.label}</option>
+                ))}
+              </select>
+            ) : workspaceDir ? (
+              <span className="input-workspace-badge" title={workspaceDir} style={{ fontSize: '11px', color: '#888', marginLeft: '6px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '26px', fontFamily: 'monospace' }}>🏠 {workspaceDir.split('/').pop()}</span>
+            ) : null}
           </div>
           {streaming ? (
             <button

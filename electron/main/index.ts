@@ -12,7 +12,7 @@
  * Rust never sees the encrypted form — main decrypts and injects the plaintext
  * key into Rust at startup and on config changes.
  */
-import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron';
 import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import * as readline from 'readline';
@@ -198,7 +198,7 @@ function setupIpc() {
   );
 
   // chat.send — resolve per-session model_key to provider/model/api_key.
-  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string; thinking_enabled?: boolean; images?: { base64: string; mediaType: string }[] }) => {
+  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string; thinking_enabled?: boolean; workspace_dir?: string; images?: { base64: string; mediaType: string }[] }) => {
     const config: any = readConfig();
     const key = p.model_key || config.llm?.default_model_id || '';
     if (!key) return Promise.reject(new Error('No model selected.'));
@@ -214,6 +214,8 @@ function setupIpc() {
       model,
       api_protocol: provider.api_protocol || 'anthropic',
       thinking_enabled: !!p.thinking_enabled,
+      workspace_dir: p.workspace_dir || '',
+      sandbox_mode: p.workspace_dir ? 'workspace_only' : 'off',
       bash_blocked_commands: config.bash?.blocked_commands || [],
       bash_timeout_secs: config.bash?.timeout_secs ?? null,
     };
@@ -223,6 +225,9 @@ function setupIpc() {
   // config:get — reads Electron config.json + secrets.json, attaches masked api_key.
   ipcMain.handle('config:get', () => {
     const config: any = readConfig();
+    // Ensure sub-objects exist for old config files.
+    config.workspaces = config.workspaces || [];
+    config.bash = config.bash || { blocked_commands: [], timeout_secs: null };
     const providers = (config.llm?.providers || []).map((p: any) => {
       const plain = readEncryptedKey(p.id);
       return {
@@ -321,6 +326,14 @@ function setupIpc() {
       const mime = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }[ext] || 'image/png';
       return { ok: true, base64: data.toString('base64'), mediaType: mime };
     } catch (e) { return { ok: false, error: String(e) }; }
+  });
+
+  // dialog:openDirectory — native folder picker.
+  ipcMain.handle('dialog:openDirectory', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+    });
+    return result.canceled ? null : result.filePaths[0] || null;
   });
 
   // Open external URL in the system default browser.

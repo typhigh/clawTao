@@ -129,6 +129,11 @@ function App() {
 
   const selectedModelKey = activeSession?.model_key || config?.llm?.default_model_id || modelOptions[0]?.key || '';
 
+  const setSessionWorkspace = (wsPath: string) => {
+    if (!activeSessionId) return;
+    useChatStore.getState().setSessionWorkspace(activeSessionId, wsPath);
+  };
+
   return (
     <div className="app">
       <div className="main-content">
@@ -151,10 +156,13 @@ function App() {
             onCreateSession={createSession}
             streaming={isStreaming}
             onCancel={() => useChatStore.getState().cancelRun()}
-            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming, textareaRef, onKeyDown: handleKeyDown, thinkingEnabled, onToggleThinking: handleToggleThinking, images, onImagesChange: setImages }}
+            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming, textareaRef, onKeyDown: handleKeyDown, thinkingEnabled, onToggleThinking: handleToggleThinking, images, onImagesChange: setImages, workspaceDir: activeSession?.workspace_dir || '' }}
             modelOptions={modelOptions}
             selectedModelKey={selectedModelKey}
             onSelectModel={handleSelectModel}
+            workspaceOptions={config?.workspaces || []}
+            selectedWorkspace={activeSession?.workspace_dir || ''}
+            onSelectWorkspace={setSessionWorkspace}
           />
         ) : (
           <SettingsView onBack={handleBackToChat} />

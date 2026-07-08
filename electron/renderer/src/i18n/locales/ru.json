@@ -24,7 +24,9 @@
     "back": "Назад",
     "attachImage": {
       "attachImage": "Прикрепить"
-    }
+    },
+    "selectWorkspace": "Выбрать папку",
+    "noWorkspace": "Без sandbox"
   },
   "tool": {
     "input": "Ввод",
@@ -89,7 +91,20 @@
     },
     "defaultModel": "Модель по умолчанию",
     "providersDescription": "Настройка API-провайдеров и доступных моделей.",
-    "defaultModelDescription": "Модель для новых сессий, если ни одна не выбрана."
+    "defaultModelDescription": "Модель для новых сессий, если ни одна не выбрана.",
+    "sandboxMode": {
+      "label": "Режим песочницы",
+      "description": "Ограничение доступа Bash. Workspace Only разрешает запись только в каталог сессии.",
+      "off": "Выкл",
+      "workspaceOnly": "Только рабочая",
+      "strict": "Строгий"
+    },
+    "defaultWorkspace": "Рабочая папка",
+    "defaultWorkspaceDescription": "Каталог для новых сессий. Можно изменить для каждой сессии.",
+    "workspaces": "Рабочие папки",
+    "workspacesDescription": "Каталоги для sandbox Bash. Выбор включает sandbox.",
+    "addWorkspace": "Добавить",
+    "removeWorkspace": "Удалить"
   },
   "common": {
     "auto": "(авто)",

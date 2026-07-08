@@ -2,15 +2,21 @@
 
 use crate::tools::registry::ToolRegistry;
 
-pub fn build(tool_registry: &ToolRegistry) -> String {
+pub fn build(tool_registry: &ToolRegistry, workspace_dir: Option<&str>) -> String {
     let cwd = std::env::current_dir()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|_| "(unknown)".to_string());
 
     let mut lines: Vec<String> = Vec::new();
 
-    // Identity + workspace
+    // Identity + working directory
     lines.push(format!("You are ClawTao, a desktop AI agent. Working directory: {cwd}."));
+    if let Some(ws) = workspace_dir {
+        if !ws.is_empty() {
+            lines.push(format!("Sandbox is active: Bash commands are restricted to write only in {ws}. \
+                Use this path for all file operations."));
+        }
+    }
     lines.push(String::new());
 
     // Tool list (auto-generated from registry)

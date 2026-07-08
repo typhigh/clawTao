@@ -24,7 +24,9 @@
     "back": "戻る",
     "attachImage": {
       "attachImage": "画像を添付"
-    }
+    },
+    "selectWorkspace": "ワークスペース選択",
+    "noWorkspace": "サンドボックスなし"
   },
   "tool": {
     "input": "入力",
@@ -89,7 +91,20 @@
     },
     "defaultModel": "デフォルトモデル",
     "providersDescription": "APIプロバイダーと利用可能なモデルを設定します。",
-    "defaultModelDescription": "モデルが選択されていない場合に新しいセッションで使用されるモデル。"
+    "defaultModelDescription": "モデルが選択されていない場合に新しいセッションで使用されるモデル。",
+    "sandboxMode": {
+      "label": "サンドボックス",
+      "description": "Bash ツールのアクセス制限。Workspace Only ではセッションディレクトリのみ書き込み可。",
+      "off": "オフ",
+      "workspaceOnly": "ワークスペースのみ",
+      "strict": "厳格"
+    },
+    "defaultWorkspace": "デフォルトワークスペース",
+    "defaultWorkspaceDescription": "新規セッションのディレクトリ。セッションごとに変更可能。",
+    "workspaces": "ワークスペース",
+    "workspacesDescription": "サンドボックス Bash 実行のディレクトリ。選択でサンドボックス有効。",
+    "addWorkspace": "ワークスペース追加",
+    "removeWorkspace": "ワークスペース削除"
   },
   "common": {
     "auto": "（自動）",
