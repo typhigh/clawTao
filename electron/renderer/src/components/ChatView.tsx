@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { UserMessageView } from './UserMessageView';
 import { LiveTurnView } from './LiveTurn';
 import { AgentTurnView } from './AgentTurn';
-import { InputArea } from './InputArea';
 import type { TimelineGroup } from '../types/timeline';
 import type { ChatError } from '../stores/chat';
 
@@ -23,38 +22,13 @@ interface Props {
   onClearNotice: () => void;
   hasActiveSession: boolean;
   onCreateSession: () => void;
-  input: {
-    value: string;
-    onChange: (v: string) => void;
-    onSend: () => void;
-    disabled: boolean;
-    sendDisabled?: boolean;
-    textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-    onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-    thinkingEnabled: boolean;
-    onToggleThinking: () => void;
-    images?: import('../stores/chat').ImageAttachment[];
-    onImagesChange?: (imgs: import('../stores/chat').ImageAttachment[]) => void;
-    /** Per-session workspace directory (sandbox root). */
-    workspaceDir?: string;
-  };
-  streaming: boolean;
-  onCancel: () => void;
-  modelOptions: ModelOption[];
-  selectedModelKey: string;
-  onSelectModel: (key: string) => void;
-  workspaceOptions?: import('../stores/settings').WorkspaceEntry[];
-  selectedWorkspace?: string;
-  onSelectWorkspace?: (wsPath: string) => void;
-  onCompact?: () => void;
-  compactDisabled?: boolean;
-  compacting?: boolean;
-  /** Number of messages in the current session — used to gate the
-   *  compact button when there are too few to compact. */
-  messageCount?: number;
+  /** Trigger a retry from the error banner. */
+  onRetry: () => void;
   /** Persistent compaction result — stays until dismissed or next send. */
   compactResult?: import('../stores/chat').CompactResult | null;
   onClearCompactResult?: () => void;
+  /** Input panel as a slot — keeps the original layout (messages/scroll/input inside the same flex column). */
+  inputPanel?: React.ReactNode;
 }
 
 /** Format a token count for human display: 128432 → "128K", 2400 → "2.4K", 756 → "756". */
@@ -78,7 +52,7 @@ function errorAction(errorCode: string): string | null {
   }
 }
 
-export function ChatView({ timeline, error, onClearError, notice, onClearNotice, compactResult, onClearCompactResult, hasActiveSession, onCreateSession, input, streaming, onCancel, modelOptions, selectedModelKey, onSelectModel, workspaceOptions, selectedWorkspace, onSelectWorkspace, onCompact, compactDisabled, compacting, messageCount }: Props) {
+export function ChatView({ timeline, error, onClearError, notice, onClearNotice, compactResult, onClearCompactResult, hasActiveSession, onCreateSession, onRetry, inputPanel }: Props) {
   const { t } = useTranslation();
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -93,7 +67,7 @@ export function ChatView({ timeline, error, onClearError, notice, onClearNotice,
       {error && (
         <div className={`error error--${error.errorCode.toLowerCase()}`}>
           <span className="error-message">{error.message}</span>
-          {error.retryable && <button className="error-retry" onClick={(e) => { e.stopPropagation(); input.onSend(); }}>{t('retry')}</button>}
+          {error.retryable && <button className="error-retry" onClick={(e) => { e.stopPropagation(); onRetry(); }}>{t('retry')}</button>}
           {!error.retryable && errorAction(error.errorCode) && (
             <span className="error-action">{errorAction(error.errorCode)}</span>
           )}
@@ -153,21 +127,7 @@ export function ChatView({ timeline, error, onClearError, notice, onClearNotice,
               >↓</button>
             </div>
           )}
-          <InputArea
-            {...input}
-            streaming={streaming}
-            onCancel={onCancel}
-            modelOptions={modelOptions}
-            selectedModelKey={selectedModelKey}
-            onSelectModel={onSelectModel}
-            workspaceOptions={workspaceOptions}
-            selectedWorkspace={selectedWorkspace}
-            onSelectWorkspace={onSelectWorkspace}
-            onCompact={onCompact}
-            compactDisabled={compactDisabled}
-            compacting={compacting}
-            messageCount={messageCount}
-          />
+          {inputPanel}
         </>
       ) : (
         <div className="empty-state">
