@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UserMessageView } from './UserMessageView';
 import { LiveTurnView } from './LiveTurn';
@@ -79,6 +80,13 @@ function errorAction(errorCode: string): string | null {
 
 export function ChatView({ timeline, error, onClearError, notice, onClearNotice, compactResult, onClearCompactResult, hasActiveSession, onCreateSession, input, streaming, onCancel, modelOptions, selectedModelKey, onSelectModel, workspaceOptions, selectedWorkspace, onSelectWorkspace, onCompact, compactDisabled, compacting, messageCount }: Props) {
   const { t } = useTranslation();
+  const messagesRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when timeline changes (session switch or new messages).
+  useEffect(() => {
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [timeline]);
 
   return (
     <main className="chat-area">
@@ -120,13 +128,31 @@ export function ChatView({ timeline, error, onClearError, notice, onClearNotice,
 
       {hasActiveSession ? (
         <>
-          <div className="messages">
+          <div className="messages" ref={messagesRef}>
             {timeline.map((group) => {
               if (group.kind === 'user') return <UserMessageView key={group.id} content={group.content} images={group.images} />;
               if (group.kind === 'liveTurn') return <LiveTurnView key="live-turn" segments={group.segments} isStreaming={group.isStreaming} />;
               return <AgentTurnView key={`${group.id}-done`} segments={group.segments} conclusion={group.conclusion} />;
             })}
           </div>
+          {timeline.length > 0 && (
+            <div className="scroll-controls">
+              <button
+                type="button"
+                className="scroll-btn"
+                onClick={() => { if (messagesRef.current) messagesRef.current.scrollTop = 0; }}
+                title={t('chat.scrollToTop')}
+                aria-label={t('chat.scrollToTop')}
+              >↑</button>
+              <button
+                type="button"
+                className="scroll-btn"
+                onClick={() => { if (messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight; }}
+                title={t('chat.scrollToBottom')}
+                aria-label={t('chat.scrollToBottom')}
+              >↓</button>
+            </div>
+          )}
           <InputArea
             {...input}
             streaming={streaming}

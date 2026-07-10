@@ -18,7 +18,9 @@
       "attachImage": "添加图片"
     },
     "selectWorkspace": "选择工作区",
-    "noWorkspace": "无沙箱"
+    "noWorkspace": "无沙箱",
+    "scrollToTop": "滚到顶部",
+    "scrollToBottom": "滚到底部"
   },
   "tool": {
     "input": "输入",
