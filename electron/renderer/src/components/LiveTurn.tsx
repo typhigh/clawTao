@@ -1,7 +1,4 @@
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { normalizeMd } from '../utils/format';
-import { markdownComponents } from '../utils/markdown';
+import { MarkdownSegment } from '../utils/markdown';
 import type { TurnSegment } from '../types/timeline';
 import { Thinking } from './Thinking';
 import { TodoView } from './TodoView';
@@ -14,10 +11,14 @@ export function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[
     <div className={`agent-turn live ${isStreaming ? 'streaming' : ''}`}>
       {segments.map((seg, i) => {
         if (seg.kind === 'text') {
-          return <div key={i} className="turn-text"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizeMd(seg.content)}</ReactMarkdown></div>;
+          return (
+            <div key={seg.id ?? i} className="turn-text">
+              <MarkdownSegment content={seg.content} />
+            </div>
+          );
         }
         if (seg.kind === 'thinking') {
-          return <Thinking key={i} content={seg.content} forceOpen={isStreaming} />;
+          return <Thinking key={seg.id ?? i} content={seg.content} forceOpen={isStreaming} />;
         }
         if (seg.kind === 'todo') {
           return <TodoView key={i} todos={seg.todos} />;

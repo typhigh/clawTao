@@ -1,5 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { normalizeMd } from './format';
 
 function CodeBlock({ children }: { children?: React.ReactNode }) {
   const { t } = useTranslation();
@@ -50,3 +53,22 @@ export const markdownComponents = {
     </a>
   ),
 };
+
+// ── MarkdownSegment ─────────────────────────────────────────────────
+
+/** O(1) content comparison: length + head/tail 64 chars.
+ *  Avoids re-parsing stable markdown blocks during streaming. */
+const shallowContentEq = (prev: string, next: string): boolean =>
+  prev.length === next.length &&
+  prev.slice(0, 64) === next.slice(0, 64) &&
+  prev.slice(-64) === next.slice(-64);
+
+/** Memoised ReactMarkdown block — only re-renders when content actually changes. */
+export const MarkdownSegment = memo(
+  ({ content }: { content: string }) => (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      {normalizeMd(content)}
+    </ReactMarkdown>
+  ),
+  (prev, next) => shallowContentEq(prev.content, next.content),
+);

@@ -40,6 +40,9 @@ declare global {
       shell: {
         openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>;
       };
+      dialog: {
+        openDirectory: () => Promise<string | null>;
+      };
     };
   }
 }

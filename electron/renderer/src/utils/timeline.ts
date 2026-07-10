@@ -77,12 +77,20 @@ export function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegmen
   let textBuf = '';
   let thinkingBuf = '';
   let pendingTool: { id: string; name: string; input: unknown } | null = null;
+  let thinkId = 0;
+  let textId = 0;
 
   const flushThinking = () => {
-    if (thinkingBuf) { segments.push({ kind: 'thinking', content: thinkingBuf }); thinkingBuf = ''; }
+    if (thinkingBuf) {
+      segments.push({ kind: 'thinking', id: `think-${thinkId++}`, content: thinkingBuf });
+      thinkingBuf = '';
+    }
   };
   const flushText = () => {
-    if (textBuf) { segments.push({ kind: 'text', content: textBuf }); textBuf = ''; }
+    if (textBuf) {
+      segments.push({ kind: 'text', id: `text-${textId++}`, content: textBuf });
+      textBuf = '';
+    }
   };
   const flushPending = () => {
     if (pendingTool) {

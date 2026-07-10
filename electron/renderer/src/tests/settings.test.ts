@@ -32,6 +32,7 @@ function makeConfig() {
       default_model_id: '',
     },
     log_level: 'info',
+    workspaces: [] as { path: string; label: string }[],
     bash: {
       blocked_commands: ['rm -rf /'],
       timeout_secs: DEFAULT_BASH_TIMEOUT_SECS,

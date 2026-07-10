@@ -8,9 +8,9 @@ export type AssistantSegment =
   | { kind: 'thinking'; id: string; content: string; timestamp: number };
 
 export type TurnSegment =
-  | { kind: 'text'; content: string }
+  | { kind: 'text'; id?: string; content: string }
   | { kind: 'toolPair'; id: string; toolName: string; toolInput: unknown; result: string | null; pending: boolean }
-  | { kind: 'thinking'; content: string }
+  | { kind: 'thinking'; id?: string; content: string }
   | { kind: 'todo'; todos: { step: string; status: string }[] }
   | { kind: 'compacted'; messageCount?: number; warning?: string };
 
