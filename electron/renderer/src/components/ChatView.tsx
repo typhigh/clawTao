@@ -17,6 +17,9 @@ interface Props {
   timeline: TimelineGroup[];
   error: ChatError | null;
   onClearError: () => void;
+  /** Transient toast notice (auto-clears). */
+  notice: { message: string; type: 'success' | 'info' | 'error' } | null;
+  onClearNotice: () => void;
   hasActiveSession: boolean;
   onCreateSession: () => void;
   input: {
@@ -31,6 +34,8 @@ interface Props {
     onToggleThinking: () => void;
     images?: import('../stores/chat').ImageAttachment[];
     onImagesChange?: (imgs: import('../stores/chat').ImageAttachment[]) => void;
+    /** Per-session workspace directory (sandbox root). */
+    workspaceDir?: string;
   };
   streaming: boolean;
   onCancel: () => void;
@@ -40,6 +45,22 @@ interface Props {
   workspaceOptions?: import('../stores/settings').WorkspaceEntry[];
   selectedWorkspace?: string;
   onSelectWorkspace?: (wsPath: string) => void;
+  onCompact?: () => void;
+  compactDisabled?: boolean;
+  compacting?: boolean;
+  /** Number of messages in the current session — used to gate the
+   *  compact button when there are too few to compact. */
+  messageCount?: number;
+  /** Persistent compaction result — stays until dismissed or next send. */
+  compactResult?: import('../stores/chat').CompactResult | null;
+  onClearCompactResult?: () => void;
+}
+
+/** Format a token count for human display: 128432 → "128K", 2400 → "2.4K", 756 → "756". */
+function fmtTokens(n: number): string {
+  if (n < 1000) return String(n);
+  const k = n / 1000;
+  return k >= 100 ? `${Math.round(k)}K` : `${Math.round(k * 10) / 10}K`;
 }
 
 /** Actions the user can take for non-retryable errors. */
@@ -56,7 +77,7 @@ function errorAction(errorCode: string): string | null {
   }
 }
 
-export function ChatView({ timeline, error, onClearError, hasActiveSession, onCreateSession, input, streaming, onCancel, modelOptions, selectedModelKey, onSelectModel, workspaceOptions, selectedWorkspace, onSelectWorkspace }: Props) {
+export function ChatView({ timeline, error, onClearError, notice, onClearNotice, compactResult, onClearCompactResult, hasActiveSession, onCreateSession, input, streaming, onCancel, modelOptions, selectedModelKey, onSelectModel, workspaceOptions, selectedWorkspace, onSelectWorkspace, onCompact, compactDisabled, compacting, messageCount }: Props) {
   const { t } = useTranslation();
 
   return (
@@ -69,6 +90,31 @@ export function ChatView({ timeline, error, onClearError, hasActiveSession, onCr
             <span className="error-action">{errorAction(error.errorCode)}</span>
           )}
           <button className="error-dismiss" onClick={onClearError} aria-label={t('close')}>✕</button>
+        </div>
+      )}
+
+      {notice && (
+        <div className={`notice notice--${notice.type}`}>
+          <span className="notice-message">{notice.message}</span>
+          <button className="notice-dismiss" onClick={onClearNotice} aria-label={t('close')}>✕</button>
+        </div>
+      )}
+
+      {compactResult && (
+        <div className={`compact-result compact-result--${compactResult.kind}`}>
+          <span className="compact-result-icon">{compactResult.kind === 'success' ? '✓' : '✗'}</span>
+          <span className="compact-result-message">
+            {compactResult.kind === 'success'
+              ? (compactResult.beforeTokens != null && compactResult.afterTokens != null && compactResult.beforeTokens > 0
+                ? t('compact.bannerSuccess', {
+                    before: fmtTokens(compactResult.beforeTokens),
+                    after: fmtTokens(compactResult.afterTokens),
+                    saved: Math.max(0, Math.round(((compactResult.beforeTokens - compactResult.afterTokens) / compactResult.beforeTokens) * 100)),
+                  })
+                : t('compact.bannerSuccessFallback'))
+              : t('compact.bannerFailed', { reason: compactResult.reason || t('compact.failed') })}
+          </span>
+          <button className="compact-result-dismiss" onClick={onClearCompactResult} aria-label={t('close')}>✕</button>
         </div>
       )}
 
@@ -91,6 +137,10 @@ export function ChatView({ timeline, error, onClearError, hasActiveSession, onCr
             workspaceOptions={workspaceOptions}
             selectedWorkspace={selectedWorkspace}
             onSelectWorkspace={onSelectWorkspace}
+            onCompact={onCompact}
+            compactDisabled={compactDisabled}
+            compacting={compacting}
+            messageCount={messageCount}
           />
         </>
       ) : (

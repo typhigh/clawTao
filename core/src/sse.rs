@@ -47,14 +47,16 @@ pub(crate) fn parse_sse_response(body_str: &str) -> Result<SseResult> {
                     .and_then(|v| v.as_str())
                     .unwrap_or("unknown API error");
                 let err_type = error.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                let detail = if err_type.is_empty() {
+                    msg.to_string()
+                } else {
+                    format!("{err_type}: {msg}")
+                };
+                if crate::context::is_context_length_error(&detail) {
+                    return Err(anyhow::anyhow!(crate::error::ChatError::ContextExceeded));
+                }
                 return Err(anyhow::anyhow!(
-                    crate::error::ChatError::BadRequest {
-                        detail: if err_type.is_empty() {
-                            msg.to_string()
-                        } else {
-                            format!("{err_type}: {msg}")
-                        }
-                    }
+                    crate::error::ChatError::BadRequest { detail }
                 ));
             }
 

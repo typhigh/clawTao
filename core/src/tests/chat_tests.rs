@@ -114,7 +114,7 @@ fn run(
     run_state_machine(
         store, adapter, &Client::new(),
         "sk-test", "http://mock-base", "gpt-4o", false,
-        vec![], &ctx(sid, rid), &tools(), cancel, None,
+        &ctx(sid, rid), &tools(), cancel, None,
     )
 }
 
@@ -130,7 +130,7 @@ fn run_collect(
     let r = run_state_machine(
         store, adapter, &Client::new(),
         "sk-test", "http://mock-base", "gpt-4o", false,
-        vec![], &ctx(sid, rid), &tools(), cancel,
+        &ctx(sid, rid), &tools(), cancel,
         Some(&mut notifications),
     );
     (r, notifications)
@@ -474,6 +474,8 @@ impl<T: SessionStore> TestStore for T {
             updated_at: chrono::Utc::now().timestamp_millis(),
             messages: vec![],
             title: String::new(),
+            compacted_summary: None,
+            compacted_message_id: None,
         };
         self.create(&sess).unwrap();
         sess

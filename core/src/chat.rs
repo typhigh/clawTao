@@ -80,7 +80,7 @@ pub(crate) fn run_turn(
         store::add_user_message_with_images(store, session_id, message_text, image_paths)?;
     }
 
-    let session = store.get(session_id)?
+    let _session = store.get(session_id)?
         .ok_or_else(|| anyhow::anyhow!(ChatError::Session { detail: "Session not found".into() }))?;
 
     let workspace_dir = config.get("workspace_dir")
@@ -129,7 +129,7 @@ pub(crate) fn run_turn(
     let (final_content, final_thinking) = run_state_machine(
         store, adapter.as_ref(), client,
         api_key, base_url, model, thinking_enabled,
-        session.messages, &ctx, &tool_registry, cancel,
+        &ctx, &tool_registry, cancel,
         None, // production: write to stdout only
     )?;
 
@@ -193,13 +193,26 @@ fn run_state_machine(
     base_url: &str,
     model: &str,
     thinking_enabled: bool,
-    mut messages: Vec<store::Message>,
     ctx: &TurnContext,
     tool_registry: &ToolRegistry,
     cancel: &AtomicBool,
     mut notif_collector: Option<&mut Vec<Notification>>,
 ) -> Result<(String, Option<String>)> {
     let mut state = TurnState::Waiting { retry_count: 0 };
+    let mut compaction_attempted = false;
+
+    // Load the full session — store.messages is the complete history and
+    // is never modified by compaction.
+    let session = store.get(&ctx.session_id)?
+        .ok_or_else(|| anyhow::anyhow!(ChatError::Session {
+            detail: "Session not found".into(),
+        }))?;
+    let mut full_messages = session.messages.clone();
+
+    let mut effective_msgs = match (&session.compacted_summary, &session.compacted_message_id) {
+        (Some(summary), Some(id)) => build_effective_messages(&full_messages, id, summary),
+        _ => full_messages.clone(),
+    };
 
     // Inline helper — avoids closure ownership issues inside the loop.
     macro_rules! notify {
@@ -216,8 +229,46 @@ fn run_state_machine(
         state = match state {
             // ── Waiting: call the LLM ──────────────────────────────
             TurnState::Waiting { retry_count } => {
+                // ── Proactive compaction ──────────────────────────
+                if !compaction_attempted {
+                    let est = crate::context::estimate_total_tokens_from_store(
+                        &ctx.system_prompt, &effective_msgs, &ctx.tools, model,
+                    );
+                    if est > crate::context::compact_threshold(base_url) {
+                        debug!(
+                            "Compaction triggered: est {est} tokens > threshold ({} msgs)",
+                            effective_msgs.len(),
+                        );
+                        notify!(Notification::new("chat.stream", Some(json!({
+                            "sessionId": ctx.session_id, "runId": ctx.run_id,
+                            "kind": "compacting",
+                        }))));
+                        match compact_session(
+                            adapter, client, api_key, base_url, model,
+                            store, &ctx.session_id, &full_messages,
+                            crate::context::MIN_TURNS,
+                        ) {
+                            Ok((summary, last_id)) => {
+                                effective_msgs = build_effective_messages(
+                                    &full_messages, &last_id, &summary,
+                                );
+                                compaction_attempted = true;
+                                notify!(Notification::new("chat.stream", Some(json!({
+                                    "sessionId": ctx.session_id, "runId": ctx.run_id,
+                                    "kind": "compacted",
+                                    "messageCount": effective_msgs.len(),
+                                    "warning": "Long threads may reduce model accuracy. Consider starting a new session for complex tasks.",
+                                }))));
+                            }
+                            Err(e) => {
+                                warn!("Proactive compaction failed: {e:?}");
+                            }
+                        }
+                    }
+                }
+
                 match llm_step(adapter, client, api_key, base_url, model,
-                                thinking_enabled, &messages, ctx, cancel) {
+                                thinking_enabled, &effective_msgs, ctx, cancel) {
                     Ok(response) => {
                         // LLM succeeded — reset retry counter for the
                         // next round (tool → back to Waiting).
@@ -247,7 +298,38 @@ fn run_state_machine(
                             .unwrap_or_else(|| ChatError::Internal {
                                 detail: format!("{e:#}"),
                             });
-                        if ce.is_retryable() && retry_count < MAX_RETRIES {
+
+                        // ── Reactive compaction ────────────────────
+                        if matches!(ce, ChatError::ContextExceeded) && !compaction_attempted {
+                            debug!("Reactive compaction on ContextExceeded");
+                            notify!(Notification::new("chat.stream", Some(json!({
+                                "sessionId": ctx.session_id, "runId": ctx.run_id,
+                                "kind": "compacting",
+                            }))));
+                            match compact_session(
+                                adapter, client, api_key, base_url, model,
+                                store, &ctx.session_id, &full_messages,
+                                crate::context::MIN_TURNS,
+                            ) {
+                                Ok((summary, last_id)) => {
+                                    effective_msgs = build_effective_messages(
+                                        &full_messages, &last_id, &summary,
+                                    );
+                                    compaction_attempted = true;
+                                    notify!(Notification::new("chat.stream", Some(json!({
+                                        "sessionId": ctx.session_id, "runId": ctx.run_id,
+                                        "kind": "compacted",
+                                        "messageCount": effective_msgs.len(),
+                                        "warning": "Long threads may reduce model accuracy. Consider starting a new session for complex tasks.",
+                                    }))));
+                                    TurnState::Waiting { retry_count: 0 }
+                                }
+                                Err(_) => {
+                                    warn!("Reactive compaction failed");
+                                    TurnState::Fatal { error: ce }
+                                }
+                            }
+                        } else if ce.is_retryable() && retry_count < MAX_RETRIES {
                             TurnState::Error { error: ce, retry_count }
                         } else {
                             TurnState::Fatal { error: ce }
@@ -259,11 +341,15 @@ fn run_state_machine(
             // ── Tooling: execute tool calls sequentially ───────────
             TurnState::Tooling { response, cursor } => {
                 if cursor >= response.tool_calls.len() {
-                    messages = store.get(&ctx.session_id)?
+                    let session = store.get(&ctx.session_id)?
                         .ok_or_else(|| anyhow::anyhow!(ChatError::Session {
                             detail: "Session not found after tool execution".into()
-                        }))?
-                        .messages;
+                        }))?;
+                    full_messages = session.messages.clone();
+                    effective_msgs = match (&session.compacted_summary, &session.compacted_message_id) {
+                        (Some(s), Some(id)) => build_effective_messages(&full_messages, id, s),
+                        _ => full_messages.clone(),
+                    };
                     TurnState::Waiting { retry_count: 0 }
                 } else {
                     let tc = &response.tool_calls[cursor];
@@ -450,6 +536,9 @@ fn llm_step(
                     } else {
                         format!("{err_type}: {msg}")
                     };
+                    if crate::context::is_context_length_error(&detail) {
+                        return Err(anyhow::anyhow!(ChatError::ContextExceeded));
+                    }
                     return Err(anyhow::anyhow!(ChatError::BadRequest { detail }));
                 }
                 for se in adapter.stream_events(&event) {
@@ -474,6 +563,244 @@ fn llm_step(
     }
 
     adapter.parse_stream(&body_str)
+}
+
+// ── Context compaction ──────────────────────────────────────────────
+
+/// Minimal LLM call for summarization — no streaming notifications, no
+/// tools, no cancel check. Returns the model's text response.
+fn summarize_conversation(
+    adapter: &dyn ApiAdapter,
+    client: &Client,
+    api_key: &str,
+    base_url: &str,
+    model: &str,
+    conversation_text: &str,
+) -> Result<String> {
+    let system =
+        "You are a helpful assistant. Summarize conversations concisely and accurately.".to_string();
+    let prompt = format!(
+        "You are performing a CONTEXT CHECKPOINT COMPACTION. Create a handoff summary for another LLM that will resume the task.\n\n\
+         Include:\n\
+         - Current progress and key decisions made\n\
+         - Important context, constraints, or user preferences\n\
+         - What remains to be done (clear next steps)\n\
+         - Any critical data, examples, or references needed to continue\n\n\
+         Be concise, structured, and focused on helping the next LLM seamlessly continue the work.\n\n\
+         Conversation:\n\
+         {conversation_text}\n\n\
+         Summary:"
+    );
+
+    let msg = LlmMessage {
+        role: "user".into(),
+        content: prompt,
+        images: None,
+        tool_calls: None,
+        tool_call_id: None,
+        thinking: None,
+    };
+
+    let req = LlmRequest {
+        system,
+        model: model.to_string(),
+        messages: vec![msg],
+        tools: vec![],
+        thinking_enabled: false,
+    };
+
+    let http = adapter.build(&req, api_key, base_url)?;
+    debug!("Compaction LLM call: url={} model={}", http.url, model);
+
+    let mut resp = client.post(&http.url);
+    for (k, v) in &http.headers {
+        resp = resp.header(k.as_str(), v.as_str());
+    }
+    let resp = resp
+        .body(http.body.clone())
+        .send()
+        .map_err(|e| map_network_error(e, &http.url))?;
+
+    let status = resp.status();
+
+    use std::io::{BufRead, BufReader};
+    let mut reader = BufReader::new(resp);
+    let mut line = String::new();
+    let mut body_bytes = Vec::new();
+
+    while reader
+        .read_line(&mut line)
+        .map_err(|_| anyhow::anyhow!(ChatError::StreamDisconnected))?
+        > 0
+    {
+        body_bytes.extend_from_slice(line.as_bytes());
+        if let Some(data) = line.trim().strip_prefix("data: ") {
+            if data == "[DONE]" {
+                line.clear();
+                continue;
+            }
+            if let Ok(event) = serde_json::from_str::<Value>(data) {
+                if let Some(sse_err) = event.get("error") {
+                    let msg = sse_err
+                        .get("message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown API error");
+                    let err_type = sse_err
+                        .get("type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let detail = if err_type.is_empty() {
+                        msg.to_string()
+                    } else {
+                        format!("{err_type}: {msg}")
+                    };
+                    if crate::context::is_context_length_error(&detail) {
+                        return Err(anyhow::anyhow!(ChatError::ContextExceeded));
+                    }
+                    return Err(anyhow::anyhow!(ChatError::BadRequest { detail }));
+                }
+            }
+        }
+        line.clear();
+    }
+
+    let body_str = String::from_utf8_lossy(&body_bytes);
+    debug!("Compaction LLM response: {} bytes", body_bytes.len());
+
+    if !status.is_success() {
+        return Err(anyhow::anyhow!(http_error_from_status(
+            status.as_u16(),
+            &body_str,
+        )));
+    }
+
+    let response = adapter.parse_stream(&body_str)?;
+    Ok(response.text)
+}
+
+/// Generate a compaction summary for old messages and persist it as
+/// session metadata.  Does **not** modify the messages table —
+/// store.get() always returns the full history.
+///
+/// `min_turns_keep` controls how many recent conversation turns to keep
+/// un-summarised.  Manual compaction uses 1 (aggressive), auto-compaction
+/// uses `MIN_TURNS`.
+///
+/// Returns `(summary, last_compacted_message_id)`.
+pub(crate) fn compact_session(
+    adapter: &dyn ApiAdapter,
+    client: &Client,
+    api_key: &str,
+    base_url: &str,
+    model: &str,
+    store: &dyn SessionStore,
+    session_id: &str,
+    messages: &[store::Message],
+    min_turns_keep: usize,
+) -> Result<(String, String)> {
+    // ── Guards ──────────────────────────────────────────────────────
+    if messages.len() < crate::context::MIN_MSGS {
+        anyhow::bail!("too few messages to compact");
+    }
+
+    let keep_count = crate::context::count_turns_from_end(messages, min_turns_keep);
+    if keep_count >= messages.len() {
+        anyhow::bail!("all messages are recent — nothing to compact");
+    }
+
+    let to_summarize = &messages[..messages.len() - keep_count];
+    if to_summarize.len() < 2 {
+        anyhow::bail!("nothing worth summarising");
+    }
+
+    // ── Generate summary ────────────────────────────────────────────
+    let mut skip: usize = 0; // 0 = first attempt uses all messages
+
+    let summary = loop {
+        let slice = &to_summarize[skip..];
+        let conversation_text = crate::context::build_conversation_text(slice);
+        debug!(
+            "Compacting session {}: {} msgs (skip {skip}), conv_text {} chars",
+            session_id,
+            slice.len(),
+            conversation_text.len(),
+        );
+
+        match summarize_conversation(
+            adapter, client, api_key, base_url, model, &conversation_text,
+        ) {
+            Ok(s) => break s,
+            Err(e) => {
+                let is_ctx = downcast_chat_error(&e)
+                    .is_some_and(|ce| matches!(ce, ChatError::ContextExceeded));
+                if !is_ctx {
+                    return Err(e);
+                }
+                // Exponential backoff: drop oldest messages 1, 2, 4, 8, ...
+                skip = if skip == 0 { 1 } else { skip.saturating_mul(2) };
+                if skip >= to_summarize.len() {
+                    return Err(e);
+                }
+                warn!(
+                    "Compaction summary hit context limit — retrying without oldest {skip} msgs"
+                );
+            }
+        }
+    };
+
+    // ── Post-process summary ────────────────────────────────────────
+    let summary = summary.trim().to_string();
+    if summary.is_empty() {
+        anyhow::bail!("compaction summary was empty");
+    }
+    let summary: String = summary
+        .chars()
+        .take(crate::context::MAX_CHARS_PER_MSG)
+        .collect();
+
+    let last_id = to_summarize.last().unwrap().id.clone();
+
+    // Persist compaction metadata — does NOT touch messages.
+    store.update_compaction(session_id, Some(&summary), Some(&last_id))?;
+
+    debug!(
+        "Compaction done: {} msgs → keeping last {keep_count}, last_compacted={last_id}",
+        messages.len(),
+    );
+
+    Ok((summary, last_id))
+}
+
+/// Build the message list the LLM should see, given full store messages
+/// and a compaction summary.  Merges the summary into the first kept
+/// user message to satisfy the Anthropic alternating-role constraint.
+pub(crate) fn build_effective_messages(
+    messages: &[store::Message],
+    compacted_id: &str,
+    summary: &str,
+) -> Vec<store::Message> {
+    let pos = messages.iter().position(|m| m.id == compacted_id);
+    let start = pos.map_or(0, |p| p + 1);
+    if start >= messages.len() {
+        return messages.to_vec();
+    }
+    let mut kept = messages[start..].to_vec();
+
+    if let Some(first_user) = kept.iter().position(|m| m.role == "user") {
+        kept[first_user].content = format!(
+            "Another language model started to solve this problem and produced \
+             a summary of its thinking process. Use this to build on the work \
+             that has already been done and avoid duplicating work.\n\n\
+             {summary}\n\n---\n\n{}",
+            kept[first_user].content
+        );
+    } else {
+        // Shouldn't happen — turn boundaries are user messages.
+        let mut summary_msg = store::new_msg("user", summary);
+        summary_msg.id = uuid::Uuid::new_v4().to_string();
+        kept.insert(0, summary_msg);
+    }
+    kept
 }
 
 // ── Error mapping helpers ────────────────────────────────────────────
@@ -501,6 +828,11 @@ pub(crate) fn http_error_from_status(status: u16, body: &str) -> ChatError {
     let detail = extract_error_message(body).unwrap_or_else(|| {
         body.chars().take(500).collect::<String>()
     });
+
+    // Detect context-length errors regardless of HTTP status.
+    if crate::context::is_context_length_error(&detail) {
+        return ChatError::ContextExceeded;
+    }
 
     match status {
         400 => ChatError::BadRequest { detail },

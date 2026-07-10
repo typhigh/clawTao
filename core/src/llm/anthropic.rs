@@ -22,7 +22,7 @@ impl ApiAdapter for AnthropicAdapter {
 
         let mut body = json!({
             "model": req.model,
-            "max_tokens": 4096,
+            "max_tokens": 32768,
             "messages": messages,
             "stream": true,
         });
@@ -136,6 +136,9 @@ impl ApiAdapter for AnthropicAdapter {
                     } else {
                         format!("{err_type}: {msg}")
                     };
+                    if crate::context::is_context_length_error(&detail) {
+                        return Err(anyhow::anyhow!(ChatError::ContextExceeded));
+                    }
                     return Err(anyhow::anyhow!(ChatError::BadRequest { detail }));
                 }
                 _ => {}

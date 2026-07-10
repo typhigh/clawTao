@@ -38,6 +38,9 @@ impl SqliteSessionStore {
         )?;
         // Migration: add image_paths to old DBs that don't have it.
         conn.execute_batch("ALTER TABLE messages ADD COLUMN image_paths TEXT;").ok();
+        // Migration: add compaction columns to sessions.
+        conn.execute_batch("ALTER TABLE sessions ADD COLUMN compacted_summary TEXT;").ok();
+        conn.execute_batch("ALTER TABLE sessions ADD COLUMN compacted_message_id TEXT;").ok();
         Ok(Self { conn: Mutex::new(conn) })
     }
 }
@@ -57,9 +60,9 @@ impl SessionStore for SqliteSessionStore {
 
     fn get(&self, id: &str) -> Result<Option<Session>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id, created_at, updated_at, title FROM sessions WHERE id = ?1")?;
+        let mut stmt = conn.prepare("SELECT id, created_at, updated_at, title, compacted_summary, compacted_message_id FROM sessions WHERE id = ?1")?;
         let session = stmt.query_row(rusqlite::params![id], |row| {
-            Ok(Session { id: row.get(0)?, created_at: row.get(1)?, updated_at: row.get(2)?, title: row.get(3)?, messages: Vec::new() })
+            Ok(Session { id: row.get(0)?, created_at: row.get(1)?, updated_at: row.get(2)?, title: row.get(3)?, messages: Vec::new(), compacted_summary: row.get(4)?, compacted_message_id: row.get(5)? })
         }).ok();
         let Some(mut session) = session else { return Ok(None) };
         let mut msg_stmt = conn.prepare(
@@ -82,9 +85,9 @@ impl SessionStore for SqliteSessionStore {
 
     fn list(&self) -> Result<Vec<Session>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id, created_at, updated_at, title FROM sessions ORDER BY updated_at DESC")?;
+        let mut stmt = conn.prepare("SELECT id, created_at, updated_at, title, compacted_summary, compacted_message_id FROM sessions ORDER BY updated_at DESC")?;
         let sessions = stmt.query_map([], |row| {
-            Ok(Session { id: row.get(0)?, created_at: row.get(1)?, updated_at: row.get(2)?, title: row.get(3)?, messages: Vec::new() })
+            Ok(Session { id: row.get(0)?, created_at: row.get(1)?, updated_at: row.get(2)?, title: row.get(3)?, messages: Vec::new(), compacted_summary: row.get(4)?, compacted_message_id: row.get(5)? })
         })?;
         let mut result = Vec::new();
         for s in sessions { result.push(s?); }
@@ -100,6 +103,21 @@ impl SessionStore for SqliteSessionStore {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM messages WHERE session_id = ?1", rusqlite::params![id])?;
         conn.execute("DELETE FROM sessions WHERE id = ?1", rusqlite::params![id])?;
+        Ok(())
+    }
+
+    fn update_compaction(
+        &self,
+        session_id: &str,
+        summary: Option<&str>,
+        last_msg_id: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE sessions SET compacted_summary = ?1, compacted_message_id = ?2, updated_at = ?3 WHERE id = ?4",
+            rusqlite::params![summary, last_msg_id, now, session_id],
+        )?;
         Ok(())
     }
 }

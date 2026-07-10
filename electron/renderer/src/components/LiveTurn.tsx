@@ -5,6 +5,7 @@ import { markdownComponents } from '../utils/markdown';
 import type { TurnSegment } from '../types/timeline';
 import { Thinking } from './Thinking';
 import { TodoView } from './TodoView';
+import { CompressIcon } from './icons';
 import { ToolPairView } from './ToolCard';
 
 /** Live turn: flat chronological segments, no fold. */
@@ -20,6 +21,20 @@ export function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[
         }
         if (seg.kind === 'todo') {
           return <TodoView key={i} todos={seg.todos} />;
+        }
+        if (seg.kind === 'compacted') {
+          return (
+            <div key={i} className="turn-compacted-banner">
+              <div className="turn-compacted-row">
+                <span className="turn-compacted-icon"><CompressIcon /></span>
+                <span className="turn-compacted-text">
+                  Context compacted — earlier messages summarized
+                  {seg.messageCount != null && ` (${seg.messageCount} messages remaining)`}.
+                </span>
+              </div>
+              {seg.warning && <div className="turn-compacted-warning">⚠ {seg.warning}</div>}
+            </div>
+          );
         }
         return <ToolPairView key={seg.id} segment={seg} />;
       })}

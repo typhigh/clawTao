@@ -14,7 +14,7 @@ fn msg(id: &str, role: &str, content: &str) -> Message {
 #[test]
 fn create_and_get() {
     let store = make_store();
-    let s = Session { id: "s1".into(), created_at: 1000, updated_at: 2000, messages: vec![], title: String::new() };
+    let s = Session { id: "s1".into(), created_at: 1000, updated_at: 2000, messages: vec![], title: String::new(), compacted_summary: None, compacted_message_id: None };
     store.create(&s).unwrap();
     let got = store.get("s1").unwrap().unwrap();
     assert_eq!(got.id, "s1");
@@ -23,8 +23,8 @@ fn create_and_get() {
 #[test]
 fn list_orders_by_updated_desc() {
     let store = make_store();
-    store.create(&Session { id: "a".into(), created_at: 1, updated_at: 100, messages: vec![], title: String::new() }).unwrap();
-    store.create(&Session { id: "b".into(), created_at: 2, updated_at: 200, messages: vec![], title: String::new() }).unwrap();
+    store.create(&Session { id: "a".into(), created_at: 1, updated_at: 100, messages: vec![], title: String::new(), compacted_summary: None, compacted_message_id: None }).unwrap();
+    store.create(&Session { id: "b".into(), created_at: 2, updated_at: 200, messages: vec![], title: String::new(), compacted_summary: None, compacted_message_id: None }).unwrap();
     let list = store.list().unwrap();
     assert_eq!(list[0].id, "b");
     assert_eq!(list[1].id, "a");
@@ -33,7 +33,7 @@ fn list_orders_by_updated_desc() {
 #[test]
 fn add_message_append() {
     let store = make_store();
-    store.create(&Session { id: "s1".into(), created_at: 1000, updated_at: 1000, messages: vec![], title: String::new() }).unwrap();
+    store.create(&Session { id: "s1".into(), created_at: 1000, updated_at: 1000, messages: vec![], title: String::new(), compacted_summary: None, compacted_message_id: None }).unwrap();
     store.add_message("s1", &msg("m1", "user", "hello")).unwrap();
     store.add_message("s1", &msg("m2", "assistant", "hi")).unwrap();
     let session = store.get("s1").unwrap().unwrap();
@@ -43,7 +43,7 @@ fn add_message_append() {
 #[test]
 fn delete_session() {
     let store = make_store();
-    store.create(&Session { id: "s1".into(), created_at: 1000, updated_at: 1000, messages: vec![], title: String::new() }).unwrap();
+    store.create(&Session { id: "s1".into(), created_at: 1000, updated_at: 1000, messages: vec![], title: String::new(), compacted_summary: None, compacted_message_id: None }).unwrap();
     assert!(store.get("s1").unwrap().is_some());
     store.delete("s1").unwrap();
     assert!(store.get("s1").unwrap().is_none());

@@ -15,14 +15,15 @@ function App() {
   const {
     sessions, activeSessionId,
     loadSessions, createSession, selectSession, deleteSession,
-    error, clearError,
-    handleStreamEvent,
+    error, clearError, notice, setNotice,
+    handleStreamEvent, compactSession, compactResult, clearCompactResult,
   } = useChatStore();
 
   const { config, loaded, load: loadConfig } = useSettingsStore();
   const [view, setView] = useState<View>('chat');
   const [inputValue, setInputValue] = useState('');
   const [images, setImages] = useState<ImageAttachment[]>([]);
+  const [compacting, setCompacting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
     loadSessions();
@@ -84,6 +85,7 @@ function App() {
     }
     const imgs = images.length > 0 ? [...images] : undefined;
     setImages([]);
+    useChatStore.setState({ compactResult: null }); // clear compaction banner
     await useChatStore.getState().sendMessage(text, thinkingEnabled, imgs as any);
   };
 
@@ -152,17 +154,48 @@ function App() {
             timeline={timeline}
             error={error}
             onClearError={clearError}
+            notice={notice}
+            onClearNotice={() => setNotice(null)}
+            compactResult={compactResult}
+            onClearCompactResult={clearCompactResult}
             hasActiveSession={!!activeSession}
             onCreateSession={createSession}
             streaming={isStreaming}
             onCancel={() => useChatStore.getState().cancelRun()}
-            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming, textareaRef, onKeyDown: handleKeyDown, thinkingEnabled, onToggleThinking: handleToggleThinking, images, onImagesChange: setImages, workspaceDir: activeSession?.workspace_dir || '' }}
+            input={{ value: inputValue, onChange: setInputValue, onSend: handleSend, disabled: false, sendDisabled: isStreaming || compacting, textareaRef, onKeyDown: handleKeyDown, thinkingEnabled, onToggleThinking: handleToggleThinking, images, onImagesChange: setImages, workspaceDir: activeSession?.workspace_dir || '' }}
             modelOptions={modelOptions}
             selectedModelKey={selectedModelKey}
             onSelectModel={handleSelectModel}
             workspaceOptions={config?.workspaces || []}
             selectedWorkspace={activeSession?.workspace_dir || ''}
             onSelectWorkspace={setSessionWorkspace}
+            onCompact={activeSessionId ? async () => {
+              setCompacting(true);
+              try {
+                const result = await compactSession(activeSessionId);
+                if (result.compacted) {
+                  useChatStore.setState({
+                    compactResult: {
+                      kind: 'success',
+                      beforeTokens: result.beforeTokens,
+                      afterTokens: result.afterTokens,
+                    },
+                  });
+                } else {
+                  useChatStore.setState({
+                    compactResult: {
+                      kind: 'error',
+                      reason: result.reason || t('compact.failed'),
+                    },
+                  });
+                }
+              } finally {
+                setCompacting(false);
+              }
+            } : undefined}
+            compactDisabled={compacting || isStreaming || !activeSessionId}
+            compacting={compacting}
+            messageCount={activeSession?.messages.length ?? 0}
           />
         ) : (
           <SettingsView onBack={handleBackToChat} />

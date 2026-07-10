@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SendIcon, ThinkingIcon, UploadIcon } from './icons';
+import { SendIcon, ThinkingIcon, UploadIcon, CompressIcon } from './icons';
 import type { ImageAttachment } from '../stores/chat';
 
 const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -35,6 +35,12 @@ interface Props {
   workspaceOptions?: import('../stores/settings').WorkspaceEntry[];
   selectedWorkspace?: string;
   onSelectWorkspace?: (wsPath: string) => void;
+  onCompact?: () => void;
+  compactDisabled?: boolean;
+  compacting?: boolean;
+  /** Number of messages in the current session — used to gate the
+   *  compact button when there are too few to compact. */
+  messageCount?: number;
 }
 
 async function fileToImage(f: File): Promise<ImageAttachment | null> {
@@ -52,10 +58,12 @@ export function InputArea({
   thinkingEnabled, onToggleThinking,
   images, onImagesChange,
   workspaceDir, workspaceOptions, selectedWorkspace, onSelectWorkspace,
+  onCompact, compactDisabled, compacting, messageCount,
 }: Props) {
   const { t } = useTranslation();
   const [thinkingHover, setThinkingHover] = useState(false);
   const [imageHover, setImageHover] = useState(false);
+  const [compactHover, setCompactHover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const addImages = async (files: FileList | File[]) => {
@@ -196,6 +204,45 @@ export function InputArea({
             ) : workspaceDir ? (
               <span className="input-workspace-badge" title={workspaceDir} style={{ fontSize: '11px', color: '#888', marginLeft: '6px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '26px', fontFamily: 'monospace' }}>🏠 {workspaceDir.split('/').pop()}</span>
             ) : null}
+            {onCompact && (() => {
+              const tooFew = (messageCount ?? 0) < 6;
+              const fullyDisabled = compactDisabled || streaming || tooFew || compacting;
+              const tooltip = compacting
+                ? t('compact.pending')
+                : streaming
+                  ? t('compact.streamingDisabled')
+                  : tooFew
+                    ? t('compact.tooFew', { min: 6, current: messageCount })
+                    : t('compact.title');
+              return (
+                <button
+                  type="button"
+                  className="input-compact-btn"
+                  disabled={fullyDisabled}
+                  title={tooltip}
+                  onClick={onCompact}
+                  onMouseEnter={() => setCompactHover(true)}
+                  onMouseLeave={() => setCompactHover(false)}
+                  style={{
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    background: compactHover && !fullyDisabled ? '#f3f3f3' : 'transparent',
+                    color: tooFew ? '#bbb' : '#555',
+                    border: '1px solid transparent',
+                    borderRadius: '6px',
+                    width: '26px',
+                    height: '26px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    font: 'inherit',
+                    cursor: fullyDisabled ? 'not-allowed' : 'pointer',
+                    opacity: fullyDisabled ? 0.5 : 1,
+                  }}
+                >{compacting ? <span className="compact-spinner" /> : <CompressIcon size={16} />}</button>
+              );
+            })()}
           </div>
           {streaming ? (
             <button

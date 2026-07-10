@@ -11,7 +11,8 @@ export type TurnSegment =
   | { kind: 'text'; content: string }
   | { kind: 'toolPair'; id: string; toolName: string; toolInput: unknown; result: string | null; pending: boolean }
   | { kind: 'thinking'; content: string }
-  | { kind: 'todo'; todos: { step: string; status: string }[] };
+  | { kind: 'todo'; todos: { step: string; status: string }[] }
+  | { kind: 'compacted'; messageCount?: number; warning?: string };
 
 export type TimelineGroup =
   | { kind: 'user'; id: string; content: string; timestamp: number; images?: ImageAttachment[] }

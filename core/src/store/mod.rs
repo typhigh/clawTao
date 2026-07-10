@@ -51,6 +51,13 @@ pub struct Session {
     pub messages: Vec<Message>,
     #[serde(default)]
     pub title: String,
+    /// Compaction summary text (set after auto-compaction).
+    #[serde(default)]
+    pub compacted_summary: Option<String>,
+    /// ID of the last message that was included in the compaction summary.
+    /// Messages after this ID are preserved in the LLM context.
+    #[serde(default)]
+    pub compacted_message_id: Option<String>,
 }
 
 // ── Constructors ──────────────────────────────────────────────────────
@@ -76,6 +83,8 @@ pub fn new_session() -> Session {
         updated_at: now,
         messages: vec![],
         title: String::new(),
+        compacted_summary: None,
+        compacted_message_id: None,
     }
 }
 

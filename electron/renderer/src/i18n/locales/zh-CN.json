@@ -106,7 +106,7 @@
     "defaultWorkspace": "默认工作区",
     "defaultWorkspaceDescription": "新建会话的默认目录，每个会话可单独修改。",
     "workspaces": "工作区",
-    "workspacesDescription": "工具执行环境——选择工作区后，文件写操作限制在该目录内。",
+    "workspacesDescription": "工具执行环境，选择工作区后，文件写操作限制在该目录内。",
     "addWorkspace": "添加工作区",
     "removeWorkspace": "移除工作区"
   },
@@ -115,5 +115,17 @@
     "error": "错误",
     "loading": "加载中…",
     "back": "返回"
+  },
+  "compact": {
+    "title": "压缩上下文",
+    "pending": "压缩中…",
+    "success": "上下文已压缩",
+    "successWithCount": "上下文已压缩，保留 {{count}} 条消息",
+    "failed": "压缩失败",
+    "tooFew": "至少需要 {{min}} 条消息（当前 {{current}}）",
+    "streamingDisabled": "运行中，无法压缩",
+    "bannerSuccess": "✓ 压缩完成：~{{before}} → ~{{after}} tokens，节省 {{saved}}%（早期内容已总结）",
+    "bannerSuccessFallback": "✓ 压缩完成（早期内容已总结）",
+    "bannerFailed": "✗ 压缩失败：{{reason}}"
   }
 }

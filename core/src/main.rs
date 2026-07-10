@@ -8,6 +8,7 @@
 //! are handled directly on the main thread.
 
 mod chat;
+mod context;
 mod error;
 mod handlers;
 mod jsonrpc;
@@ -67,6 +68,8 @@ fn main() {
             updated_at: chrono::Utc::now().timestamp_millis(),
             messages: vec![],
             title: String::new(),
+            compacted_summary: None,
+            compacted_message_id: None,
         }).ok();
     }
 
@@ -106,6 +109,8 @@ fn dispatch(
 ) {
     if request.method == "chat.send" {
         session_actor::dispatch_chat_send(request, registry);
+    } else if request.method == "session.compact" {
+        session_actor::dispatch_session_compact(request, registry);
     } else if request.method == "chat.interrupt" {
         if let Err(e) = handlers::chat_interrupt(request, registry) {
             error!("Error handling request: {:#}", e);

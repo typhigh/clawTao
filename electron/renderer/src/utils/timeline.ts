@@ -118,6 +118,13 @@ export function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegmen
           segments.push({ kind: 'toolPair', id: ev.toolCallId!, toolName: ev.toolName!, toolInput: null, result: ev.output!, pending: false });
         }
         break;
+      case 'compacting':
+        flushThinking(); flushText(); flushPending();
+        break;
+      case 'compacted':
+        flushThinking(); flushText(); flushPending();
+        segments.push({ kind: 'compacted', messageCount: ev.messageCount, warning: ev.warning });
+        break;
     }
   }
   flushThinking(); flushText(); flushPending();

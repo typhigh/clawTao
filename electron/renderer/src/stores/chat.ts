@@ -13,7 +13,7 @@ declare global {
   interface Window {
     electronAPI: {
       chat: {
-        send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean, images?: ImageAttachment[]) => Promise<{
+        send: (message: string, sessionId: string, model_key?: string, thinking_enabled?: boolean, images?: ImageAttachment[], workspace_dir?: string) => Promise<{
           runId: string;
           message: Message;
         }>;
@@ -24,6 +24,7 @@ declare global {
         create: () => Promise<Session>;
         get: (sessionId: string) => Promise<Session>;
         delete: (sessionId: string) => Promise<unknown>;
+        compact: (sessionId: string) => Promise<{ compacted: boolean; reason?: string; beforeTokens?: number; afterTokens?: number }>;
       };
       config: {
         get: () => Promise<unknown>;
@@ -99,7 +100,7 @@ export interface Session {
 export type StreamEvent = {
   sessionId: string;
   runId: string;
-  kind: 'started' | 'text' | 'thinking' | 'todo' | 'tool_call' | 'tool_result' | 'done';
+  kind: 'started' | 'text' | 'thinking' | 'todo' | 'tool_call' | 'tool_result' | 'compacting' | 'compacted' | 'done';
   // text / thinking
   delta?: string;
   // tool_call
@@ -110,6 +111,9 @@ export type StreamEvent = {
   output?: string;
   // todo
   todos?: { step: string; status: string }[];
+  // compaction
+  messageCount?: number;
+  warning?: string;
 };
 
 // ── Image attachment ──────────────────────────────────────────────────
@@ -138,10 +142,23 @@ export interface ChatError {
 
 // ── Store ─────────────────────────────────────────────────────────────
 
+export interface CompactResult {
+  kind: 'success' | 'error';
+  beforeTokens?: number;
+  afterTokens?: number;
+  reason?: string;
+}
+
 interface ChatState {
   sessions: Session[];
   activeSessionId: string | null;
   error: ChatError | null;
+  /** Transient toast notice (auto-clears in ~3s). Success/error/info messages
+   *  that aren't tied to the persistent `error` field. */
+  notice: { message: string; type: 'success' | 'info' | 'error' } | null;
+  /** Persistent compaction result banner — stays until the user dismisses it
+   *  or sends a new message. */
+  compactResult: CompactResult | null;
 
   // Actions
   loadSessions: () => Promise<void>;
@@ -156,6 +173,9 @@ interface ChatState {
   /** Single handler for all stream events — dispatches on `kind`. */
   handleStreamEvent: (ev: StreamEvent) => void;
   clearError: () => void;
+  clearCompactResult: () => void;
+  compactSession: (sessionId: string) => Promise<{ compacted: boolean; reason?: string; beforeTokens?: number; afterTokens?: number }>;
+  setNotice: (notice: { message: string; type: 'success' | 'info' | 'error' } | null) => void;
 }
 
 // Helper: update a single session in-place.
@@ -193,10 +213,54 @@ function toChatError(err: unknown): ChatError {
   return { message: String(err), errorCode: 'INTERNAL_ERROR', retryable: false };
 }
 
+// ── Stream event batching ────────────────────────────────────────────────
+
+let streamBuffer: StreamEvent[] = [];
+let streamFlushTimer: ReturnType<typeof setTimeout> | null = null;
+const STREAM_FLUSH_MS = 50;
+
+function flushStreamBuffer(
+  set: (partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>)) => void,
+) {
+  if (streamFlushTimer) { clearTimeout(streamFlushTimer); streamFlushTimer = null; }
+  if (streamBuffer.length === 0) return;
+  const batch = streamBuffer;
+  streamBuffer = [];
+  set((state) => {
+    // Group all events by session.
+    const bySession = new Map<string, StreamEvent[]>();
+    for (const ev of batch) {
+      let arr = bySession.get(ev.sessionId);
+      if (!arr) { arr = []; bySession.set(ev.sessionId, arr); }
+      arr.push(ev);
+    }
+    let sessions = state.sessions;
+    for (const [sid, evs] of bySession) {
+      sessions = patchSession(sessions, sid, (s) => ({
+        ...s,
+        currentTurn: [...(s.currentTurn || []), ...evs],
+      }));
+    }
+    return { sessions };
+  });
+}
+
+function enqueueStreamEvent(
+  ev: StreamEvent,
+  set: (partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>)) => void,
+) {
+  streamBuffer.push(ev);
+  if (!streamFlushTimer) {
+    streamFlushTimer = setTimeout(() => flushStreamBuffer(set), STREAM_FLUSH_MS);
+  }
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions: [],
   activeSessionId: null,
   error: null,
+  notice: null,
+  compactResult: null,
 
   loadSessions: async () => {
     try {
@@ -294,6 +358,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return;
     }
 
+    // Clear any pending batched events from the previous turn.
+    streamBuffer = [];
+    if (streamFlushTimer) { clearTimeout(streamFlushTimer); streamFlushTimer = null; }
+
     const userMsg: Message = {
       id: `tmp-${Date.now()}`,
       role: 'user',
@@ -329,72 +397,82 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   handleStreamEvent: (ev: StreamEvent) => {
-    set((state) => {
-      const sid = ev.sessionId;
-      switch (ev.kind) {
-        case 'started':
-          return {
-            sessions: patchSession(state.sessions, sid, (s) => ({
-              ...s,
-              isStreaming: true,
-              currentTurn: [ev],
-              currentRunId: ev.runId,
-            })),
-          };
-        case 'text':
-        case 'thinking':
-        case 'todo':
-        case 'tool_call':
-        case 'tool_result':
-          return {
-            sessions: patchSession(state.sessions, sid, (s) => ({
-              ...s,
-              currentTurn: [...(s.currentTurn || []), ev],
-            })),
-          };
-        case 'done':
-          // Preserve user-uploaded images from the temp user message.
-          const tempUserImages = (state.sessions
-            .find(s => s.id === sid)?.messages || [])
-            .filter(m => m.id.startsWith('tmp-') && m.role === 'user')
-            .flatMap(m => m.images || []);
-          // Async-reload from Rust, then merge preserved images.
-          window.electronAPI.session.get(sid).then((session) => {
-            if (tempUserImages.length > 0) {
-              const msgs = [...session.messages];
-              for (let i = msgs.length - 1; i >= 0; i--) {
-                if (msgs[i].role === 'user') { msgs[i] = { ...msgs[i], images: tempUserImages }; break; }
-              }
-              session.messages = msgs;
+    // Terminal / state-changing events flush immediately.
+    switch (ev.kind) {
+      case 'started':
+        streamBuffer = [];
+        if (streamFlushTimer) { clearTimeout(streamFlushTimer); streamFlushTimer = null; }
+        set({
+          compactResult: null,
+          sessions: patchSession(get().sessions, ev.sessionId, (s) => ({
+            ...s,
+            isStreaming: true,
+            currentTurn: [ev],
+            currentRunId: ev.runId,
+          })),
+        });
+        return;
+      case 'done':
+        flushStreamBuffer(set);
+        const sid = ev.sessionId;
+        const tempUserImages = (get().sessions
+          .find(s => s.id === sid)?.messages || [])
+          .filter(m => m.id.startsWith('tmp-') && m.role === 'user')
+          .flatMap(m => m.images || []);
+        // Append done event, then async-reload.
+        set((state) => ({
+          sessions: patchSession(state.sessions, sid, (s) => ({
+            ...s,
+            currentTurn: [...(s.currentTurn || []), ev],
+          })),
+        }));
+        window.electronAPI.session.get(sid).then((session) => {
+          if (tempUserImages.length > 0) {
+            const msgs = [...session.messages];
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i].role === 'user') { msgs[i] = { ...msgs[i], images: tempUserImages }; break; }
             }
-            set((s2) => ({
-              sessions: patchSession(s2.sessions, sid, () => ({
-                ...session,
-                isStreaming: false,
-                currentTurn: [],
-                model_key: s2.sessions.find(x => x.id === sid)?.model_key,
-                workspace_dir: s2.sessions.find(x => x.id === sid)?.workspace_dir,
-              })),
-            }));
-          }).catch(() => {
-            set((s2) => ({
-              sessions: patchSession(s2.sessions, sid, (s) => ({
-                ...s,
-                isStreaming: false,
-                currentTurn: [],
-              })),
-            }));
-          });
-          return {
-            sessions: patchSession(state.sessions, sid, (s) => ({
-              ...s,
-              currentTurn: [...(s.currentTurn || []), ev],
+            session.messages = msgs;
+          }
+          set((s2) => ({
+            sessions: patchSession(s2.sessions, sid, () => ({
+              ...session,
+              isStreaming: false,
+              currentTurn: [],
+              model_key: s2.sessions.find(x => x.id === sid)?.model_key,
+              workspace_dir: s2.sessions.find(x => x.id === sid)?.workspace_dir,
             })),
-          };
-        default:
-          return {};
-      }
-    });
+          }));
+        }).catch(() => {
+          set((s2) => ({
+            sessions: patchSession(s2.sessions, sid, (s) => ({
+              ...s,
+              isStreaming: false,
+              currentTurn: [],
+            })),
+          }));
+        });
+        return;
+      case 'compacted':
+        // Flush pending, then apply compacted banner immediately.
+        flushStreamBuffer(set);
+        set({
+          compactResult: { kind: 'success', beforeTokens: undefined, afterTokens: undefined },
+        });
+        enqueueStreamEvent(ev, set);
+        return;
+      case 'text':
+      case 'thinking':
+      case 'todo':
+      case 'tool_call':
+      case 'tool_result':
+      case 'compacting':
+        // Batch these — fire every ~50ms.
+        enqueueStreamEvent(ev, set);
+        return;
+      default:
+        return;
+    }
   },
 
   cancelRun: async () => {
@@ -438,4 +516,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  clearCompactResult: () => set({ compactResult: null }),
+
+  /** Show a transient toast that auto-clears after ~3.5s. */
+  setNotice: (notice) => {
+    set({ notice });
+    if (notice) {
+      setTimeout(() => {
+        // Only clear if the same notice is still on screen.
+        const cur = get().notice;
+        if (cur && cur.message === notice.message && cur.type === notice.type) {
+          set({ notice: null });
+        }
+      }, 3500);
+    }
+  },
+
+  compactSession: async (sessionId: string) => {
+    try {
+      const result = await window.electronAPI.session.compact(sessionId);
+      return result;
+    } catch {
+      return { compacted: false };
+    }
+  },
 }));

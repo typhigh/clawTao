@@ -104,6 +104,39 @@ export function UploadIcon() {
   );
 }
 
+/** Compress / shrink icon — used for the manual "compact context" button +
+ *  the context-compaction banner.
+ *
+ *  Visual metaphor: a stack of horizontal lines (chat messages) with inward
+ *  chevrons (compression direction). Unambiguously reads as "fold these
+ *  messages into a summary" — distinct from fullscreen / expand icons.
+ */
+export function CompressIcon({ size }: { size?: number } = {}) {
+  const s = size ?? 18;
+  return (
+    <svg
+      width={s} height={s}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: 'block' }}
+    >
+      {/* Three horizontal lines = chat messages */}
+      <line x1="3" y1="6"  x2="13" y2="6" />
+      <line x1="3" y1="12" x2="15" y2="12" />
+      <line x1="3" y1="18" x2="13" y2="18" />
+      {/* Two chevrons pointing inward = compression direction */}
+      <polyline points="20 8  16 12 20 16" />
+      <polyline points="20 18 16 12 20 6"  opacity="0.4" />
+    </svg>
+  );
+}
+
 /** Lightbulb icon — used for the "thinking" toggle in the input area. (Lucide)
  *  `active` overlays a light-yellow lightning bolt when extended thinking is on. */
 export function ThinkingIcon({ active = false }: { active?: boolean } = {}) {

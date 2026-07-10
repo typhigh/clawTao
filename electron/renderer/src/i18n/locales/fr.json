@@ -102,9 +102,21 @@
     "defaultWorkspace": "Espace par défaut",
     "defaultWorkspaceDescription": "Répertoire pour les nouvelles sessions. Modifiable par session.",
     "workspaces": "Espaces de travail",
-    "workspacesDescription": "Environnement d'exécution. La sélection restreint les écritures fichier à ce répertoire.",
+    "workspacesDescription": "Environnement d'exécution, la sélection restreint les écritures fichier à ce répertoire.",
     "addWorkspace": "Ajouter espace",
     "removeWorkspace": "Supprimer espace"
+  },
+  "compact": {
+    "title": "Compresser le contexte",
+    "pending": "Compression…",
+    "success": "Contexte compressé",
+    "successWithCount": "Contexte compressé, {{count}} messages conservés",
+    "failed": "Échec de la compression",
+    "tooFew": "Au moins {{min}} messages requis (actuellement {{current}})",
+    "streamingDisabled": "Impossible de compresser pendant la diffusion",
+    "bannerSuccess": "✓ Compression terminée : ~{{before}} → ~{{after}} tokens, {{saved}}% économisés (messages précédents résumés)",
+    "bannerSuccessFallback": "✓ Compression terminée (messages précédents résumés)",
+    "bannerFailed": "✗ Échec de la compression : {{reason}}"
   },
   "common": {
     "auto": "(auto)",

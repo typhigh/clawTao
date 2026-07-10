@@ -64,7 +64,7 @@ fn build_basic_user_message() {
         serde_json::from_str(&http.body).expect("body should be valid JSON");
 
     assert_eq!(body["model"], "claude-sonnet-4-6");
-    assert_eq!(body["max_tokens"], 4096);
+    assert_eq!(body["max_tokens"], 32768);
     assert_eq!(body["stream"], true);
     assert_eq!(body["system"], "You are helpful.");
 

@@ -9,4 +9,13 @@ pub trait SessionStore: Send + Sync {
     fn list(&self) -> Result<Vec<Session>>;
     fn add_message(&self, session_id: &str, msg: &Message) -> Result<()>;
     fn delete(&self, id: &str) -> Result<()>;
+
+    /// Persist compaction metadata. Does NOT modify the messages table.
+    /// Pass `None` to clear compaction state.
+    fn update_compaction(
+        &self,
+        session_id: &str,
+        summary: Option<&str>,
+        last_msg_id: Option<&str>,
+    ) -> Result<()>;
 }

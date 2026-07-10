@@ -21,6 +21,12 @@ pub enum SessionMsg {
         params: serde_json::Value,
         response_id: Option<serde_json::Value>,
     },
+    /// Run a manual compaction. Serialised with Run so store mutations
+    /// are never concurrent for the same session.
+    Compact {
+        params: serde_json::Value,
+        response_id: Option<serde_json::Value>,
+    },
     /// Gracefully shut down the actor (e.g. on session delete).
     Shutdown,
 }
@@ -110,8 +116,48 @@ pub(crate) fn dispatch_chat_send(
     }
 }
 
-/// Session actor loop. Processes Run messages sequentially.
-/// Resets the cancel flag at the start of each Run.
+/// Dispatch a session.compact request to the appropriate session actor.
+/// Serialises with chat.send so store mutations are never concurrent.
+pub(crate) fn dispatch_session_compact(
+    request: &crate::jsonrpc::Request,
+    registry: &SessionRegistry,
+) {
+    let session_id = match request.params.as_ref()
+        .and_then(|p| p.get("sessionId"))
+        .and_then(|v| v.as_str())
+    {
+        Some(id) => id.to_string(),
+        None => {
+            let _ = crate::jsonrpc::write_response(&crate::jsonrpc::Response::error(
+                request.id.clone(), -32602, "Missing sessionId",
+            ));
+            return;
+        }
+    };
+
+    let store = Arc::clone(&registry.store);
+    let params = request.params.clone().unwrap_or_default();
+    let response_id = request.id.clone();
+    let sid = session_id.clone();
+
+    let tx = registry.get_or_spawn(&session_id, move |rx, cancel| {
+        let store = Arc::clone(&store);
+        let sid = sid.clone();
+        std::thread::spawn(move || {
+            actor_loop(rx, &sid, store, cancel, process_run_wrapper);
+        })
+    });
+
+    if tx.send(SessionMsg::Compact { params, response_id }).is_err() {
+        tracing::error!("Failed to send Compact to session actor {session_id}");
+        let _ = crate::jsonrpc::write_response(&crate::jsonrpc::Response::error(
+            request.id.clone(), -32603, "Session actor has stopped",
+        ));
+    }
+}
+
+/// Session actor loop. Processes Run and Compact messages sequentially.
+/// Resets the cancel flag at the start of each message.
 pub(crate) fn actor_loop(
     rx: mpsc::Receiver<SessionMsg>,
     session_id: &str,
@@ -130,6 +176,10 @@ pub(crate) fn actor_loop(
                 cancel.store(false, Ordering::SeqCst);
                 process(&client, &*store, params, response_id, &cancel);
             }
+            SessionMsg::Compact { params, response_id } => {
+                cancel.store(false, Ordering::SeqCst);
+                process_compact_wrapper(&client, &*store, params, response_id);
+            }
             SessionMsg::Shutdown => {
                 info!("Actor for session {session_id} shutting down");
                 break;
@@ -143,7 +193,7 @@ pub(crate) fn actor_loop(
 /// On error downcasts the anyhow chain for a `ChatError` so the JSON-RPC
 /// error response can carry structured metadata (`errorCode`, `retryable`,
 /// `suggestion`) that the frontend uses to render differentiated recovery UI.
-pub(crate) fn process_run_wrapper(
+fn process_run_wrapper(
     client: &Client,
     store: &dyn SessionStore,
     params: Value,
@@ -179,6 +229,25 @@ pub(crate) fn process_run_wrapper(
                 ),
             );
         }
+    }
+}
+
+/// Compact processor: delegates to handlers::session_compact.
+/// Runs on the session actor thread so store access is serialised.
+fn process_compact_wrapper(
+    client: &Client,
+    store: &dyn SessionStore,
+    params: Value,
+    response_id: Option<Value>,
+) {
+    let request = crate::jsonrpc::Request {
+        jsonrpc: "2.0".into(),
+        id: response_id,
+        method: "session.compact".into(),
+        params: Some(params),
+    };
+    if let Err(e) = crate::handlers::session_compact(&request, store, client) {
+        error!("compact error: {e:#}");
     }
 }
 

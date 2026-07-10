@@ -192,6 +192,37 @@ function setupIpc() {
   ipcMain.handle('session:get', (_e, p: { sessionId: string }) => sendRpc('session.get', p));
   ipcMain.handle('session:delete', (_e, p: { sessionId: string }) => sendRpc('session.delete', p));
 
+  // session.compact — manual context compaction.
+  ipcMain.handle('session:compact', (_e, p: { sessionId: string }) => {
+    const config: any = readConfig();
+    const flat: any = { sessionId: p.sessionId, config: {} };
+    for (const prov of (config.llm?.providers || [])) {
+      const mid = config.llm.default_model_id || '';
+      const [pid, ...rest] = mid.split('/');
+      if (pid === prov.id) {
+        flat.config.api_key = readEncryptedKey(prov.id) || prov.api_key || '';
+        flat.config.base_url = prov.base_url;
+        flat.config.api_protocol = prov.api_protocol || 'openai';
+        flat.config.model = rest.join('/');
+        break;
+      }
+    }
+    if (!flat.config.api_key) {
+      // Fallback: use first provider with a key.
+      for (const prov of (config.llm?.providers || [])) {
+        const key = readEncryptedKey(prov.id) || prov.api_key || '';
+        if (key) {
+          flat.config.api_key = key;
+          flat.config.base_url = prov.base_url;
+          flat.config.api_protocol = prov.api_protocol || 'openai';
+          flat.config.model = prov.models?.[0] || '';
+          break;
+        }
+      }
+    }
+    return sendRpc('session.compact', flat);
+  });
+
   // chat.interrupt
   ipcMain.handle('chat:interrupt', (_e, p: { sessionId: string }) =>
     sendRpc('chat.interrupt', p)

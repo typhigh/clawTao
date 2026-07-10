@@ -83,6 +83,98 @@ pub fn ping(request: &Request) -> Result<()> {
     Ok(())
 }
 
+// ── Compaction ────────────────────────────────────────────────────────────
+
+/// Manual compaction handler. Runs on the session actor thread so store
+/// access is serialised with chat.send.
+pub(crate) fn session_compact(
+    request: &Request,
+    store: &dyn SessionStore,
+    client: &reqwest::blocking::Client,
+) -> Result<()> {
+    let session_id = jsonrpc::get_param(&request.params, "sessionId")?;
+
+    let config = request.params.as_ref()
+        .and_then(|p| p.get("config"))
+        .ok_or_else(|| anyhow::anyhow!("Missing config"))?;
+
+    let api_key = config["api_key"].as_str().filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("API key not configured"))?;
+    let base_url = config["base_url"].as_str().filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("Missing base_url"))?;
+    let model = config["model"].as_str().filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("Missing model"))?;
+    let protocol = config["api_protocol"].as_str()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("Missing api_protocol"))?;
+
+    let session = store.get(session_id)?
+        .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
+
+    if session.messages.len() < crate::context::MIN_MSGS {
+        jsonrpc::write_response(&Response::success(request.id.clone(), json!({
+            "compacted": false,
+            "reason": "too few messages to compact",
+        })))?;
+        return Ok(());
+    }
+
+    // ── Estimate "before" tokens (what the LLM currently sees) ──────
+    let before_tokens = if let (Some(ref summary), Some(ref compacted_id)) =
+        (&session.compacted_summary, &session.compacted_message_id)
+    {
+        let effective = crate::chat::build_effective_messages(
+            &session.messages, compacted_id, summary,
+        );
+        crate::context::estimate_total_tokens_from_store("", &effective, &[], "")
+    } else {
+        crate::context::estimate_total_tokens_from_store("", &session.messages, &[], "")
+    };
+
+    let adapter: Box<dyn crate::llm::ApiAdapter> = match protocol {
+        "anthropic" => Box::new(crate::llm::AnthropicAdapter),
+        _ => Box::new(crate::llm::OpenAiAdapter),
+    };
+
+    // Manual compaction is more aggressive than automatic: keep only
+    // the last turn so the user sees a noticeable reduction.
+    const MANUAL_KEEP_TURNS: usize = 1;
+
+    match crate::chat::compact_session(
+        adapter.as_ref(), client, api_key, base_url, model,
+        store, session_id, &session.messages,
+        MANUAL_KEEP_TURNS,
+    ) {
+        Ok((_summary, _last_id)) => {
+            // Re-read session to get the persisted compacted_summary.
+            let session = store.get(session_id)?
+                .ok_or_else(|| anyhow::anyhow!("Session vanished after compaction"))?;
+            let after_tokens = {
+                let effective = crate::chat::build_effective_messages(
+                    &session.messages,
+                    session.compacted_message_id.as_ref().unwrap(),
+                    session.compacted_summary.as_ref().unwrap(),
+                );
+                crate::context::estimate_total_tokens_from_store("", &effective, &[], "")
+            };
+            jsonrpc::write_response(&Response::success(request.id.clone(), json!({
+                "compacted": true,
+                "beforeTokens": before_tokens,
+                "afterTokens": after_tokens,
+            })))?;
+        }
+        Err(e) => {
+            let detail = format!("{e:#}");
+            tracing::warn!("Manual compaction failed: {detail}");
+            jsonrpc::write_response(&Response::success(request.id.clone(), json!({
+                "compacted": false,
+                "reason": detail,
+            })))?;
+        }
+    }
+    Ok(())
+}
+
 // ── Error ────────────────────────────────────────────────────────────────
 
 pub fn not_found(request: &Request) -> Result<()> {

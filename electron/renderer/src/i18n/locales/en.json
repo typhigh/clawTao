@@ -102,7 +102,7 @@
     "defaultWorkspace": "Default Workspace",
     "defaultWorkspaceDescription": "Directory for new sessions. Can be overridden per session.",
     "workspaces": "Workspaces",
-    "workspacesDescription": "Tool execution environment. Selecting a workspace restricts file writes to that directory.",
+    "workspacesDescription": "Tool execution environment, selecting a workspace restricts file writes to that directory.",
     "addWorkspace": "Add workspace",
     "removeWorkspace": "Remove workspace"
   },
@@ -111,5 +111,17 @@
     "error": "Error",
     "loading": "Loading...",
     "back": "Back"
+  },
+  "compact": {
+    "title": "Compact context",
+    "pending": "Compacting…",
+    "success": "Context compacted",
+    "successWithCount": "Context compacted, {{count}} messages kept",
+    "failed": "Compaction failed",
+    "tooFew": "Need at least {{min}} messages (currently {{current}})",
+    "streamingDisabled": "Cannot compact while streaming",
+    "bannerSuccess": "✓ Compacted: ~{{before}} → ~{{after}} tokens, saved {{saved}}% (earlier messages summarized)",
+    "bannerSuccessFallback": "✓ Compaction complete (earlier messages summarized)",
+    "bannerFailed": "✗ Compaction failed: {{reason}}"
   }
 }

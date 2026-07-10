@@ -102,9 +102,21 @@
     "defaultWorkspace": "デフォルトワークスペース",
     "defaultWorkspaceDescription": "新規セッションのディレクトリ。セッションごとに変更可能。",
     "workspaces": "ワークスペース",
-    "workspacesDescription": "ツール実行環境。選択でファイル書き込みがそのディレクトリに制限されます。",
+    "workspacesDescription": "ツール実行環境、選択でファイル書き込みがそのディレクトリに制限されます。",
     "addWorkspace": "ワークスペース追加",
     "removeWorkspace": "ワークスペース削除"
+  },
+  "compact": {
+    "title": "コンテキスト圧縮",
+    "pending": "圧縮中…",
+    "success": "コンテキストを圧縮しました",
+    "successWithCount": "コンテキストを圧縮しました（{{count}}件のメッセージを保持）",
+    "failed": "圧縮に失敗しました",
+    "tooFew": "最低{{min}}件のメッセージが必要です（現在{{current}}件）",
+    "streamingDisabled": "ストリーミング中は圧縮できません",
+    "bannerSuccess": "✓ 圧縮完了：~{{before}} → ~{{after}} tokens、{{saved}}% 節約（以前のメッセージは要約されました）",
+    "bannerSuccessFallback": "✓ 圧縮完了（以前のメッセージは要約されました）",
+    "bannerFailed": "✗ 圧縮失敗：{{reason}}"
   },
   "common": {
     "auto": "（自動）",
