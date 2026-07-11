@@ -37,14 +37,12 @@ function ChatInputPanelInner({
   const [images, setImages] = useState<ImageAttachment[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Auto-grow textarea
+  // Auto-resize textarea (ClawX pattern). Cap at 200px to prevent layout blow-up.
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    const minHeight = 2 * 24;
-    const maxHeight = 6 * 24;
-    const target = Math.max(minHeight, Math.min(ta.scrollHeight, maxHeight));
+    const target = Math.min(ta.scrollHeight, 200);
     ta.style.height = `${target}px`;
   }, [inputValue]);
 
@@ -52,10 +50,6 @@ function ChatInputPanelInner({
     if (!inputValue.trim() || isStreaming || !sessionId) return;
     const text = inputValue;
     setInputValue('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${2 * 24}px`;
-    }
     const imgs = images.length > 0 ? [...images] : undefined;
     setImages([]);
     useChatStore.setState({ compactResult: null });

@@ -96,6 +96,7 @@ export function ChatScreen() {
   return (
     <ChatView
       timeline={timeline}
+      activeSessionId={activeSessionId}
       error={error}
       onClearError={clearError}
       notice={notice}

@@ -15,6 +15,8 @@ export interface ModelOption {
 
 interface Props {
   timeline: TimelineGroup[];
+  /** Active session id — used to reset scroll-to-bottom stickiness on switch. */
+  activeSessionId: string | null;
   error: ChatError | null;
   onClearError: () => void;
   /** Transient toast notice (auto-clears). */
@@ -52,14 +54,37 @@ function errorAction(errorCode: string): string | null {
   }
 }
 
-export function ChatView({ timeline, error, onClearError, notice, onClearNotice, compactResult, onClearCompactResult, hasActiveSession, onCreateSession, onRetry, inputPanel }: Props) {
+export function ChatView({ timeline, activeSessionId, error, onClearError, notice, onClearNotice, compactResult, onClearCompactResult, hasActiveSession, onCreateSession, onRetry, inputPanel }: Props) {
   const { t } = useTranslation();
   const messagesRef = useRef<HTMLDivElement>(null);
+  // True when user is at (or near) the bottom. While streaming we only
+  // auto-scroll if this is true, so users can scroll up to read history
+  // without being yanked back. Reset on session switch (handled below).
+  const userAtBottomRef = useRef(true);
+  const STICK_THRESHOLD = 32; // px from bottom counted as "still at bottom"
 
-  // Auto-scroll to bottom when timeline changes (session switch or new messages).
+  const updateStickiness = () => {
+    const el = messagesRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    userAtBottomRef.current = distFromBottom <= STICK_THRESHOLD;
+  };
+
+  // Session switch — reset stickiness and always jump to bottom.
   useEffect(() => {
     const el = messagesRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    userAtBottomRef.current = true;
+    el.scrollTop = el.scrollHeight;
+  }, [activeSessionId]);
+
+  // Timeline update — only follow if user is already at the bottom.
+  useEffect(() => {
+    const el = messagesRef.current;
+    if (!el) return;
+    if (userAtBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [timeline]);
 
   return (
@@ -102,7 +127,7 @@ export function ChatView({ timeline, error, onClearError, notice, onClearNotice,
 
       {hasActiveSession ? (
         <>
-          <div className="messages" ref={messagesRef}>
+          <div className="messages" ref={messagesRef} onScroll={updateStickiness}>
             {timeline.map((group) => {
               if (group.kind === 'user') return <UserMessageView key={group.id} content={group.content} images={group.images} />;
               if (group.kind === 'liveTurn') return <LiveTurnView key="live-turn" segments={group.segments} isStreaming={group.isStreaming} />;
