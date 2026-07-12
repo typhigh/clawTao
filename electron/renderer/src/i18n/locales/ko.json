@@ -114,6 +114,7 @@
   },
   "compact": {
     "title": "컨텍스트 압축",
+    "button": "압축",
     "pending": "압축 중…",
     "success": "컨텍스트 압축 완료",
     "successWithCount": "컨텍스트 압축 완료, {{count}}개 메시지 유지",
@@ -123,6 +124,14 @@
     "bannerSuccess": "✓ 압축 완료: ~{{before}} → ~{{after}} tokens, {{saved}}% 절약 (이전 메시지 요약됨)",
     "bannerSuccessFallback": "✓ 압축 완료 (이전 메시지 요약됨)",
     "bannerFailed": "✗ 압축 실패: {{reason}}"
+  },
+  "context": {
+    "title": "컨텍스트 사용량",
+    "systemPrompt": "시스템 프롬프트",
+    "messageHistory": "대화 기록",
+    "remaining": "남은 공간",
+    "summary": "{{totalPct}}% 사용",
+    "loading": "컨텍스트 사용량 가져오는 중…"
   },
   "common": {
     "auto": "(자동)",

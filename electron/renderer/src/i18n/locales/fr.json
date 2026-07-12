@@ -114,6 +114,7 @@
   },
   "compact": {
     "title": "Compresser le contexte",
+    "button": "Compresser",
     "pending": "Compression…",
     "success": "Contexte compressé",
     "successWithCount": "Contexte compressé, {{count}} messages conservés",
@@ -123,6 +124,14 @@
     "bannerSuccess": "✓ Compression terminée : ~{{before}} → ~{{after}} tokens, {{saved}}% économisés (messages précédents résumés)",
     "bannerSuccessFallback": "✓ Compression terminée (messages précédents résumés)",
     "bannerFailed": "✗ Échec de la compression : {{reason}}"
+  },
+  "context": {
+    "title": "Utilisation du contexte",
+    "systemPrompt": "Prompt système",
+    "messageHistory": "Historique",
+    "remaining": "Restant",
+    "summary": "Utilisé {{totalPct}}%",
+    "loading": "Récupération de l'utilisation du contexte…"
   },
   "common": {
     "auto": "(auto)",

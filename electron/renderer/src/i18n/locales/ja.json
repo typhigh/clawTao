@@ -114,6 +114,7 @@
   },
   "compact": {
     "title": "コンテキスト圧縮",
+    "button": "圧縮",
     "pending": "圧縮中…",
     "success": "コンテキストを圧縮しました",
     "successWithCount": "コンテキストを圧縮しました（{{count}}件のメッセージを保持）",
@@ -123,6 +124,14 @@
     "bannerSuccess": "✓ 圧縮完了：~{{before}} → ~{{after}} tokens、{{saved}}% 節約（以前のメッセージは要約されました）",
     "bannerSuccessFallback": "✓ 圧縮完了（以前のメッセージは要約されました）",
     "bannerFailed": "✗ 圧縮失敗：{{reason}}"
+  },
+  "context": {
+    "title": "コンテキスト使用量",
+    "systemPrompt": "システムプロンプト",
+    "messageHistory": "会話履歴",
+    "remaining": "残り",
+    "summary": "{{totalPct}}% 使用中",
+    "loading": "コンテキスト使用量を取得中…"
   },
   "common": {
     "auto": "（自動）",
