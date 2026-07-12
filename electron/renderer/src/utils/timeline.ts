@@ -76,7 +76,7 @@ export function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegmen
   const segments: TurnSegment[] = [];
   let textBuf = '';
   let thinkingBuf = '';
-  let pendingTool: { id: string; name: string; input: unknown } | null = null;
+  let pendingTools = new Map<string, { name: string; input: unknown }>();
   let thinkId = 0;
   let textId = 0;
 
@@ -93,10 +93,10 @@ export function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegmen
     }
   };
   const flushPending = () => {
-    if (pendingTool) {
-      segments.push({ kind: 'toolPair', id: pendingTool.id, toolName: pendingTool.name, toolInput: pendingTool.input, result: null, pending: true });
-      pendingTool = null;
+    for (const [id, p] of pendingTools) {
+      segments.push({ kind: 'toolPair', id, toolName: p.name, toolInput: p.input, result: null, pending: true });
     }
+    pendingTools.clear();
   };
 
   for (const ev of events) {
@@ -114,16 +114,19 @@ export function buildLiveSegments(events: StreamEvent[]): { segments: TurnSegmen
       case 'thinking': thinkingBuf += ev.delta!; break;
       case 'text': flushThinking(); textBuf += ev.delta!; break;
       case 'tool_call':
-        flushThinking(); flushText(); flushPending();
-        pendingTool = { id: ev.toolCallId!, name: ev.toolName!, input: ev.input };
+        flushThinking(); flushText();
+        pendingTools.set(ev.toolCallId!, { name: ev.toolName!, input: ev.input });
         break;
       case 'tool_result':
         flushText();
-        if (pendingTool && pendingTool.id === ev.toolCallId) {
-          segments.push({ kind: 'toolPair', id: pendingTool.id, toolName: pendingTool.name, toolInput: pendingTool.input, result: ev.output!, pending: false });
-          pendingTool = null;
-        } else {
-          segments.push({ kind: 'toolPair', id: ev.toolCallId!, toolName: ev.toolName!, toolInput: null, result: ev.output!, pending: false });
+        {
+          const p = pendingTools.get(ev.toolCallId!);
+          if (p) {
+            pendingTools.delete(ev.toolCallId!);
+            segments.push({ kind: 'toolPair', id: ev.toolCallId!, toolName: p.name, toolInput: p.input, result: ev.output!, pending: false });
+          } else {
+            segments.push({ kind: 'toolPair', id: ev.toolCallId!, toolName: ev.toolName!, toolInput: null, result: ev.output!, pending: false });
+          }
         }
         break;
       case 'compacting':

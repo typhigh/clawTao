@@ -246,6 +246,12 @@ impl SandboxProfile {
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| "/Users/unknown".to_string());
 
+        // Canonicalize the workspace path to resolve symlinks (e.g. /tmp → /private/tmp on macOS).
+        // Fall back to the original path if canonicalization fails (e.g. directory not yet created).
+        let workspace_dir = std::fs::canonicalize(&config.workspace_dir)
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| config.workspace_dir.clone());
+
         let network_policy = match config.mode {
             SandboxMode::Strict => NETWORK_POLICY_DENY,
             _ => NETWORK_POLICY_ALLOW,
@@ -253,7 +259,7 @@ impl SandboxProfile {
 
         let sbpl = SBPL_BASE
             .replace("{{HOME}}", &home)
-            .replace("{{WORKSPACE_DIR}}", &config.workspace_dir)
+            .replace("{{WORKSPACE_DIR}}", &workspace_dir)
             .replace("{{NETWORK_POLICY}}", network_policy.trim_start());
 
         Self { sbpl }

@@ -108,6 +108,7 @@ describe('chat store', () => {
   });
 
   it('handleStreamEvent "text" appends to per-session currentTurn', () => {
+    vi.useFakeTimers();
     useChatStore.setState({
       activeSessionId: 's1',
       sessions: [makeSession({ currentTurn: [makeEvent({ kind: 'started' })], isStreaming: true })],
@@ -115,14 +116,17 @@ describe('chat store', () => {
 
     useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'text', delta: 'Hello' }));
     useChatStore.getState().handleStreamEvent(makeEvent({ kind: 'text', delta: ' World' }));
+    vi.runAllTimers();
 
     const turn = currentTurn(useChatStore.getState(), 's1');
     expect(turn).toHaveLength(3);
     expect(turn[1].delta).toBe('Hello');
     expect(turn[2].delta).toBe(' World');
+    vi.useRealTimers();
   });
 
   it('handleStreamEvent receives events for non-active session', () => {
+    vi.useFakeTimers();
     // Session s2 is not active but should still receive events.
     useChatStore.setState({
       activeSessionId: 's1',
@@ -133,13 +137,16 @@ describe('chat store', () => {
     });
 
     useChatStore.getState().handleStreamEvent(makeEvent({ sessionId: 's2', kind: 'text', delta: 's2-text' }));
+    vi.runAllTimers();
 
     const s2Turn = currentTurn(useChatStore.getState(), 's2');
     expect(s2Turn).toHaveLength(1);
     expect(s2Turn[0].delta).toBe('s2-text');
+    vi.useRealTimers();
   });
 
   it('handleStreamEvent "tool_call" and "tool_result" ordered per-session', () => {
+    vi.useFakeTimers();
     useChatStore.setState({
       activeSessionId: 's1',
       sessions: [makeSession({ currentTurn: [makeEvent({ kind: 'started' })], isStreaming: true })],
@@ -151,6 +158,7 @@ describe('chat store', () => {
     useChatStore.getState().handleStreamEvent(makeEvent({
       kind: 'tool_result', toolCallId: 'tc1', toolName: 'Bash', output: 'stdout:\nfile.txt',
     }));
+    vi.runAllTimers();
 
     const turn = currentTurn(useChatStore.getState(), 's1');
     expect(turn).toHaveLength(3);
@@ -158,6 +166,7 @@ describe('chat store', () => {
     expect(turn[1].toolName).toBe('Bash');
     expect(turn[2].kind).toBe('tool_result');
     expect(turn[2].output).toBe('stdout:\nfile.txt');
+    vi.useRealTimers();
   });
 
   it('handleStreamEvent "done" reloads session and clears streaming', async () => {

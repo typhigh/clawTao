@@ -11,6 +11,7 @@ use crate::tools::{self, registry::ToolRegistry};
 use crate::jsonrpc::{get_param, write_notification, write_response};
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tracing::{debug, trace, warn};
@@ -31,7 +32,7 @@ pub(crate) fn run_turn(
     request: &crate::jsonrpc::Request,
     store: &dyn SessionStore,
     client: &Client,
-    cancel: &AtomicBool,
+    cancel: &Arc<AtomicBool>,
 ) -> Result<()> {
     let message_text = get_param(&request.params, "message")
         .map_err(|e| anyhow::anyhow!(ChatError::BadRequest { detail: e.to_string() }))?;
@@ -162,7 +163,7 @@ enum TurnState {
     /// Waiting for the LLM to respond.
     Waiting { retry_count: u32 },
     /// Executing tool calls one by one.
-    Tooling { response: LlmResponse, cursor: usize },
+    Tooling { response: LlmResponse },
     /// Turn completed normally (text reply, no more tools).
     Done { text: String, thinking: Option<String> },
     /// User pressed cancel — preserve partial output.
@@ -195,7 +196,7 @@ fn run_state_machine(
     thinking_enabled: bool,
     ctx: &TurnContext,
     tool_registry: &ToolRegistry,
-    cancel: &AtomicBool,
+    cancel: &Arc<AtomicBool>,
     mut notif_collector: Option<&mut Vec<Notification>>,
 ) -> Result<(String, Option<String>)> {
     let mut state = TurnState::Waiting { retry_count: 0 };
@@ -289,7 +290,7 @@ fn run_state_machine(
                                 &response.text,
                                 response.thinking.as_deref(),
                             )?;
-                            TurnState::Tooling { response, cursor: 0 }
+                            TurnState::Tooling { response }
                         }
                     }
                     Err(e) => {
@@ -338,32 +339,17 @@ fn run_state_machine(
                 }
             }
 
-            // ── Tooling: execute tool calls sequentially ───────────
-            TurnState::Tooling { response, cursor } => {
-                if cursor >= response.tool_calls.len() {
-                    let session = store.get(&ctx.session_id)?
-                        .ok_or_else(|| anyhow::anyhow!(ChatError::Session {
-                            detail: "Session not found after tool execution".into()
-                        }))?;
-                    full_messages = session.messages.clone();
-                    effective_msgs = match (&session.compacted_summary, &session.compacted_message_id) {
-                        (Some(s), Some(id)) => build_effective_messages(&full_messages, id, s),
-                        _ => full_messages.clone(),
-                    };
-                    TurnState::Waiting { retry_count: 0 }
-                } else {
-                    let tc = &response.tool_calls[cursor];
-                    debug!("Executing tool: {} id={} args={}",
-                           tc.function.name, tc.id, tc.function.arguments);
+            // ── Tooling: execute tool calls in parallel ─────────────
+            TurnState::Tooling { response } => {
+                // Notify frontend for each tool call before spawning.
+                for tc in &response.tool_calls {
                     let args_val: Value = serde_json::from_str(&tc.function.arguments)
                         .unwrap_or(Value::Null);
-
                     notify!(Notification::new("chat.stream", Some(json!({
                         "sessionId": ctx.session_id, "runId": ctx.run_id,
                         "kind": "tool_call", "toolCallId": tc.id,
                         "toolName": tc.function.name, "input": args_val,
                     }))));
-
                     if tc.function.name == "TodoWrite" {
                         if let Some(todos) = args_val.get("todos") {
                             notify!(Notification::new("chat.stream", Some(json!({
@@ -372,37 +358,74 @@ fn run_state_machine(
                             }))));
                         }
                     }
+                }
 
-                    let tool_result = if cancel.load(Ordering::SeqCst) {
-                        "[interrupted by user]".to_string()
-                    } else if let Some(executor) = tool_registry.get(&tc.function.name) {
-                        // ── Sandbox check ──────────────────────────
-                        if let Err(msg) = executor.check_sandbox(&args_val, &ctx.sandbox_rules) {
-                            format!("Sandbox denied: {msg}")
-                        } else {
-                            match executor.execute(args_val.clone(), cancel) {
-                                Ok(output) => output,
-                                Err(e) => {
-                                    warn!("Tool {} failed: {e}", tc.function.name);
-                                    format!("Tool error: {e}")
+                // Spawn one thread per tool call.
+                let handles: Vec<std::thread::JoinHandle<(usize, String, String)>> =
+                    response.tool_calls.iter().enumerate().map(|(idx, tc)| {
+                        let cancel = Arc::clone(cancel);
+                        let sandbox = ctx.sandbox_rules.clone();
+                        let args: Value = serde_json::from_str(&tc.function.arguments)
+                            .unwrap_or(Value::Null);
+                        let tc_id = tc.id.clone();
+                        let tc_name = tc.function.name.clone();
+                        let executor = tool_registry.get(&tc.function.name).cloned();
+                        std::thread::spawn(move || {
+                            let result = if cancel.load(Ordering::SeqCst) {
+                                "[interrupted by user]".to_string()
+                            } else if let Some(exec) = executor {
+                                if let Err(msg) = exec.check_sandbox(&args, &sandbox) {
+                                    format!("Sandbox denied: {msg}")
+                                } else {
+                                    match exec.execute(args, &cancel) {
+                                        Ok(output) => output,
+                                        Err(e) => {
+                                            warn!("Tool {} failed: {e}", tc_name);
+                                            format!("Tool error: {e}")
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                    } else {
-                        warn!("Unknown tool requested: {}", tc.function.name);
-                        format!("Unknown tool: {}", tc.function.name)
-                    };
+                            } else {
+                                warn!("Unknown tool requested: {}", tc_name);
+                                format!("Unknown tool: {}", tc_name)
+                            };
+                            (idx, tc_id, result)
+                        })
+                    }).collect();
 
-                    debug!("Tool result for {}: {:.200}", tc.function.name, tool_result);
+                // Collect results, sort back to original tool_calls order,
+                // then store and notify (on the main thread).
+                let mut results: Vec<(usize, String, String)> = handles
+                    .into_iter()
+                    .map(|h| h.join().expect("tool thread panicked"))
+                    .collect();
+                results.sort_by_key(|(idx, ..)| *idx);
+
+                for (_, tc_id, result) in &results {
+                    debug!("Tool result for {tc_id}: {result:.200}");
+                    let tc_name = response.tool_calls.iter()
+                        .find(|t| t.id == *tc_id)
+                        .map(|t| t.function.name.as_str())
+                        .unwrap_or("unknown");
                     notify!(Notification::new("chat.stream", Some(json!({
                         "sessionId": ctx.session_id, "runId": ctx.run_id,
-                        "kind": "tool_result", "toolCallId": tc.id,
-                        "toolName": tc.function.name, "output": tool_result,
+                        "kind": "tool_result", "toolCallId": tc_id,
+                        "toolName": tc_name, "output": result,
                     }))));
-                    store::add_tool_result(store, &ctx.session_id, &tc.id, &tool_result)?;
-
-                    TurnState::Tooling { response, cursor: cursor + 1 }
+                    store::add_tool_result(store, &ctx.session_id, tc_id, result)?;
                 }
+
+                // Reload full messages and go back to Waiting.
+                let session = store.get(&ctx.session_id)?
+                    .ok_or_else(|| anyhow::anyhow!(ChatError::Session {
+                        detail: "Session not found after tool execution".into()
+                    }))?;
+                full_messages = session.messages.clone();
+                effective_msgs = match (&session.compacted_summary, &session.compacted_message_id) {
+                    (Some(s), Some(id)) => build_effective_messages(&full_messages, id, s),
+                    _ => full_messages.clone(),
+                };
+                TurnState::Waiting { retry_count: 0 }
             }
 
             // ── Error: retryable — backoff then retry ──────────────
@@ -443,7 +466,7 @@ fn llm_step(
     thinking_enabled: bool,
     messages: &[store::Message],
     ctx: &TurnContext,
-    cancel: &AtomicBool,
+    cancel: &Arc<AtomicBool>,
 ) -> Result<LlmResponse> {
     let mut llm_msgs: Vec<LlmMessage> = messages.iter().map(|m| {
         let (content, images) = if m.content.starts_with("[SCREENSHOT]\n") {

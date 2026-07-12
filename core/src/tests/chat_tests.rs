@@ -14,7 +14,7 @@ use crate::tools::{self, registry::ToolRegistry};
 use reqwest::blocking::Client;
 use std::io::Write;
 use std::sync::atomic::AtomicBool;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 // ── Test infrastructure ───────────────────────────────────────────────
 
@@ -57,6 +57,9 @@ fn tc(id: &str, name: &str, args: &str) -> ToolCall {
         function: ToolCallFunction { name: name.into(), arguments: args.into() },
     }
 }
+
+/// Pre-built `Arc<AtomicBool>` not cancelled, used by run/run_collect.
+fn no_cancel() -> Arc<AtomicBool> { Arc::new(AtomicBool::new(false)) }
 
 fn store() -> impl SessionStore {
     use crate::store::json_store::JsonSessionStore;
@@ -107,7 +110,7 @@ fn repeat_server(status: &str) -> String {
 fn run(
     store: &dyn SessionStore,
     adapter: &dyn ApiAdapter,
-    cancel: &AtomicBool,
+    cancel: &Arc<AtomicBool>,
     sid: &str,
     rid: &str,
 ) -> Result<(String, Option<String>), anyhow::Error> {
@@ -122,7 +125,7 @@ fn run(
 fn run_collect(
     store: &dyn SessionStore,
     adapter: &dyn ApiAdapter,
-    cancel: &AtomicBool,
+    cancel: &Arc<AtomicBool>,
     sid: &str,
     rid: &str,
 ) -> (Result<(String, Option<String>), anyhow::Error>, Vec<crate::jsonrpc::Notification>) {
@@ -144,7 +147,7 @@ fn waiting_to_done_text_only() {
     let sess = s.create_session_for_test();
     let url = repeat_server("200 OK");
     let a = MockAdapter::new(vec![text("hello")], &url);
-    let (out, _) = run(&s, &a, &AtomicBool::new(false), &sess.id, "r1").unwrap();
+    let (out, _) = run(&s, &a, &no_cancel(), &sess.id, "r1").unwrap();
     assert_eq!(out, "hello");
 }
 
@@ -160,7 +163,7 @@ fn full_cycle_tool_then_text() {
         vec![tool("", vec![tc("t1", "Read", r#"{"path":"/x"}"#)]), text("done")],
         &url,
     );
-    let (out, _) = run(&s, &a, &AtomicBool::new(false), &sess.id, "r2").unwrap();
+    let (out, _) = run(&s, &a, &no_cancel(), &sess.id, "r2").unwrap();
     assert_eq!(out, "done");
     assert!(s.get(&sess.id).unwrap().unwrap().messages.iter().any(|m| m.role == "tool"));
 }
@@ -172,7 +175,7 @@ fn cancel_before_tools_goes_to_interrupted() {
     let s = store();
     let sess = s.create_session_for_test();
     let url = repeat_server("200 OK");
-    let cancel = AtomicBool::new(true);
+    let cancel = Arc::new(AtomicBool::new(true));
     let (out, _) = run(&s, &MockAdapter::new(vec![text("partial")], &url), &cancel, &sess.id, "r3").unwrap();
     assert_eq!(out, "partial");
 }
@@ -183,7 +186,7 @@ fn cancel_during_tools_skips_remaining() {
     let sess = s.create_session_for_test();
     // Enough connections for possible retries from port-reuse on macOS.
     let url = repeat_server("200 OK");
-    let cancel = AtomicBool::new(true);
+    let cancel = Arc::new(AtomicBool::new(true));
     let a = MockAdapter::new(
         vec![tool("", vec![tc("a", "Read", r#"{"path":"/x"}"#), tc("b", "Bash", r#"{"command":"echo"}"#)])],
         &url,
@@ -203,7 +206,7 @@ fn retryable_error_recovers_on_retry() {
     let sess = s.create_session_for_test();
     // One 503, then 200.
     let url = sequence_server(&["503 Service Unavailable", "200 OK"]);
-    let (out, _) = run(&s, &MockAdapter::new(vec![text("recovered")], &url), &AtomicBool::new(false), &sess.id, "r5").unwrap();
+    let (out, _) = run(&s, &MockAdapter::new(vec![text("recovered")], &url), &no_cancel(), &sess.id, "r5").unwrap();
     assert_eq!(out, "recovered");
 }
 
@@ -212,7 +215,7 @@ fn retry_recovers_after_two_failures() {
     let s = store();
     let sess = s.create_session_for_test();
     let url = sequence_server(&["503 Service Unavailable", "503 Service Unavailable", "200 OK"]);
-    let (out, _) = run(&s, &MockAdapter::new(vec![text("ok")], &url), &AtomicBool::new(false), &sess.id, "r6").unwrap();
+    let (out, _) = run(&s, &MockAdapter::new(vec![text("ok")], &url), &no_cancel(), &sess.id, "r6").unwrap();
     assert_eq!(out, "ok");
 }
 
@@ -224,7 +227,7 @@ fn retries_exhausted_becomes_fatal() {
     let sess = s.create_session_for_test();
     // 4 × 503: initial + 3 retries
     let url = repeat_server("503 Service Unavailable");
-    let r = run(&s, &MockAdapter::new(vec![text("nope")], &url), &AtomicBool::new(false), &sess.id, "r7");
+    let r = run(&s, &MockAdapter::new(vec![text("nope")], &url), &no_cancel(), &sess.id, "r7");
     assert!(r.is_err());
     assert!(format!("{}", r.unwrap_err()).contains("capacity"));
 }
@@ -236,7 +239,7 @@ fn non_retryable_skips_retries() {
     let s = store();
     let sess = s.create_session_for_test();
     let url = repeat_server("401 Unauthorized");
-    let r = run(&s, &MockAdapter::new(vec![text("x")], &url), &AtomicBool::new(false), &sess.id, "r8");
+    let r = run(&s, &MockAdapter::new(vec![text("x")], &url), &no_cancel(), &sess.id, "r8");
     assert!(r.is_err());
     let msg = format!("{}", r.unwrap_err());
     assert!(msg.contains("API key"), "expected UNAUTHORIZED, got: {msg}");
@@ -247,7 +250,7 @@ fn bad_request_is_fatal() {
     let s = store();
     let sess = s.create_session_for_test();
     let url = repeat_server("400 Bad Request");
-    let r = run(&s, &MockAdapter::new(vec![text("x")], &url), &AtomicBool::new(false), &sess.id, "r9");
+    let r = run(&s, &MockAdapter::new(vec![text("x")], &url), &no_cancel(), &sess.id, "r9");
     assert!(r.is_err());
 }
 
@@ -269,7 +272,7 @@ fn retry_counter_resets_after_success() {
         vec![tool("", vec![tc("t1", "Read", r#"{"path":"/x"}"#)]), text("finally")],
         &url,
     );
-    let (out, _) = run(&s, &a, &AtomicBool::new(false), &sess.id, "r10").unwrap();
+    let (out, _) = run(&s, &a, &no_cancel(), &sess.id, "r10").unwrap();
     assert_eq!(out, "finally");
 }
 
@@ -286,7 +289,7 @@ fn retry_sends_stream_error_notifications_with_correct_fields() {
     ]);
     let (result, notes) = run_collect(
         &s, &MockAdapter::new(vec![text("ok2")], &url),
-        &AtomicBool::new(false), &sess.id, "r11",
+        &no_cancel(), &sess.id, "r11",
     );
     let (out, _) = result.unwrap();
     assert_eq!(out, "ok2");
@@ -319,7 +322,7 @@ fn normal_turn_sends_tool_call_and_result_notifications() {
             vec![tool("", vec![tc("t1", "Bash", r#"{"command":"echo hi"}"#)]), text("done")],
             &url,
         ),
-        &AtomicBool::new(false), &sess.id, "r12",
+        &no_cancel(), &sess.id, "r12",
     );
     let (out, _) = result.unwrap();
     assert_eq!(out, "done");
@@ -338,7 +341,7 @@ fn normal_turn_no_tools_sends_no_tool_notifications() {
     let url = repeat_server("200 OK");
     let (result, notes) = run_collect(
         &s, &MockAdapter::new(vec![text("hello")], &url),
-        &AtomicBool::new(false), &sess.id, "r13",
+        &no_cancel(), &sess.id, "r13",
     );
     let (out, _) = result.unwrap();
     assert_eq!(out, "hello");
@@ -358,7 +361,7 @@ fn fatal_error_sends_no_stream_error_notification() {
     let url = repeat_server("401 Unauthorized");
     let (r, notes) = run_collect(
         &s, &MockAdapter::new(vec![text("x")], &url),
-        &AtomicBool::new(false), &sess.id, "r14",
+        &no_cancel(), &sess.id, "r14",
     );
     assert!(r.is_err());
     let has_stream_error = notes.iter().any(|n| {
@@ -375,7 +378,7 @@ fn exactly_three_retries_then_fatal() {
     let sess = s.create_session_for_test();
     // 4 attempts total: 1 initial + 3 retries. All must fail.
     let url = repeat_server("503 Service Unavailable");
-    let r = run(&s, &MockAdapter::new(vec![text("x")], &url), &AtomicBool::new(false), &sess.id, "r12");
+    let r = run(&s, &MockAdapter::new(vec![text("x")], &url), &no_cancel(), &sess.id, "r12");
     assert!(r.is_err());
 }
 
@@ -390,7 +393,7 @@ fn succeeds_on_last_retry_attempt() {
         "503 Service Unavailable",
         "200 OK",
     ]);
-    let (out, _) = run(&s, &MockAdapter::new(vec![text("last chance")], &url), &AtomicBool::new(false), &sess.id, "r13").unwrap();
+    let (out, _) = run(&s, &MockAdapter::new(vec![text("last chance")], &url), &no_cancel(), &sess.id, "r13").unwrap();
     assert_eq!(out, "last chance");
 }
 
@@ -411,7 +414,7 @@ fn tooling_multiple_tools_executed_sequentially() {
         ],
         &url,
     );
-    let (out, _) = run(&s, &a, &AtomicBool::new(false), &sess.id, "r14").unwrap();
+    let (out, _) = run(&s, &a, &no_cancel(), &sess.id, "r14").unwrap();
     assert_eq!(out, "all done");
     let msgs = &s.get(&sess.id).unwrap().unwrap().messages;
     let tool_count = msgs.iter().filter(|m| m.role == "tool").count();
@@ -426,7 +429,7 @@ fn rate_limited_is_retryable_from_waiting() {
     let s = store();
     let sess = s.create_session_for_test();
     let url = sequence_server(&["429 Too Many Requests", "200 OK"]);
-    let (out, _) = run(&s, &MockAdapter::new(vec![text("ok429")], &url), &AtomicBool::new(false), &sess.id, "r15").unwrap();
+    let (out, _) = run(&s, &MockAdapter::new(vec![text("ok429")], &url), &no_cancel(), &sess.id, "r15").unwrap();
     assert_eq!(out, "ok429");
 }
 
@@ -435,7 +438,7 @@ fn server_overloaded_is_retryable() {
     let s = store();
     let sess = s.create_session_for_test();
     let url = sequence_server(&["500 Internal Server Error", "200 OK"]);
-    let (out, _) = run(&s, &MockAdapter::new(vec![text("ok500")], &url), &AtomicBool::new(false), &sess.id, "r16").unwrap();
+    let (out, _) = run(&s, &MockAdapter::new(vec![text("ok500")], &url), &no_cancel(), &sess.id, "r16").unwrap();
     assert_eq!(out, "ok500");
 }
 
@@ -444,7 +447,7 @@ fn http_502_is_treated_as_overloaded() {
     let s = store();
     let sess = s.create_session_for_test();
     let url = sequence_server(&["502 Bad Gateway", "200 OK"]);
-    let (out, _) = run(&s, &MockAdapter::new(vec![text("ok502")], &url), &AtomicBool::new(false), &sess.id, "r17").unwrap();
+    let (out, _) = run(&s, &MockAdapter::new(vec![text("ok502")], &url), &no_cancel(), &sess.id, "r17").unwrap();
     assert_eq!(out, "ok502");
 }
 
@@ -520,7 +523,7 @@ fn todo_write_valid_input_returns_ok() {
     use crate::tools::executor::ToolExecutor;
     let tool = TodoWriteTool;
     let input = serde_json::json!({"todos": [{"step": "do A", "status": "pending"}]});
-    let result = tool.execute(input, &AtomicBool::new(false));
+    let result = tool.execute(input, &no_cancel());
     assert_eq!(result.unwrap(), "ok");
 }
 

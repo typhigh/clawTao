@@ -43,16 +43,28 @@ fn sandbox_mode_clone_and_eq() {
 
 // ── Integration tests: real sandbox-exec ─────────────────────────
 
+/// Check if sandbox-exec can actually run (not just exist).
+/// Nested sandboxing may be blocked when the test process itself is sandboxed.
+fn sandbox_exec_works() -> bool {
+    std::process::Command::new(SEATBELT_EXECUTABLE)
+        .arg("-p").arg("(version 1) (allow default)")
+        .arg("--").arg("/usr/bin/true")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
 #[test]
 #[cfg(target_os = "macos")]
-#[ignore = "requires macOS with sandbox-exec, may fail due to /tmp symlink resolution"]
 fn sandbox_exec_allows_write_in_workspace() {
-    if !std::path::Path::new(SEATBELT_EXECUTABLE).exists() {
-        eprintln!("skipping: {SEATBELT_EXECUTABLE} not found");
+    if !sandbox_exec_works() {
+        eprintln!("skipping: sandbox-exec not available (may be running under sandbox)");
         return;
     }
     let tmp = std::path::PathBuf::from(format!("/tmp/clawtao-sbtest-{}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
+    // Canonicalize to resolve /tmp → /private/tmp symlink on macOS.
+    let tmp = std::fs::canonicalize(&tmp).unwrap();
 
     let config = SandboxConfig::new(&tmp.to_string_lossy(), SandboxMode::WorkspaceOnly);
     let profile = SandboxProfile::generate(&config);
@@ -76,14 +88,15 @@ fn sandbox_exec_allows_write_in_workspace() {
 
 #[test]
 #[cfg(target_os = "macos")]
-#[ignore = "requires macOS with sandbox-exec"]
 fn sandbox_exec_blocks_write_outside_workspace() {
-    if !std::path::Path::new(SEATBELT_EXECUTABLE).exists() {
-        eprintln!("skipping: {SEATBELT_EXECUTABLE} not found");
+    if !sandbox_exec_works() {
+        eprintln!("skipping: sandbox-exec not available (may be running under sandbox)");
         return;
     }
     let tmp = std::path::PathBuf::from(format!("/tmp/clawtao-sbtest-{}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
+    // Canonicalize to resolve /tmp → /private/tmp symlink on macOS.
+    let tmp = std::fs::canonicalize(&tmp).unwrap();
 
     let config = SandboxConfig::new(&tmp.to_string_lossy(), SandboxMode::WorkspaceOnly);
     let profile = SandboxProfile::generate(&config);

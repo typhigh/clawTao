@@ -15,16 +15,33 @@ execSync(`pkill -f "${USER_DIR}" 2>/dev/null || true`);
 for (const f of ['SingletonLock','SingletonSocket','SingletonCookie'])
   try { unlinkSync(join(USER_DIR, f)); } catch {}
 
+class Lock {
+  constructor() { this._p = Promise.resolve(); }
+  async acquire() {
+    await this._p;
+    let release;
+    this._p = new Promise(r => { release = r; });
+    return release;
+  }
+}
+
 let browser, page;
+const startupLock = new Lock();
 
 async function ensureBrowser() {
   if (browser) return;
-  browser = await chromium.launchPersistentContext(USER_DIR, {
-    headless: false,
-    viewport: { width: 1280, height: 800 },
-    args: ['--no-first-run', '--no-default-browser-check'],
-  });
-  page = browser.pages()[0] || await browser.newPage();
+  const release = await startupLock.acquire();
+  try {
+    if (browser) return;
+    browser = await chromium.launchPersistentContext(USER_DIR, {
+      headless: false,
+      viewport: { width: 1280, height: 800 },
+      args: ['--no-first-run', '--no-default-browser-check'],
+    });
+    page = browser.pages()[0] || await browser.newPage();
+  } finally {
+    release();
+  }
 }
 
 async function getSnapshot() {

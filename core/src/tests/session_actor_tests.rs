@@ -69,7 +69,7 @@ fn actor_loop_processes_one_run_per_message() {
                 std::env::temp_dir().join(format!("clawtao_test_al_{}", uuid::Uuid::new_v4()))
             )),
             Arc::new(AtomicBool::new(false)),
-            move |_client: &Client, _store: &dyn SessionStore, _params: Value, _rid: Option<Value>, _cancel: &AtomicBool| {
+            move |_client: &Client, _store: &dyn SessionStore, _params: Value, _rid: Option<Value>, _cancel: &Arc<AtomicBool>| {
                 c2.fetch_add(1, Ordering::SeqCst);
             },
         );
@@ -100,7 +100,7 @@ fn cancel_flag_stops_processor() {
                 std::env::temp_dir().join(format!("clawtao_test_cancel_{}", uuid::Uuid::new_v4()))
             )),
             cancel,
-            move |_client: &Client, _store: &dyn SessionStore, _params: Value, _rid: Option<Value>, _cancel: &AtomicBool| {
+            move |_client: &Client, _store: &dyn SessionStore, _params: Value, _rid: Option<Value>, _cancel: &Arc<AtomicBool>| {
                 c2.fetch_add(1, Ordering::SeqCst);
             },
         );

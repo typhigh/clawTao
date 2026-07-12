@@ -163,7 +163,7 @@ pub(crate) fn actor_loop(
     session_id: &str,
     store: Arc<dyn SessionStore>,
     cancel: Arc<AtomicBool>,
-    process: impl Fn(&Client, &dyn SessionStore, Value, Option<Value>, &AtomicBool) + Send + 'static,
+    process: impl Fn(&Client, &dyn SessionStore, Value, Option<Value>, &Arc<AtomicBool>) + Send + 'static,
 ) {
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(300))
@@ -198,7 +198,7 @@ fn process_run_wrapper(
     store: &dyn SessionStore,
     params: Value,
     response_id: Option<Value>,
-    cancel: &AtomicBool,
+    cancel: &Arc<AtomicBool>,
 ) {
     let request = crate::jsonrpc::Request {
         jsonrpc: "2.0".into(),
