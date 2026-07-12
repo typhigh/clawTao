@@ -28,7 +28,11 @@
     "selectWorkspace": "Select workspace",
     "noWorkspace": "No sandbox",
     "scrollToTop": "Scroll to top",
-    "scrollToBottom": "Scroll to bottom"
+    "scrollToBottom": "Scroll to bottom",
+    "settingsTooltip": "Settings",
+    "on": "ON",
+    "off": "OFF",
+    "workspace": "Workspace"
   },
   "tool": {
     "input": "Input",
@@ -116,6 +120,7 @@
   },
   "compact": {
     "title": "Compact context",
+    "button": "Compact",
     "pending": "Compacting…",
     "success": "Context compacted",
     "successWithCount": "Context compacted, {{count}} messages kept",
@@ -125,5 +130,13 @@
     "bannerSuccess": "✓ Compacted: ~{{before}} → ~{{after}} tokens, saved {{saved}}% (earlier messages summarized)",
     "bannerSuccessFallback": "✓ Compaction complete (earlier messages summarized)",
     "bannerFailed": "✗ Compaction failed: {{reason}}"
+  },
+  "context": {
+    "title": "Context usage",
+    "systemPrompt": "System prompt",
+    "messageHistory": "Conversation",
+    "remaining": "Remaining",
+    "summary": "Used {{totalPct}}%",
+    "loading": "Fetching context usage…"
   }
 }

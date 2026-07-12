@@ -25,6 +25,7 @@ declare global {
         get: (sessionId: string) => Promise<Session>;
         delete: (sessionId: string) => Promise<unknown>;
         compact: (sessionId: string) => Promise<{ compacted: boolean; reason?: string; beforeTokens?: number; afterTokens?: number }>;
+        contextStats: (sessionId: string, modelKey?: string, workspaceDir?: string) => Promise<{ systemTokens: number; messageTokens: number; contextWindow: number; compacted: boolean }>;
       };
       config: {
         get: () => Promise<unknown>;

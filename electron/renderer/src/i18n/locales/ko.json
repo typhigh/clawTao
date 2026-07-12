@@ -28,7 +28,11 @@
     "selectWorkspace": "작업 공간 선택",
     "noWorkspace": "샌드박스 없음",
     "scrollToTop": "맨 위로",
-    "scrollToBottom": "맨 아래로"
+    "scrollToBottom": "맨 아래로",
+    "settingsTooltip": "설정",
+    "on": "켜짐",
+    "off": "꺼짐",
+    "workspace": "작업 공간"
   },
   "tool": {
     "input": "입력",

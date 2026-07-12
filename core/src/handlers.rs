@@ -2,6 +2,7 @@
 
 use crate::jsonrpc::{self, Request, Response};
 use crate::store::{self, store_trait::SessionStore};
+use crate::tools::registry::ToolRegistry;
 use anyhow::Result;
 use serde_json::json;
 use std::sync::Arc;
@@ -16,6 +17,7 @@ pub fn route(
         "session.create" => session_create(request, &**store),
         "session.get" => session_get(request, &**store),
         "session.delete" => session_delete(request, &**store),
+        "session.context_stats" => session_context_stats(request, &**store),
         "ping" => ping(request),
         _ => not_found(request),
     }
@@ -175,6 +177,115 @@ pub(crate) fn session_compact(
     Ok(())
 }
 
+// ── Context stats ────────────────────────────────────────────────────────
+
+/// Lightweight context-window usage snapshot for the per-session UI.
+///
+/// Returns the breakdown the frontend needs to render the 10×10 context grid:
+///  - `systemTokens`: tokens consumed by the system prompt + tool definitions.
+///    Constant per provider until tools are added.
+///  - `messageTokens`: tokens consumed by the (effective) message history,
+///    i.e. anything the LLM would see on the next call.
+///  - `contextWindow`: the provider's max context window.
+///
+/// The frontend fills cells in a 10×10 grid (= 100 cells = 1% per cell):
+///  - `systemTokens / contextWindow` → dark-gray cells (system-prompt slice)
+///  - `messageTokens / contextWindow` → light-gray cells (history slice)
+///  - everything else stays white.
+pub(crate) fn session_context_stats(
+    request: &Request,
+    store: &dyn SessionStore,
+) -> Result<()> {
+    let session_id = jsonrpc::get_param(&request.params, "sessionId")?;
+
+    // base_url is required for the per-provider context-window lookup.
+    // If the caller didn't supply one (renderer shortcut, ad-hoc shell
+    // query, …) fall back to a conservative 256K window so the UI still
+    // shows a useful proportion rather than crashing.
+    let base_url = jsonrpc::get_param_opt(&request.params, "base_url")
+        .unwrap_or("");
+
+    let model = jsonrpc::get_param_opt(&request.params, "model").unwrap_or("");
+
+    let session = match store.get(session_id)? {
+        Some(s) => s,
+        None => {
+            jsonrpc::write_response(&Response::success(request.id.clone(), json!({
+                "systemTokens": 0,
+                "messageTokens": 0,
+                "contextWindow": crate::context::provider_context_window(base_url),
+                "compacted": false,
+            })))?;
+            return Ok(());
+        }
+    };
+
+    // Use the same "effective" message list the LLM would actually see —
+    // respects any prior compaction summary.
+    let (effective, compacted) = match (
+        session.compacted_summary.as_ref(),
+        session.compacted_message_id.as_ref(),
+    ) {
+        (Some(summary), Some(compacted_id)) => {
+            let msgs = crate::chat::build_effective_messages(
+                &session.messages, compacted_id, summary,
+            );
+            (msgs, true)
+        }
+        _ => (session.messages.clone(), false),
+    };
+
+    // System tokens = the system prompt (built with the schema-only tool
+    // registry, since the actual turn uses the same tool set) plus the
+    // tool-definition tokens the LLM sees on every call.
+    //
+    // We rebuild the system prompt here for parity with `chat.rs:124` so
+    // the displayed number matches what the next turn will actually send.
+    let workspace_dir = jsonrpc::get_param_opt(&request.params, "workspace_dir");
+    let tool_registry = build_schema_registry();
+    let system_prompt = crate::system_prompt::build(
+        &tool_registry, workspace_dir.filter(|s| !s.is_empty()),
+    );
+    let tool_defs: Vec<crate::llm::UnifiedTool> = tool_registry.list_specs().iter()
+        .map(|spec| crate::llm::UnifiedTool {
+            name: spec.function.name.clone(),
+            description: spec.function.description.clone(),
+            parameters: spec.function.parameters.clone(),
+        })
+        .collect();
+    let system_tokens = crate::context::estimate_total_tokens_from_store(
+        &system_prompt, &[], &tool_defs, model,
+    );
+    let message_tokens = crate::context::estimate_total_tokens_from_store(
+        "", &effective, &[], model,
+    );
+    let context_window = crate::context::provider_context_window(base_url);
+
+    jsonrpc::write_response(&Response::success(request.id.clone(), json!({
+        "systemTokens": system_tokens,
+        "messageTokens": message_tokens,
+        "contextWindow": context_window,
+        "compacted": compacted,
+    })))?;
+    Ok(())
+}
+
+/// Build a stateless tool registry containing the schema-only tool
+/// definitions used for token estimation. Re-creating this on every
+/// `context_stats` call is fine — `register_all` is cheap and the
+/// tools have no per-instance state we'd care about for token math.
+fn build_schema_registry() -> ToolRegistry {
+    let mut reg = ToolRegistry::new();
+    crate::tools::builtin::register_all(
+        &mut reg,
+        // Sandbox mode is irrelevant to token estimation; off is the
+        // safest default and keeps the schema stable.
+        crate::tools::builtin::SandboxConfig::off(),
+        None,
+    );
+    reg
+}
+
 // ── Error ────────────────────────────────────────────────────────────────
 
 pub fn not_found(request: &Request) -> Result<()> {
@@ -185,3 +296,7 @@ pub fn not_found(request: &Request) -> Result<()> {
     ))?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "tests/context_stats_tests.rs"]
+mod context_stats_tests;

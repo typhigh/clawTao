@@ -28,7 +28,11 @@
     "selectWorkspace": "Sélectionner espace",
     "noWorkspace": "Pas de sandbox",
     "scrollToTop": "Haut de page",
-    "scrollToBottom": "Bas de page"
+    "scrollToBottom": "Bas de page",
+    "settingsTooltip": "Paramètres",
+    "on": "Activé",
+    "off": "Désactivé",
+    "workspace": "Espace"
   },
   "tool": {
     "input": "Entrée",

@@ -28,7 +28,11 @@
     "selectWorkspace": "Выбрать папку",
     "noWorkspace": "Без sandbox",
     "scrollToTop": "Наверх",
-    "scrollToBottom": "Вниз"
+    "scrollToBottom": "Вниз",
+    "settingsTooltip": "Настройки",
+    "on": "Вкл",
+    "off": "Выкл",
+    "workspace": "Рабочая область"
   },
   "tool": {
     "input": "Ввод",

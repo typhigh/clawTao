@@ -223,6 +223,35 @@ function setupIpc() {
     return sendRpc('session.compact', flat);
   });
 
+  // session:context-stats — read-only token usage snapshot for the
+  // 10×10 context grid in the input area. We resolve the per-session
+  // model (or fall back to the default model) just enough to get
+  // `base_url` and `model` for the per-provider context-window lookup.
+  // The handler does NOT need the API key.
+  ipcMain.handle('session:context-stats', (_e, p: { sessionId: string; modelKey?: string; workspaceDir?: string }) => {
+    const config: any = readConfig();
+    const key = p.modelKey || config.llm?.default_model_id || '';
+    let provider: any = null;
+    let model = '';
+    if (key) {
+      const [providerId, ...rest] = key.split('/');
+      model = rest.join('/');
+      provider = (config.llm?.providers || []).find((pr: any) => pr.id === providerId);
+    }
+    // Fall back to the first configured provider if the session has no
+    // model yet (e.g. brand-new session before the user picked one).
+    if (!provider) {
+      provider = (config.llm?.providers || [])[0] || null;
+      if (provider) model = provider.models?.[0] || '';
+    }
+    return sendRpc('session.context_stats', {
+      sessionId: p.sessionId,
+      base_url: provider?.base_url || '',
+      model,
+      workspace_dir: p.workspaceDir || '',
+    });
+  });
+
   // chat.interrupt
   ipcMain.handle('chat:interrupt', (_e, p: { sessionId: string }) =>
     sendRpc('chat.interrupt', p)

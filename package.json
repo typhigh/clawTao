@@ -10,7 +10,7 @@
     "build:vite": "tsc && vite build",
     "postinstall": "npx playwright install chromium",
     "test:all": "pnpm run test:ui && pnpm run test:core",
-    "test:ui": "vitest run",
+    "test:ui": "mkdir -p .vitest-tmp && TMPDIR=\"$PWD/.vitest-tmp\" vitest run",
     "test:core": "cd core && cargo test"
   },
   "keywords": [

@@ -956,6 +956,68 @@ html, body, #root {
 .input-area-wrapper {
   display: flex;
   flex-direction: column;
+  padding: 0 20px; /* 20px breathing room from window edges */
+}
+
+.input-settings-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.input-settings-popup {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  min-width: 260px;
+  z-index: 10;
+}
+
+.input-settings-row {
+  display: grid;
+  grid-template-columns: 18px 88px minmax(100px, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  text-align: left;
+}
+
+.input-settings-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.input-settings-text {
+  color: #555;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.input-settings-workspace {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid #d0d0d0;
+  background: #ffffff;
+  border-radius: 4px;
+  padding: 1px 4px;
+  color: #1c1c1e;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .input-area-bottom {
@@ -1023,37 +1085,6 @@ html, body, #root {
   flex-wrap: wrap;
 }
 
-.input-model-select-inline {
-  background: transparent;
-}
-
-.input-thinking-toggle-inline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: #999;
-  padding: 0;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  font: inherit;
-  transition: color 0.12s, background 0.12s, border-color 0.12s;
-}
-.input-thinking-toggle-inline:hover:not(:disabled) {
-  color: #1c1c1e;
-  background: #f3f3f3;
-}
-.input-thinking-toggle-inline.on {
-  color: #1c1c1e;
-}
-.input-thinking-toggle-inline:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
 .input-send-btn {
   align-self: flex-end;
 }
@@ -1068,23 +1099,83 @@ html, body, #root {
 .input-send-btn-inline:hover:not(:disabled) { transform: scale(1.05); }
 .input-send-btn-inline:active:not(:disabled) { transform: scale(0.94); }
 
-.input-model-select {
-  background: transparent;
-  border: 0;
-  color: #555;
-  font: inherit;
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  outline: none;
-  max-width: 280px;
-  text-overflow: ellipsis;
+/* ── Custom ModelSelect (replaces native <select>) ──────────────── */
+
+.model-select {
+  position: relative;
+  display: inline-flex;
+  left: -8px; /* visually hugs the left edge — only this element shifts, nothing else */
 }
 
-.input-model-select:hover { background: #f0f0f0; color: #1c1c1e; }
-.input-model-select:focus { background: #f0f0f0; }
-.input-model-select:disabled { opacity: 0.5; cursor: not-allowed; }
+.model-select-trigger {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-size: 12px !important;
+  line-height: 1.2;
+  color: #555;
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 2px 4px 6px;
+  display: flex;        /* not inline-flex — buttons default to inline-block which fights max-content */
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+  outline: none;
+  transition: background 0.12s, color 0.12s;
+  width: fit-content;
+  flex: 0 0 auto;        /* don't grow, don't shrink, don't fill — content size only */
+}
+
+.model-select-label {
+  font-size: 12px !important;
+  white-space: nowrap;
+}
+
+.model-select-chevron {
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: transform 0.15s, opacity 0.12s;
+}
+
+.model-select-trigger:hover .model-select-chevron,
+.model-select-trigger[aria-expanded="true"] .model-select-chevron {
+  opacity: 1;
+}
+
+.model-select-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px); /* open upward, like the settings popup */
+  left: 0;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.10);
+  padding: 4px;
+  z-index: 10;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.model-select-option {
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1c1c1e;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.model-select-option:hover,
+.model-select-option.active {
+  background: #f0f0f0;
+}
+
+.model-select-option.selected {
+  color: #007aff;
+  font-weight: 600;
+}
 
 .input-area {
   padding: 12px 14px 6px 14px; /* px-3 pt-3 pb-1.5 — mirror ClawX */
@@ -1118,7 +1209,7 @@ html, body, #root {
   border-color: #999;
 }
 
-.input-area button {
+.input-area button[type="submit"] {
   padding: 10px 20px;
   background: #007aff;
   color: white;
@@ -1130,11 +1221,11 @@ html, body, #root {
   flex-shrink: 0;
 }
 
-.input-area button:hover {
+.input-area button[type="submit"]:hover {
   background: #0066dd;
 }
 
-.input-area button:disabled {
+.input-area button[type="submit"]:disabled {
   background: #ccc;
   cursor: not-allowed;
 }
@@ -2091,3 +2182,90 @@ html, body, #root {
 .todo-in_progress .todo-step { color: #1c1c1e; }
 .todo-pending .todo-icon { color: #ccc; }
 .todo-pending .todo-step { color: #999; }
+
+/* ── Context Grid ────────────────────────────────────────────────── */
+
+.ctx-popup {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 12px;
+  width: 200px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+/* The grid needs a *definite* height for `grid-template-rows: repeat(10, 1fr)`
+   to distribute space. `aspect-ratio: 1` alone is unreliable across browsers
+   for grid row sizing, so we use an explicit square container sized to the
+   popover width. */
+.ctx-grid-10x10 {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(10, 1fr);
+  gap: 2px;
+  width: 100%;
+  height: 176px; /* 200 popup − 24 padding − 0; gap uses 2×9=18px → ~160 cells */
+  background: #ebebeb; /* shows through 2px gaps + frames the grid */
+  border-radius: 3px;
+  padding: 1px;
+}
+
+.ctx-cell {
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.ctx-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #555;
+}
+
+.ctx-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ctx-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.ctx-pct {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: #888;
+}
+
+.ctx-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #666;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+
+.ctx-summary-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.ctx-compact-btn {
+  /* hover/disabled states live inline to keep parity with other input buttons */
+}

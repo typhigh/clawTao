@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useChatStore, ImageAttachment } from '../stores/chat';
 import type { WorkspaceEntry } from '../stores/settings';
 import { InputArea } from './InputArea';
+import { ContextGrid } from './ContextGrid';
 import type { ModelOption } from './ChatView';
 
 interface Props {
@@ -100,10 +101,18 @@ function ChatInputPanelInner({
       workspaceOptions={workspaceOptions}
       selectedWorkspace={workspaceDir}
       onSelectWorkspace={onSelectWorkspace}
-      onCompact={onCompact}
-      compactDisabled={compactDisabled}
-      compacting={compacting}
-      messageCount={messageCount}
+      contextGrid={
+        <ContextGrid
+          sessionId={sessionId}
+          modelKey={selectedModelKey}
+          workspaceDir={workspaceDir}
+          onCompact={onCompact}
+          compactDisabled={compactDisabled}
+          compacting={compacting}
+          messageCount={messageCount}
+          streaming={isStreaming}
+        />
+      }
     />
   );
 }

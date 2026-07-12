@@ -1,16 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SendIcon, ThinkingIcon, UploadIcon, CompressIcon } from './icons';
+import { SendIcon, ThinkingIcon, UploadIcon, GearIcon, WorkspaceIcon } from './icons';
+import { ModelSelect, ModelOption } from './ModelSelect';
 import type { ImageAttachment } from '../stores/chat';
 
 const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-
-interface ModelOption {
-  providerId: string;
-  providerName: string;
-  model: string;
-  key: string;
-}
 
 interface Props {
   value: string;
@@ -35,12 +29,9 @@ interface Props {
   workspaceOptions?: import('../stores/settings').WorkspaceEntry[];
   selectedWorkspace?: string;
   onSelectWorkspace?: (wsPath: string) => void;
-  onCompact?: () => void;
-  compactDisabled?: boolean;
-  compacting?: boolean;
-  /** Number of messages in the current session — used to gate the
-   *  compact button when there are too few to compact. */
-  messageCount?: number;
+  /** Optional context-grid element rendered in the bottom row.
+   *  The compact button now lives inside the context grid popover. */
+  contextGrid?: React.ReactNode;
 }
 
 async function fileToImage(f: File): Promise<ImageAttachment | null> {
@@ -58,13 +49,27 @@ export function InputArea({
   thinkingEnabled, onToggleThinking,
   images, onImagesChange,
   workspaceDir, workspaceOptions, selectedWorkspace, onSelectWorkspace,
-  onCompact, compactDisabled, compacting, messageCount,
+  contextGrid,
 }: Props) {
   const { t } = useTranslation();
   const [thinkingHover, setThinkingHover] = useState(false);
   const [imageHover, setImageHover] = useState(false);
-  const [compactHover, setCompactHover] = useState(false);
+  const [gearHover, setGearHover] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  // Close settings popup when clicking outside.
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [settingsOpen]);
 
   const addImages = async (files: FileList | File[]) => {
     const results: ImageAttachment[] = [];
@@ -92,7 +97,7 @@ export function InputArea({
   const btnDisabled = !value.trim() || disabled || sendDisabled;
 
   return (
-    <div className="input-area-wrapper">
+    <div className="input-area-wrapper" ref={wrapperRef}>
       <form className="input-area" onSubmit={(e) => { e.preventDefault(); if (streaming) onCancel(); else onSend(); }}>
         <div className="input-textarea-wrap">
           <textarea
@@ -120,6 +125,7 @@ export function InputArea({
             onChange={(e) => { if (e.target.files) addImages(e.target.files); e.target.value = ''; }} />
         </div>
         <div className="input-bottom-row">
+          {contextGrid}
           <button
             type="button"
             className="input-image-btn"
@@ -129,63 +135,69 @@ export function InputArea({
             onMouseLeave={() => setImageHover(false)}
             style={{ appearance: 'none', WebkitAppearance: 'none', background: imageHover ? '#f0f0f0' : 'transparent', border: '1px solid transparent', color: '#555', borderRadius: '6px', width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, font: 'inherit', cursor: 'pointer', opacity: disabled ? 0.4 : 1 }}
           ><UploadIcon /></button>
-          <select
-            className="input-model-select input-model-select-inline"
+          <ModelSelect
+            options={modelOptions}
             value={selectedModelKey}
-            onChange={(e) => onSelectModel(e.target.value)}
-            disabled={disabledModel || modelOptions.length === 0}
+            onChange={onSelectModel}
+            disabled={disabledModel}
+            placeholder={t('chat.noModelsConfigured')}
             title={t('chat.selectModel')}
-          >
-            {modelOptions.length === 0 ? (
-              <option value="">{t('chat.noModelsConfigured')}</option>
-            ) : (
-              modelOptions.map(opt => (
-                <option key={opt.key} value={opt.key}>
-                  {opt.providerId === 'custom' ? `${opt.providerName} / ${opt.model}` : opt.model}
-                </option>
-              ))
-            )}
-          </select>
-          <button
-            type="button"
-            className={'input-thinking-toggle input-thinking-toggle-inline' + (thinkingEnabled ? ' on' : '')}
-            onClick={onToggleThinking}
-            onMouseEnter={() => setThinkingHover(true)}
-            onMouseLeave={() => setThinkingHover(false)}
-            title={t('chat.thinking')}
-            aria-pressed={thinkingEnabled}
-            disabled={disabled}
-            style={{ appearance: 'none', WebkitAppearance: 'none', background: thinkingHover && !disabled ? '#f3f3f3' : 'transparent', color: thinkingEnabled ? '#1c1c1e' : '#999', border: '1px solid transparent', borderRadius: '6px', width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: disabled ? 'not-allowed' : 'pointer' }}
-          >
-            <ThinkingIcon active={thinkingEnabled} />
-          </button>
-          {(workspaceOptions?.length || 0) > 0 ? (
-            <select className="input-model-select input-model-select-inline"
-              value={selectedWorkspace || ''}
-              onChange={(e) => onSelectWorkspace?.(e.target.value)}
-              title={t('chat.selectWorkspace')}
-              style={{ maxWidth: '120px' }}>
-              <option value="">{t('chat.noWorkspace')}</option>
-              {workspaceOptions!.map(ws => (
-                <option key={ws.path} value={ws.path}>{ws.label}</option>
-              ))}
-            </select>
-          ) : workspaceDir ? (
-            <span className="input-workspace-badge" title={workspaceDir} style={{ fontSize: '11px', color: '#888', marginLeft: '6px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '26px', fontFamily: 'monospace' }}>🏠 {workspaceDir.split('/').pop()}</span>
-          ) : null}
-          {onCompact && (() => {
-            const tooFew = (messageCount ?? 0) < 6;
-            const fullyDisabled = compactDisabled || streaming || tooFew || compacting;
-            const tooltip = compacting ? t('compact.pending') : streaming ? t('compact.streamingDisabled') : tooFew ? t('compact.tooFew', { min: 6, current: messageCount }) : t('compact.title');
-            return (
-              <button type="button" className="input-compact-btn" disabled={fullyDisabled} title={tooltip} onClick={onCompact}
-                onMouseEnter={() => setCompactHover(true)}
-                onMouseLeave={() => setCompactHover(false)}
-                style={{ appearance: 'none', WebkitAppearance: 'none', background: compactHover && !fullyDisabled ? '#f3f3f3' : 'transparent', color: tooFew ? '#bbb' : '#555', border: '1px solid transparent', borderRadius: '6px', width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, font: 'inherit', cursor: fullyDisabled ? 'not-allowed' : 'pointer', opacity: fullyDisabled ? 0.5 : 1 }}
-              >{compacting ? <span className="compact-spinner" /> : <CompressIcon size={16} />}</button>
-            );
-          })()}
+          />
           <span style={{ flex: 1 }} />
+          <div className="input-settings-wrapper">
+            {settingsOpen && (
+              <div className="input-settings-popup">
+                <div className="input-settings-row">
+                  <span className="input-settings-icon"><ThinkingIcon active={thinkingEnabled} /></span>
+                  <span className="input-settings-text">{t('chat.thinking')}</span>
+                  <button
+                    type="button"
+                    className={'input-thinking-toggle' + (thinkingEnabled ? ' on' : '')}
+                    onClick={onToggleThinking}
+                    onMouseEnter={() => setThinkingHover(true)}
+                    onMouseLeave={() => setThinkingHover(false)}
+                    title={t('chat.thinking')}
+                    aria-pressed={thinkingEnabled}
+                    disabled={disabled}
+                    style={{ appearance: 'none', WebkitAppearance: 'none', background: thinkingHover && !disabled ? '#f3f3f3' : 'transparent', color: thinkingEnabled ? '#1c1c1e' : '#999', border: '1px solid #e0e0e0', borderRadius: '4px', width: '40px', height: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontSize: '10px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer' }}
+                  >{thinkingEnabled ? t('chat.on') : t('chat.off')}</button>
+                </div>
+                {(workspaceOptions?.length || 0) > 0 ? (
+                  <div className="input-settings-row">
+                    <span className="input-settings-icon"><WorkspaceIcon /></span>
+                    <span className="input-settings-text">{t('chat.workspace')}</span>
+                    <select className="input-settings-workspace"
+                      value={selectedWorkspace || ''}
+                      onChange={(e) => onSelectWorkspace?.(e.target.value)}
+                      title={t('chat.selectWorkspace')}
+                      disabled={disabled}>
+                      <option value="">{t('chat.noWorkspace')}</option>
+                      {workspaceOptions!.map(ws => (
+                        <option key={ws.path} value={ws.path}>{ws.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : workspaceDir ? (
+                  <div className="input-settings-row">
+                    <span className="input-settings-icon"><WorkspaceIcon /></span>
+                    <span className="input-settings-text">{t('chat.workspace')}</span>
+                    <span className="input-workspace-badge" title={workspaceDir} style={{ fontSize: '11px', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace', display: 'block', width: '100%' }}>{workspaceDir.split('/').pop()}</span>
+                  </div>
+                ) : null}
+              </div>
+            )}
+            <button
+              type="button"
+              className={'input-settings-btn' + (settingsOpen ? ' on' : '')}
+              onClick={() => setSettingsOpen(v => !v)}
+              onMouseEnter={() => setGearHover(true)}
+              onMouseLeave={() => setGearHover(false)}
+              title={t('chat.settingsTooltip')}
+              aria-pressed={settingsOpen}
+              disabled={disabled}
+              style={{ appearance: 'none', WebkitAppearance: 'none', background: gearHover && !disabled ? '#f3f3f3' : settingsOpen ? '#e8e8e8' : 'transparent', color: settingsOpen ? '#1c1c1e' : '#888', border: '1px solid transparent', borderRadius: '6px', width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: disabled ? 'not-allowed' : 'pointer' }}
+            ><GearIcon /></button>
+          </div>
           {streaming ? (
             <button type="submit" title={t('chat.stop')}
               style={{ background: '#e53935', color: '#ffffff', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer' }}>

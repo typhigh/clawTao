@@ -24,6 +24,8 @@ const electronAPI = {
     get: (sessionId: string) => ipcRenderer.invoke('session:get', { sessionId }),
     delete: (sessionId: string) => ipcRenderer.invoke('session:delete', { sessionId }),
     compact: (sessionId: string) => ipcRenderer.invoke('session:compact', { sessionId }),
+    contextStats: (sessionId: string, modelKey?: string, workspaceDir?: string) =>
+      ipcRenderer.invoke('session:context-stats', { sessionId, modelKey, workspaceDir }),
   },
 
   // Unified stream event listener (replaces chat:started / text_delta / tool_started / tool_result / done)

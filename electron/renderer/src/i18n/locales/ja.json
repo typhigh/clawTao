@@ -28,7 +28,11 @@
     "selectWorkspace": "ワークスペース選択",
     "noWorkspace": "サンドボックスなし",
     "scrollToTop": "一番上へ",
-    "scrollToBottom": "一番下へ"
+    "scrollToBottom": "一番下へ",
+    "settingsTooltip": "設定",
+    "on": "オン",
+    "off": "オフ",
+    "workspace": "ワークスペース"
   },
   "tool": {
     "input": "入力",
