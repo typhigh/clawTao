@@ -116,176 +116,84 @@ export function InputArea({
               ))}
             </div>
           )}
-          {/* Hidden file input */}
           <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden
             onChange={(e) => { if (e.target.files) addImages(e.target.files); e.target.value = ''; }} />
-          <div className="input-bottom-row">
-            <button
-              type="button"
-              className="input-image-btn"
-              title={t('chat.attachImage')}
-              onClick={() => fileInputRef.current?.click()}
-              onMouseEnter={() => setImageHover(true)}
-              onMouseLeave={() => setImageHover(false)}
-              style={{
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                background: imageHover ? '#f0f0f0' : 'transparent',
-                border: '1px solid transparent',
-                color: '#555',
-                borderRadius: '6px',
-                width: '26px',
-                height: '26px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                font: 'inherit',
-                cursor: 'pointer',
-                opacity: disabled ? 0.4 : 1,
-              }}
-            ><UploadIcon /></button>
-            <select
-              className="input-model-select input-model-select-inline"
-              value={selectedModelKey}
-              onChange={(e) => onSelectModel(e.target.value)}
-              disabled={disabledModel || modelOptions.length === 0}
-              title={t('chat.selectModel')}
-            >
-              {modelOptions.length === 0 ? (
-                <option value="">{t('chat.noModelsConfigured')}</option>
-              ) : (
-                modelOptions.map(opt => (
-                  <option key={opt.key} value={opt.key}>
-                    {opt.providerId === 'custom' ? `${opt.providerName} / ${opt.model}` : opt.model}
-                  </option>
-                ))
-              )}
+        </div>
+        <div className="input-bottom-row">
+          <button
+            type="button"
+            className="input-image-btn"
+            title={t('chat.attachImage')}
+            onClick={() => fileInputRef.current?.click()}
+            onMouseEnter={() => setImageHover(true)}
+            onMouseLeave={() => setImageHover(false)}
+            style={{ appearance: 'none', WebkitAppearance: 'none', background: imageHover ? '#f0f0f0' : 'transparent', border: '1px solid transparent', color: '#555', borderRadius: '6px', width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, font: 'inherit', cursor: 'pointer', opacity: disabled ? 0.4 : 1 }}
+          ><UploadIcon /></button>
+          <select
+            className="input-model-select input-model-select-inline"
+            value={selectedModelKey}
+            onChange={(e) => onSelectModel(e.target.value)}
+            disabled={disabledModel || modelOptions.length === 0}
+            title={t('chat.selectModel')}
+          >
+            {modelOptions.length === 0 ? (
+              <option value="">{t('chat.noModelsConfigured')}</option>
+            ) : (
+              modelOptions.map(opt => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.providerId === 'custom' ? `${opt.providerName} / ${opt.model}` : opt.model}
+                </option>
+              ))
+            )}
+          </select>
+          <button
+            type="button"
+            className={'input-thinking-toggle input-thinking-toggle-inline' + (thinkingEnabled ? ' on' : '')}
+            onClick={onToggleThinking}
+            onMouseEnter={() => setThinkingHover(true)}
+            onMouseLeave={() => setThinkingHover(false)}
+            title={t('chat.thinking')}
+            aria-pressed={thinkingEnabled}
+            disabled={disabled}
+            style={{ appearance: 'none', WebkitAppearance: 'none', background: thinkingHover && !disabled ? '#f3f3f3' : 'transparent', color: thinkingEnabled ? '#1c1c1e' : '#999', border: '1px solid transparent', borderRadius: '6px', width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: disabled ? 'not-allowed' : 'pointer' }}
+          >
+            <ThinkingIcon active={thinkingEnabled} />
+          </button>
+          {(workspaceOptions?.length || 0) > 0 ? (
+            <select className="input-model-select input-model-select-inline"
+              value={selectedWorkspace || ''}
+              onChange={(e) => onSelectWorkspace?.(e.target.value)}
+              title={t('chat.selectWorkspace')}
+              style={{ maxWidth: '120px' }}>
+              <option value="">{t('chat.noWorkspace')}</option>
+              {workspaceOptions!.map(ws => (
+                <option key={ws.path} value={ws.path}>{ws.label}</option>
+              ))}
             </select>
-            <button
-              type="button"
-              className={'input-thinking-toggle input-thinking-toggle-inline' + (thinkingEnabled ? ' on' : '')}
-              onClick={onToggleThinking}
-              onMouseEnter={() => setThinkingHover(true)}
-              onMouseLeave={() => setThinkingHover(false)}
-              title={t('chat.thinking')}
-              aria-pressed={thinkingEnabled}
-              disabled={disabled}
-              style={{
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                background: thinkingHover && !disabled ? '#f3f3f3' : 'transparent',
-                color: thinkingEnabled ? '#1c1c1e' : '#999',
-                border: '1px solid transparent',
-                borderRadius: '6px',
-                width: '26px',
-                height: '26px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                cursor: disabled ? 'not-allowed' : 'pointer',
-                opacity: 1,
-              }}
-            >
-              <ThinkingIcon active={thinkingEnabled} />
-            </button>
-            {(workspaceOptions?.length || 0) > 0 ? (
-              <select className="input-model-select input-model-select-inline"
-                value={selectedWorkspace || ''}
-                onChange={(e) => onSelectWorkspace?.(e.target.value)}
-                title={t('chat.selectWorkspace')}
-                style={{ maxWidth: '120px' }}>
-                <option value="">{t('chat.noWorkspace')}</option>
-                {workspaceOptions!.map(ws => (
-                  <option key={ws.path} value={ws.path}>{ws.label}</option>
-                ))}
-              </select>
-            ) : workspaceDir ? (
-              <span className="input-workspace-badge" title={workspaceDir} style={{ fontSize: '11px', color: '#888', marginLeft: '6px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '26px', fontFamily: 'monospace' }}>🏠 {workspaceDir.split('/').pop()}</span>
-            ) : null}
-            {onCompact && (() => {
-              const tooFew = (messageCount ?? 0) < 6;
-              const fullyDisabled = compactDisabled || streaming || tooFew || compacting;
-              const tooltip = compacting
-                ? t('compact.pending')
-                : streaming
-                  ? t('compact.streamingDisabled')
-                  : tooFew
-                    ? t('compact.tooFew', { min: 6, current: messageCount })
-                    : t('compact.title');
-              return (
-                <button
-                  type="button"
-                  className="input-compact-btn"
-                  disabled={fullyDisabled}
-                  title={tooltip}
-                  onClick={onCompact}
-                  onMouseEnter={() => setCompactHover(true)}
-                  onMouseLeave={() => setCompactHover(false)}
-                  style={{
-                    appearance: 'none',
-                    WebkitAppearance: 'none',
-                    background: compactHover && !fullyDisabled ? '#f3f3f3' : 'transparent',
-                    color: tooFew ? '#bbb' : '#555',
-                    border: '1px solid transparent',
-                    borderRadius: '6px',
-                    width: '26px',
-                    height: '26px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0,
-                    font: 'inherit',
-                    cursor: fullyDisabled ? 'not-allowed' : 'pointer',
-                    opacity: fullyDisabled ? 0.5 : 1,
-                  }}
-                >{compacting ? <span className="compact-spinner" /> : <CompressIcon size={16} />}</button>
-              );
-            })()}
-          </div>
+          ) : workspaceDir ? (
+            <span className="input-workspace-badge" title={workspaceDir} style={{ fontSize: '11px', color: '#888', marginLeft: '6px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: '26px', fontFamily: 'monospace' }}>🏠 {workspaceDir.split('/').pop()}</span>
+          ) : null}
+          {onCompact && (() => {
+            const tooFew = (messageCount ?? 0) < 6;
+            const fullyDisabled = compactDisabled || streaming || tooFew || compacting;
+            const tooltip = compacting ? t('compact.pending') : streaming ? t('compact.streamingDisabled') : tooFew ? t('compact.tooFew', { min: 6, current: messageCount }) : t('compact.title');
+            return (
+              <button type="button" className="input-compact-btn" disabled={fullyDisabled} title={tooltip} onClick={onCompact}
+                onMouseEnter={() => setCompactHover(true)}
+                onMouseLeave={() => setCompactHover(false)}
+                style={{ appearance: 'none', WebkitAppearance: 'none', background: compactHover && !fullyDisabled ? '#f3f3f3' : 'transparent', color: tooFew ? '#bbb' : '#555', border: '1px solid transparent', borderRadius: '6px', width: '26px', height: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, font: 'inherit', cursor: fullyDisabled ? 'not-allowed' : 'pointer', opacity: fullyDisabled ? 0.5 : 1 }}
+              >{compacting ? <span className="compact-spinner" /> : <CompressIcon size={16} />}</button>
+            );
+          })()}
+          <span style={{ flex: 1 }} />
           {streaming ? (
-            <button
-              type="submit"
-              className="input-send-btn input-send-btn-inline input-stop-btn"
-              title={t('chat.stop')}
-              style={{
-                background: '#e53935',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '50%',
-                width: '28px',
-                height: '28px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                cursor: 'pointer',
-              }}
-            >
+            <button type="submit" title={t('chat.stop')}
+              style={{ background: '#e53935', color: '#ffffff', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer' }}>
               <StopIcon />
             </button>
           ) : (
-            <button
-              type="submit"
-              className="input-send-btn input-send-btn-inline"
-              disabled={btnDisabled}
-              title={t('chat.send')}
-              style={{
-                background: '#1c1c1e',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '50%',
-                width: '28px',
-                height: '28px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-                cursor: btnDisabled ? 'not-allowed' : 'pointer',
-                opacity: btnDisabled ? 0.55 : 1,
-              }}
-            >
+            <button type="submit" disabled={btnDisabled} title={t('chat.send')}
+              style={{ background: '#1c1c1e', color: '#ffffff', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: btnDisabled ? 'not-allowed' : 'pointer', opacity: btnDisabled ? 0.55 : 1 }}>
               <SendIcon />
             </button>
           )}
