@@ -2,10 +2,22 @@ use std::sync::atomic::AtomicBool;
 use super::*;
 use crate::tools::executor::ToolError;
 
+fn test_temp_dir() -> std::path::PathBuf {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target").join("tests")
+        .join(uuid::Uuid::new_v4().to_string());
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn tmp_file(name: &str) -> std::path::PathBuf {
+    test_temp_dir().join(name)
+}
+
 #[test]
 fn write_and_read_back() {
     let tool = WriteTool;
-    let tmp = std::env::temp_dir().join("clawtao_test_write.txt");
+    let tmp = tmp_file("test_write.txt");
     let result = tool.execute(serde_json::json!({
         "path": tmp.to_str().unwrap(),
         "content": "test content"

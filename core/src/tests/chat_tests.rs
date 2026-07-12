@@ -63,9 +63,15 @@ fn no_cancel() -> Arc<AtomicBool> { Arc::new(AtomicBool::new(false)) }
 
 fn store() -> impl SessionStore {
     use crate::store::json_store::JsonSessionStore;
-    JsonSessionStore::new(
-        std::env::temp_dir().join(format!("clawtao_test_{}", uuid::Uuid::new_v4())),
-    )
+    JsonSessionStore::new(test_temp_dir())
+}
+
+fn test_temp_dir() -> std::path::PathBuf {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target").join("tests")
+        .join(uuid::Uuid::new_v4().to_string());
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
 }
 
 fn tools() -> ToolRegistry {

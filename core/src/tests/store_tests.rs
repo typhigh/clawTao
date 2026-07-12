@@ -2,8 +2,16 @@ use crate::store;
 use crate::store::json_store::JsonSessionStore;
 use crate::store::store_trait::SessionStore;
 
+fn test_temp_dir() -> std::path::PathBuf {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target").join("tests")
+        .join(uuid::Uuid::new_v4().to_string());
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
 fn make_store() -> JsonSessionStore {
-    let dir = std::env::temp_dir().join(format!("clawtao_test_{}", uuid::Uuid::new_v4()));
+    let dir = test_temp_dir();
     JsonSessionStore::new(dir)
 }
 

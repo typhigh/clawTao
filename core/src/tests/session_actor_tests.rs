@@ -5,9 +5,17 @@ use reqwest::blocking::Client;
 use serde_json::Value;
 use std::sync::{Arc, Barrier, atomic::AtomicBool, atomic, atomic::Ordering, mpsc};
 
+fn test_temp_dir() -> std::path::PathBuf {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target").join("tests")
+        .join(uuid::Uuid::new_v4().to_string());
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
 
 fn make_registry() -> SessionRegistry {
-    let dir = std::env::temp_dir().join(format!("clawtao_test_actor_{}", uuid::Uuid::new_v4()));
+    let dir = test_temp_dir();
     SessionRegistry::new(Arc::new(JsonSessionStore::new(dir)))
 }
 
@@ -65,9 +73,7 @@ fn actor_loop_processes_one_run_per_message() {
     let c2 = Arc::clone(&c);
     std::thread::spawn(move || {
         actor_loop(rx, "test",
-            Arc::new(JsonSessionStore::new(
-                std::env::temp_dir().join(format!("clawtao_test_al_{}", uuid::Uuid::new_v4()))
-            )),
+            Arc::new(JsonSessionStore::new(test_temp_dir())),
             Arc::new(AtomicBool::new(false)),
             move |_client: &Client, _store: &dyn SessionStore, _params: Value, _rid: Option<Value>, _cancel: &Arc<AtomicBool>| {
                 c2.fetch_add(1, Ordering::SeqCst);
@@ -96,9 +102,7 @@ fn cancel_flag_stops_processor() {
     let c2 = Arc::clone(&c);
     std::thread::spawn(move || {
         actor_loop(rx, "test",
-            Arc::new(JsonSessionStore::new(
-                std::env::temp_dir().join(format!("clawtao_test_cancel_{}", uuid::Uuid::new_v4()))
-            )),
+            Arc::new(JsonSessionStore::new(test_temp_dir())),
             cancel,
             move |_client: &Client, _store: &dyn SessionStore, _params: Value, _rid: Option<Value>, _cancel: &Arc<AtomicBool>| {
                 c2.fetch_add(1, Ordering::SeqCst);

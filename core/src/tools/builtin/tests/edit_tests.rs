@@ -1,10 +1,22 @@
 use std::sync::atomic::AtomicBool;
 use super::*;
 
+fn test_temp_dir() -> std::path::PathBuf {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target").join("tests")
+        .join(uuid::Uuid::new_v4().to_string());
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn tmp_file(name: &str) -> std::path::PathBuf {
+    test_temp_dir().join(name)
+}
+
 #[test]
 fn edit_replace_single_occurrence() {
     let tool = EditTool;
-    let tmp = std::env::temp_dir().join("clawtao_test_edit.txt");
+    let tmp = tmp_file("test_edit.txt");
     std::fs::write(&tmp, "hello world").unwrap();
 
     tool.execute(serde_json::json!({
@@ -20,7 +32,7 @@ fn edit_replace_single_occurrence() {
 #[test]
 fn edit_multiple_occurrences_fails() {
     let tool = EditTool;
-    let tmp = std::env::temp_dir().join("clawtao_test_edit2.txt");
+    let tmp = tmp_file("test_edit2.txt");
     std::fs::write(&tmp, "aa bb aa").unwrap();
 
     let err = tool.execute(serde_json::json!({
@@ -36,7 +48,7 @@ fn edit_multiple_occurrences_fails() {
 #[test]
 fn edit_not_found_fails() {
     let tool = EditTool;
-    let tmp = std::env::temp_dir().join("clawtao_test_edit3.txt");
+    let tmp = tmp_file("test_edit3.txt");
     std::fs::write(&tmp, "hello").unwrap();
 
     let err = tool.execute(serde_json::json!({
@@ -52,7 +64,7 @@ fn edit_not_found_fails() {
 #[test]
 fn edit_replace_all() {
     let tool = EditTool;
-    let tmp = std::env::temp_dir().join("clawtao_test_edit4.txt");
+    let tmp = tmp_file("test_edit4.txt");
     std::fs::write(&tmp, "aa bb aa cc aa").unwrap();
 
     let result = tool.execute(serde_json::json!({
@@ -70,7 +82,7 @@ fn edit_replace_all() {
 #[test]
 fn edit_replace_all_not_found_fails() {
     let tool = EditTool;
-    let tmp = std::env::temp_dir().join("clawtao_test_edit5.txt");
+    let tmp = tmp_file("test_edit5.txt");
     std::fs::write(&tmp, "hello").unwrap();
 
     let err = tool.execute(serde_json::json!({
