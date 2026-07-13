@@ -118,6 +118,13 @@ export type StreamEvent = {
   // compaction
   messageCount?: number;
   warning?: string;
+  // file change tracking (Write/Edit tools carry old+new content for diff)
+  fileChange?: {
+    path: string;
+    oldContent?: string | null;
+    newContent?: string;
+    action: 'created' | 'modified';
+  };
 };
 
 // ── Image attachment ──────────────────────────────────────────────────

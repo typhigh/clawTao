@@ -47,7 +47,10 @@
     "wait-on": "^8.0.0"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "diff": "^9.0.0",
     "i18next": "^25.0.0",
+    "monaco-editor": "^0.55.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-i18next": "^16.0.0",

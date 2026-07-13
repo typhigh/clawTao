@@ -31,6 +31,12 @@ interface Props {
   onClearCompactResult?: () => void;
   /** Input panel as a slot — keeps the original layout (messages/scroll/input inside the same flex column). */
   inputPanel?: React.ReactNode;
+  /** Per-turn generated files for historical turns (index-aligned with agent turns). */
+  historicalFiles?: import('../lib/generated-files').GeneratedFile[][];
+  /** Generated files for the live turn (null when no live turn or no files). */
+  liveFiles?: import('../lib/generated-files').GeneratedFile[] | null;
+  /** Called when a file change card is clicked. */
+  onFileClick?: (file: import('../lib/generated-files').GeneratedFile) => void;
 }
 
 /** Format a token count for human display: 128432 → "128K", 2400 → "2.4K", 756 → "756". */
@@ -54,7 +60,7 @@ function errorAction(errorCode: string): string | null {
   }
 }
 
-export function ChatView({ timeline, activeSessionId, error, onClearError, notice, onClearNotice, compactResult, onClearCompactResult, hasActiveSession, onCreateSession, onRetry, inputPanel }: Props) {
+export function ChatView({ timeline, activeSessionId, error, onClearError, notice, onClearNotice, compactResult, onClearCompactResult, hasActiveSession, onCreateSession, onRetry, historicalFiles, liveFiles, onFileClick, inputPanel }: Props) {
   const { t } = useTranslation();
   const messagesRef = useRef<HTMLDivElement>(null);
   // True when user is at (or near) the bottom. While streaming we only
@@ -128,10 +134,13 @@ export function ChatView({ timeline, activeSessionId, error, onClearError, notic
       {hasActiveSession ? (
         <>
           <div className="messages" ref={messagesRef} onScroll={updateStickiness}>
-            {timeline.map((group) => {
+            {timeline.map((group, idx) => {
               if (group.kind === 'user') return <UserMessageView key={group.id} content={group.content} images={group.images} />;
-              if (group.kind === 'liveTurn') return <LiveTurnView key="live-turn" segments={group.segments} isStreaming={group.isStreaming} />;
-              return <AgentTurnView key={`${group.id}-done`} segments={group.segments} conclusion={group.conclusion} />;
+              if (group.kind === 'liveTurn') return <LiveTurnView key="live-turn" segments={group.segments} isStreaming={group.isStreaming} files={liveFiles ?? undefined} onFileClick={onFileClick} />;
+              // Map agent turns: count agent turns up to idx to index historicalFiles
+              const agentTurnIdx = timeline.slice(0, idx).filter(g => g.kind === 'agentTurn').length;
+              const turnFiles = historicalFiles?.[agentTurnIdx];
+              return <AgentTurnView key={`${group.id}-done`} segments={group.segments} conclusion={group.conclusion} files={turnFiles} onFileClick={onFileClick} />;
             })}
           </div>
           {timeline.length > 0 && (

@@ -341,6 +341,47 @@ fn run_state_machine(
 
             // ── Tooling: execute tool calls in parallel ─────────────
             TurnState::Tooling { response } => {
+                // Pre-compute file change metadata for Write/Edit tools.
+                // Reading old content NOW (before threads spawn) avoids any race:
+                // the Write tool hasn't written the file yet.
+                use std::collections::HashMap;
+                let mut file_changes: HashMap<String, Value> = HashMap::new();
+                for tc in &response.tool_calls {
+                    let args_val: Value = serde_json::from_str(&tc.function.arguments)
+                        .unwrap_or(Value::Null);
+                    let name = tc.function.name.as_str();
+                    if name == "Write" {
+                        if let Some(path) = args_val.get("path").and_then(|v| v.as_str()) {
+                            let old_content = std::fs::read_to_string(path).ok();
+                            let new_content = args_val.get("content")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            let action = if old_content.is_some() { "modified" } else { "created" };
+                            file_changes.insert(tc.id.clone(), json!({
+                                "path": path,
+                                "action": action,
+                                "oldContent": old_content,
+                                "newContent": new_content,
+                            }));
+                        }
+                    } else if name == "Edit" {
+                        if let Some(path) = args_val.get("path").and_then(|v| v.as_str()) {
+                            let old_str = args_val.get("old_string")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            let new_str = args_val.get("new_string")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            file_changes.insert(tc.id.clone(), json!({
+                                "path": path,
+                                "action": "modified",
+                                "oldContent": old_str,
+                                "newContent": new_str,
+                            }));
+                        }
+                    }
+                }
+
                 // Notify frontend for each tool call before spawning.
                 for tc in &response.tool_calls {
                     let args_val: Value = serde_json::from_str(&tc.function.arguments)
@@ -407,10 +448,12 @@ fn run_state_machine(
                         .find(|t| t.id == *tc_id)
                         .map(|t| t.function.name.as_str())
                         .unwrap_or("unknown");
+                    let fc = file_changes.remove(tc_id.as_str());
                     notify!(Notification::new("chat.stream", Some(json!({
                         "sessionId": ctx.session_id, "runId": ctx.run_id,
                         "kind": "tool_result", "toolCallId": tc_id,
                         "toolName": tc_name, "output": result,
+                        "fileChange": fc,
                     }))));
                     store::add_tool_result(store, &ctx.session_id, tc_id, result)?;
                 }

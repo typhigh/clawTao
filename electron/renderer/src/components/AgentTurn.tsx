@@ -6,10 +6,22 @@ import { normalizeMd } from '../utils/format';
 import { markdownComponents } from '../utils/markdown';
 import { pairToolWithResults, countTurnSegments } from '../utils/timeline';
 import type { AssistantSegment } from '../types/timeline';
+import type { GeneratedFile } from '../lib/generated-files';
 import { SegmentView } from './ToolCard';
+import { FileChangesPanel } from './FileChangesPanel';
 
 /** Historical turn: tools folded, conclusion always visible. */
-function AgentTurnViewInner({ segments, conclusion }: { segments: AssistantSegment[]; conclusion: string | null }) {
+function AgentTurnViewInner({
+  segments,
+  conclusion,
+  files,
+  onFileClick,
+}: {
+  segments: AssistantSegment[];
+  conclusion: string | null;
+  files?: GeneratedFile[];
+  onFileClick?: (file: GeneratedFile) => void;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -31,6 +43,9 @@ function AgentTurnViewInner({ segments, conclusion }: { segments: AssistantSegme
         <div className="agent-turn-body">
           {processSegments.map((seg) => <SegmentView key={seg.id} segment={seg} />)}
         </div>
+      )}
+      {files && files.length > 0 && onFileClick && (
+        <FileChangesPanel files={files} onFileClick={onFileClick} />
       )}
       {conclusion && (
         <div className="agent-turn-conclusion">

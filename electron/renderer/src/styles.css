@@ -2269,3 +2269,217 @@ html, body, #root {
 .ctx-compact-btn {
   /* hover/disabled states live inline to keep parity with other input buttons */
 }
+
+/* ── File Changes Panel ───────────────────────────────────────────────── */
+
+.file-changes-panel {
+  margin: 6px 0;
+  padding: 6px 0;
+}
+
+.file-changes-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.file-changes-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ── File Change Card ────────────────────────────────────────────────── */
+
+.file-change-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #1c1c1e;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  max-width: 320px;
+  white-space: nowrap;
+}
+
+.file-change-card:hover {
+  background: #f0f0f0;
+  border-color: #b0b0b0;
+}
+
+.file-change-card__icon {
+  flex-shrink: 0;
+  color: #888;
+  display: flex;
+  align-items: center;
+}
+
+.file-change-card__name {
+  font-weight: 600;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.file-change-card__path {
+  color: #888;
+  font-size: 11px;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  display: none; /* hidden by default, shown on wider screens */
+}
+
+.file-change-card__stats {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+}
+
+.file-change-card__added {
+  color: #2e7d32;
+}
+
+.file-change-card__removed {
+  color: #e53935;
+}
+
+/* ── File Change Badge ───────────────────────────────────────────────── */
+
+.file-change-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  text-transform: none;
+}
+
+.file-change-badge--created {
+  background: #eef2f7;
+  color: #4a6b85;
+}
+
+.file-change-badge--modified {
+  background: #f0f0f0;
+  color: #666;
+}
+
+/* ── Diff Modal ──────────────────────────────────────────────────────── */
+
+.diff-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.diff-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1200px;
+  height: 85vh;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.diff-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #ececec;
+  flex-shrink: 0;
+}
+
+.diff-modal-title {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-modal-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.diff-modal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border: 1px solid #d0d0d0;
+  border-radius: 5px;
+  background: #fff;
+  color: #555;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.diff-modal-btn:hover {
+  background: #f0f0f0;
+  color: #1c1c1e;
+}
+
+.diff-modal-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.diff-modal-close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #d0d0d0;
+  border-radius: 50%;
+  background: #fff;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+
+.diff-modal-close:hover {
+  background: #e53935;
+  color: #fff;
+  border-color: #e53935;
+}
+
+.diff-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}

@@ -4,6 +4,7 @@ import { useSettingsStore } from '../stores/settings';
 import { SettingsView } from './SettingsView';
 import { Sidebar } from './Sidebar';
 import { ChatScreen } from './ChatScreen';
+import { DiffModal } from './DiffModal';
 
 type View = 'chat' | 'settings';
 
@@ -51,6 +52,7 @@ function App() {
 
         {view === 'chat' ? <ChatScreen /> : <SettingsView onBack={handleBackToChat} />}
       </div>
+      <DiffModal />
     </div>
   );
 }

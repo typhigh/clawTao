@@ -138,5 +138,14 @@
     "remaining": "Remaining",
     "summary": "Used {{totalPct}}%",
     "loading": "Fetching context usage…"
+  },
+  "workspaceChanges": {
+    "title": "File Changes ({{count}})",
+    "created": "Created",
+    "modified": "Modified",
+    "diffTitle": "Changes: {{filename}}",
+    "prev": "Previous",
+    "next": "Next",
+    "close": "Close"
   }
 }

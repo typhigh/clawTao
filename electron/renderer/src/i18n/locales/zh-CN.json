@@ -142,5 +142,14 @@
     "remaining": "剩余空间",
     "summary": "已占用 {{totalPct}}%",
     "loading": "正在获取上下文用量…"
+  },
+  "workspaceChanges": {
+    "title": "文件变更（{{count}} 个）",
+    "created": "新增",
+    "modified": "修改",
+    "diffTitle": "变更：{{filename}}",
+    "prev": "上一个",
+    "next": "下一个",
+    "close": "关闭"
   }
 }

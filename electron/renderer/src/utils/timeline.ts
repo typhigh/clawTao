@@ -168,6 +168,29 @@ export function pairToolWithResults(segments: AssistantSegment[]): AssistantSegm
   return out;
 }
 
+// ── getTurnMessageRanges ────────────────────────────────────────────
+
+/** Returns `[startIndex, endIndex]` message index pairs for each agent turn.
+ *  Used by file change extraction to scope messages per turn. */
+export function getTurnMessageRanges(messages: Message[]): number[][] {
+  const ranges: number[][] = [];
+  let turnStart = -1;
+
+  for (let i = 0; i < messages.length; i += 1) {
+    const msg = messages[i];
+    if (msg.role === 'user') {
+      if (turnStart >= 0) ranges.push([turnStart, i - 1]);
+      turnStart = -1;
+    } else if (msg.role === 'assistant') {
+      if (turnStart < 0) turnStart = i;
+    }
+  }
+  if (turnStart >= 0 && turnStart < messages.length) {
+    ranges.push([turnStart, messages.length - 1]);
+  }
+  return ranges;
+}
+
 // ── countTurnSegments ───────────────────────────────────────────────
 
 export function countTurnSegments(segments: AssistantSegment[]): { toolCount: number; processCount: number } {

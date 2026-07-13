@@ -1,12 +1,24 @@
 import { MarkdownSegment } from '../utils/markdown';
 import type { TurnSegment } from '../types/timeline';
+import type { GeneratedFile } from '../lib/generated-files';
 import { Thinking } from './Thinking';
 import { TodoView } from './TodoView';
 import { CompressIcon } from './icons';
 import { ToolPairView } from './ToolCard';
+import { FileChangesPanel } from './FileChangesPanel';
 
 /** Live turn: flat chronological segments, no fold. */
-export function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[]; isStreaming: boolean }) {
+export function LiveTurnView({
+  segments,
+  isStreaming,
+  files,
+  onFileClick,
+}: {
+  segments: TurnSegment[];
+  isStreaming: boolean;
+  files?: GeneratedFile[];
+  onFileClick?: (file: GeneratedFile) => void;
+}) {
   return (
     <div className={`agent-turn live ${isStreaming ? 'streaming' : ''}`}>
       {segments.map((seg, i) => {
@@ -39,6 +51,9 @@ export function LiveTurnView({ segments, isStreaming }: { segments: TurnSegment[
         }
         return <ToolPairView key={seg.id} segment={seg} />;
       })}
+      {files && files.length > 0 && onFileClick && (
+        <FileChangesPanel files={files} onFileClick={onFileClick} />
+      )}
     </div>
   );
 }

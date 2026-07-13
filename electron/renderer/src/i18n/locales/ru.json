@@ -138,5 +138,14 @@
     "error": "Ошибка",
     "loading": "Загрузка...",
     "back": "Назад"
+  },
+  "workspaceChanges": {
+    "title": "Изменения файлов ({{count}})",
+    "created": "Создан",
+    "modified": "Изменён",
+    "diffTitle": "Изменения: {{filename}}",
+    "prev": "Назад",
+    "next": "Вперёд",
+    "close": "Закрыть"
   }
 }

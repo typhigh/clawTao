@@ -138,5 +138,14 @@
     "error": "Erreur",
     "loading": "Chargement...",
     "back": "Retour"
+  },
+  "workspaceChanges": {
+    "title": "Fichiers modifiés ({{count}})",
+    "created": "Créé",
+    "modified": "Modifié",
+    "diffTitle": "Modifications : {{filename}}",
+    "prev": "Précédent",
+    "next": "Suivant",
+    "close": "Fermer"
   }
 }

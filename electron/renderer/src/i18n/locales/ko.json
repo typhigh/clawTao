@@ -138,5 +138,14 @@
     "error": "오류",
     "loading": "로딩 중...",
     "back": "뒤로"
+  },
+  "workspaceChanges": {
+    "title": "파일 변경 ({{count}}개)",
+    "created": "생성됨",
+    "modified": "수정됨",
+    "diffTitle": "변경: {{filename}}",
+    "prev": "이전",
+    "next": "다음",
+    "close": "닫기"
   }
 }
