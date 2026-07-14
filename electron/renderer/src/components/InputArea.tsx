@@ -57,18 +57,59 @@ export function InputArea({
   const [gearHover, setGearHover] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  // Narrow boundary for the settings popup: only the gear + popup.
+  // Clicking the textarea / model select / upload button is considered "outside"
+  // and should close the popup.
+  const settingsRef = useRef<HTMLDivElement | null>(null);
 
-  // Close settings popup when clicking outside.
+  // Close settings popup when clicking outside the gear/popup region.
   useEffect(() => {
     if (!settingsOpen) return;
     const handler = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
         setSettingsOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, [settingsOpen]);
+
+  // Close settings popup when the mouse leaves the gear/popup region.
+  // The popup is absolutely positioned 6px above the gear, so a debounce keeps
+  // it from flickering while the user travels between the two. We use a
+  // generous 1s window — short enough to feel passive, long enough that
+  // glancing away (e.g. at the chat scrollbar) doesn't snap it shut.
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const el = settingsRef.current;
+    if (!el) return;
+    let leaveTimer: number | undefined;
+    const onEnter = () => {
+      if (leaveTimer !== undefined) {
+        window.clearTimeout(leaveTimer);
+        leaveTimer = undefined;
+      }
+    };
+    const onLeave = () => {
+      leaveTimer = window.setTimeout(() => setSettingsOpen(false), 600);
+    };
+    el.addEventListener('mouseenter', onEnter);
+    el.addEventListener('mouseleave', onLeave);
+    return () => {
+      el.removeEventListener('mouseenter', onEnter);
+      el.removeEventListener('mouseleave', onLeave);
+      if (leaveTimer !== undefined) window.clearTimeout(leaveTimer);
+    };
+  }, [settingsOpen]);
+
+  // Allow Escape to dismiss the popup while it's open.
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSettingsOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [settingsOpen]);
 
   const addImages = async (files: FileList | File[]) => {
@@ -97,7 +138,7 @@ export function InputArea({
   const btnDisabled = !value.trim() || disabled || sendDisabled;
 
   return (
-    <div className="input-area-wrapper" ref={wrapperRef}>
+    <div className="input-area-wrapper">
       <form className="input-area" onSubmit={(e) => { e.preventDefault(); if (streaming) onCancel(); else onSend(); }}>
         <div className="input-textarea-wrap">
           <textarea
@@ -144,7 +185,7 @@ export function InputArea({
             title={t('chat.selectModel')}
           />
           <span style={{ flex: 1 }} />
-          <div className="input-settings-wrapper">
+          <div className="input-settings-wrapper" ref={settingsRef}>
             {settingsOpen && (
               <div className="input-settings-popup">
                 <div className="input-settings-row">
