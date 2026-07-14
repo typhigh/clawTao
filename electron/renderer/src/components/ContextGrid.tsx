@@ -119,6 +119,43 @@ export function ContextGrid({
     return () => document.removeEventListener('mousedown', h);
   }, [open]);
 
+  // Close when the mouse leaves the wrapper. The popup floats 6px above the
+  // button, so debounce to avoid flicker while moving between the two. We use
+  // a generous 1s window — short enough to feel passive, long enough that
+  // glancing away (e.g. at the chat scrollbar) doesn't snap it shut.
+  useEffect(() => {
+    if (!open) return;
+    const el = wrapperRef.current;
+    if (!el) return;
+    let leaveTimer: number | undefined;
+    const onEnter = () => {
+      if (leaveTimer !== undefined) {
+        window.clearTimeout(leaveTimer);
+        leaveTimer = undefined;
+      }
+    };
+    const onLeave = () => {
+      leaveTimer = window.setTimeout(() => setOpen(false), 600);
+    };
+    el.addEventListener('mouseenter', onEnter);
+    el.addEventListener('mouseleave', onLeave);
+    return () => {
+      el.removeEventListener('mouseenter', onEnter);
+      el.removeEventListener('mouseleave', onLeave);
+      if (leaveTimer !== undefined) window.clearTimeout(leaveTimer);
+    };
+  }, [open]);
+
+  // Escape key dismisses the popup.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
   // ── Derived values ─────────────────────────────────────────────
   const derived = useMemo(() => {
     if (!stats || stats.contextWindow <= 0) return null;

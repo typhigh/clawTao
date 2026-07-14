@@ -1,14 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DiffEditor, loader, type Monaco } from '@monaco-editor/react';
-import * as monaco from 'monaco-editor';
+import { DiffEditor } from '@monaco-editor/react';
 import { useWorkspaceChangesStore } from '../stores/workspace-changes';
 import { computeDiffPair, computeLineStats } from '../lib/generated-files';
-import { FileChangeCard } from './FileChangeCard';
-
-// Configure @monaco-editor/react to use the locally bundled Monaco
-// instead of downloading from CDN.
-loader.config({ monaco });
 
 /** Map a file extension to a Monaco language identifier. */
 function languageForPath(filePath: string): string {
@@ -93,25 +87,37 @@ export function DiffModal() {
           <button className="diff-modal-close" onClick={closeDiff} aria-label={t('workspaceChanges.close')}>✕</button>
         </div>
 
-        {/* Body — Monaco DiffEditor */}
+        {/* Body — Monaco DiffEditor.
+            StrictModeGate ensures the editor only mounts once, avoiding React
+            StrictMode's double-effect simulation which triggers Monaco's
+            "TextModel got disposed before DiffEditorWidget model got reset". */}
         <div className="diff-modal-body">
-          <DiffEditor
-            original={diffPair.original}
-            modified={diffPair.modified}
-            language={language}
-            options={{
-              readOnly: true,
-              renderSideBySide: true,
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              wordWrap: 'on',
-              automaticLayout: true,
-              lineNumbers: 'on',
-              folding: true,
-              renderOverviewRuler: false,
-            }}
-            loading={<div style={{ padding: 24, color: '#888', fontSize: 13 }}>{t('common.loading')}</div>}
-          />
+            <DiffEditor
+              key={focusedFile.filePath}
+              original={diffPair.original}
+              modified={diffPair.modified}
+              language={language}
+              // keepCurrentModel prevents @monaco-editor/react's cleanup
+              // from disposing models during React StrictMode's simulated
+              // unmount/remount cycle.  Without these props the double-fire
+              // triggers Monaco's "TextModel got disposed before
+              // DiffEditorWidget model got reset".  Orphaned models are
+              // tiny (a few KB of text) and get GC'd when the modal closes.
+              keepCurrentOriginalModel={true}
+              keepCurrentModifiedModel={true}
+              options={{
+                readOnly: true,
+                renderSideBySide: true,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                automaticLayout: true,
+                lineNumbers: 'on',
+                folding: true,
+                renderOverviewRuler: false,
+              }}
+              loading={<div style={{ padding: 24, color: '#888', fontSize: 13 }}>{t('common.loading')}</div>}
+            />
         </div>
       </div>
     </div>
