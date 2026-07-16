@@ -662,6 +662,12 @@ html, body, #root {
   font-size: 14px;
 }
 
+/* KaTeX renders at 1.21em by default — too large next to 14px text. */
+.agent-turn-conclusion .katex,
+.turn-text .katex {
+  font-size: 1em;
+}
+
 .turn-compacted-banner {
   margin: 8px 0;
   padding: 10px 14px;

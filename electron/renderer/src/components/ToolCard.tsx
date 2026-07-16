@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { safeStringify, normalizeMd } from '../utils/format';
-import { markdownComponents } from '../utils/markdown';
+import { markdownComponents, sharedRemarkPlugins, sharedRehypePlugins } from '../utils/markdown';
 import type { AssistantSegment, TurnSegment } from '../types/timeline';
 import { WrenchIcon, PaperclipIcon } from './icons';
 import { Thinking } from './Thinking';
@@ -92,7 +91,7 @@ export function SegmentView({ segment }: { segment: AssistantSegment }) {
   if (segment.kind === 'text') {
     return (
       <div className="turn-segment turn-text">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizeMd(segment.content)}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={sharedRemarkPlugins} rehypePlugins={sharedRehypePlugins} components={markdownComponents}>{normalizeMd(segment.content)}</ReactMarkdown>
       </div>
     );
   }

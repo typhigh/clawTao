@@ -2,7 +2,15 @@ import React, { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { normalizeMd } from './format';
+
+/** Plugins shared by all ReactMarkdown instances — GFM tables/strikethrough
+ *  plus KaTeX math rendering for $$...$$ and $...$ blocks. */
+export const sharedRemarkPlugins = [remarkGfm, remarkMath];
+export const sharedRehypePlugins = [rehypeKatex];
 
 function CodeBlock({ children }: { children?: React.ReactNode }) {
   const { t } = useTranslation();
@@ -66,7 +74,7 @@ const shallowContentEq = (prev: string, next: string): boolean =>
 /** Memoised ReactMarkdown block — only re-renders when content actually changes. */
 export const MarkdownSegment = memo(
   ({ content }: { content: string }) => (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+    <ReactMarkdown remarkPlugins={sharedRemarkPlugins} rehypePlugins={sharedRehypePlugins} components={markdownComponents}>
       {normalizeMd(content)}
     </ReactMarkdown>
   ),

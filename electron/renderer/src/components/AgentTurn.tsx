@@ -1,9 +1,8 @@
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { normalizeMd } from '../utils/format';
-import { markdownComponents } from '../utils/markdown';
+import { markdownComponents, sharedRemarkPlugins, sharedRehypePlugins } from '../utils/markdown';
 import { pairToolWithResults, countTurnSegments } from '../utils/timeline';
 import type { AssistantSegment } from '../types/timeline';
 import type { GeneratedFile } from '../lib/generated-files';
@@ -46,7 +45,7 @@ function AgentTurnViewInner({
       )}
       {conclusion && (
         <div className="agent-turn-conclusion">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizeMd(conclusion)}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={sharedRemarkPlugins} rehypePlugins={sharedRehypePlugins} components={markdownComponents}>{normalizeMd(conclusion)}</ReactMarkdown>
         </div>
       )}
       {files && files.length > 0 && onFileClick && (
