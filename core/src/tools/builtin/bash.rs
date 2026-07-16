@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tracing::warn;
 
-use super::sandbox::{SandboxConfig, SandboxProfile};
+use super::sandbox::{Policy, SandboxConfig, SandboxProfile};
 
 pub struct BashTool {
     sandbox: SandboxConfig,
@@ -25,12 +25,40 @@ impl ToolExecutor for BashTool {
     }
 
     fn spec(&self) -> ToolSpec {
-        let mut desc = String::from(
-            "Execute a shell command and return its stdout and stderr. \
-             Use for file operations, git, build commands, etc."
-        );
-        if self.sandbox.is_active() {
-            desc.push_str(" Commands are sandboxed to the workspace directory via macOS Seatbelt.");
+        let mut desc = String::from("Execute a shell command and return its stdout and stderr. ");
+
+        let write_eff = self.sandbox.effective_write();
+        let read_eff = self.sandbox.effective_read();
+        let ws = self.sandbox.workspace_dir.as_deref().unwrap_or("");
+        match (write_eff, read_eff) {
+            (Policy::Forbidden, _) => {
+                desc.push_str("All file write attempts are blocked by the system. ");
+                desc.push_str("Use for read-only exploration (ls, find, git log, cat, head, etc.).");
+            }
+            (Policy::Restricted, Policy::Unrestricted) => {
+                desc.push_str(&format!(
+                    "Commands are sandboxed — writes limited to workspace ({}); reads unrestricted.",
+                    ws
+                ));
+            }
+            (Policy::Restricted, Policy::Restricted) | (Policy::Unrestricted, Policy::Restricted) => {
+                desc.push_str(&format!(
+                    "Commands are sandboxed — reads and writes limited to workspace ({}).",
+                    ws
+                ));
+            }
+            (Policy::Restricted, Policy::Forbidden) => {
+                desc.push_str(&format!(
+                    "Commands are sandboxed — writes limited to workspace ({}); reads blocked.",
+                    ws
+                ));
+            }
+            (Policy::Unrestricted, Policy::Unrestricted) => {
+                desc.push_str("Use for file operations, git, build commands, etc.");
+            }
+            (Policy::Unrestricted, Policy::Forbidden) => {
+                desc.push_str("Reads blocked by the system. Use for writes only.");
+            }
         }
 
         ToolSpec::new("Bash", &desc, json!({
@@ -51,8 +79,11 @@ impl ToolExecutor for BashTool {
 
         // ── Build the command: optionally wrap with sandbox-exec ──────────
         let mut cmd = if self.sandbox.is_active() {
-            warn!("Sandbox: workspace={}, mode={:?}",
-                  self.sandbox.workspace_dir, self.sandbox.mode);
+            warn!("Sandbox: workspace={:?}, write={:?}, read={:?}, net={:?}",
+                  self.sandbox.workspace_dir,
+                  self.sandbox.effective_write(),
+                  self.sandbox.effective_read(),
+                  self.sandbox.effective_network());
             match SandboxProfile::wrap_command(&self.sandbox, command) {
                 Some(c) => {
                     warn!("Sandbox cmd: {:?}", c);
@@ -74,8 +105,10 @@ impl ToolExecutor for BashTool {
         // Default to workspace dir when sandboxed so basic commands (pwd, ls) work.
         if let Some(cwd) = cmd_cwd {
             cmd.current_dir(cwd);
-        } else if self.sandbox.is_active() {
-            cmd.current_dir(&self.sandbox.workspace_dir);
+        } else if let Some(ws) = self.sandbox.workspace_dir.as_deref() {
+            if !ws.is_empty() {
+                cmd.current_dir(ws);
+            }
         }
 
         // ── No timeout: simple output ─────────────────────────────────────

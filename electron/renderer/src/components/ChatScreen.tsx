@@ -156,6 +156,12 @@ export function ChatScreen() {
           workspaceDir={activeSession?.workspace_dir || ''}
           workspaceOptions={config?.workspaces || []}
           onSelectWorkspace={handleSelectWorkspace}
+          sandboxWrite={config?.sandbox?.write_policy}
+          sandboxRead={config?.sandbox?.read_policy}
+          sandboxNetwork={config?.sandbox?.network_policy}
+          onSandboxWriteChange={(v) => { if (config) useSettingsStore.getState().save({ ...config, sandbox: { ...config.sandbox, write_policy: v } }); }}
+          onSandboxReadChange={(v) => { if (config) useSettingsStore.getState().save({ ...config, sandbox: { ...config.sandbox, read_policy: v } }); }}
+          onSandboxNetworkChange={(v) => { if (config) useSettingsStore.getState().save({ ...config, sandbox: { ...config.sandbox, network_policy: v === 'restricted' ? 'unrestricted' : v } }); }}
           onCompact={activeSessionId ? handleCompact : undefined}
           compactDisabled={compacting || isStreaming || !activeSessionId}
           compacting={compacting}

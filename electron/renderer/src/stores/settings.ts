@@ -59,6 +59,12 @@ export interface AppConfig {
     blocked_commands: string[];
     timeout_secs: number | null;
   };
+  /** Per-session sandbox policy overrides. Stored in Electron config.json. */
+  sandbox?: {
+    write_policy?: 'forbidden' | 'restricted' | 'unrestricted';
+    read_policy?: 'forbidden' | 'restricted' | 'unrestricted';
+    network_policy?: 'forbidden' | 'unrestricted';
+  };
 }
 
 interface SettingsState {

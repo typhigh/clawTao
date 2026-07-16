@@ -258,7 +258,7 @@ function setupIpc() {
   );
 
   // chat.send — resolve per-session model_key to provider/model/api_key.
-  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string; thinking_enabled?: boolean; workspace_dir?: string; images?: { base64: string; mediaType: string }[] }) => {
+  ipcMain.handle('chat:send', (_e, p: { message: string; sessionId: string; model_key?: string; thinking_enabled?: boolean; workspace_dir?: string; images?: { base64: string; mediaType: string }[]; plan_mode?: boolean }) => {
     const config: any = readConfig();
     const key = p.model_key || config.llm?.default_model_id || '';
     if (!key) return Promise.reject(new Error('No model selected.'));
@@ -268,6 +268,7 @@ function setupIpc() {
     if (!provider) return Promise.reject(new Error(`Provider not found: ${providerId}`));
 
     // Assemble a flat config object for the Rust backend.
+    const sandboxCfg = (config as any).sandbox || {};
     const flatConfig: Record<string, unknown> = {
       api_key: readEncryptedKey(providerId) || '',
       base_url: provider.base_url || '',
@@ -275,7 +276,13 @@ function setupIpc() {
       api_protocol: provider.api_protocol || 'anthropic',
       thinking_enabled: !!p.thinking_enabled,
       workspace_dir: p.workspace_dir || '',
+      // New-style sandbox policies (preferred)
+      write_policy: sandboxCfg.write_policy || undefined,
+      read_policy: sandboxCfg.read_policy || undefined,
+      network_policy: sandboxCfg.network_policy || undefined,
+      // Legacy fallback — removed once all users have migrated configs
       sandbox_mode: p.workspace_dir ? 'workspace_only' : 'off',
+      plan_mode: !!p.plan_mode,
       bash_blocked_commands: config.bash?.blocked_commands || [],
       bash_timeout_secs: config.bash?.timeout_secs ?? null,
     };

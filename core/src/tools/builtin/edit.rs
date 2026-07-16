@@ -41,7 +41,9 @@ impl ToolExecutor for EditTool {
 
     fn check_sandbox(&self, input: &serde_json::Value, rules: &SandboxRules) -> Result<(), String> {
         let path = input.get("path").and_then(|v| v.as_str()).unwrap_or("");
-        rules.path_is_allowed(path)
+        // Edit reads the file before writing — check both policies.
+        rules.read_path_is_allowed(path)?;
+        rules.write_path_is_allowed(path)
     }
 
     fn execute(&self, input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {

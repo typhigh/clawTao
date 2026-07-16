@@ -8,6 +8,7 @@ use crate::llm::{ApiAdapter, AnthropicAdapter, LlmMessage, LlmRequest, OpenAiAda
 use crate::llm::types::LlmResponse;
 use crate::store::{self, store_trait::SessionStore};
 use crate::tools::{self, registry::ToolRegistry};
+use crate::tools::builtin::Policy;
 use crate::jsonrpc::{get_param, write_notification, write_response};
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
@@ -67,12 +68,21 @@ pub(crate) fn run_turn(
     let thinking_enabled = config["thinking_enabled"].as_bool().unwrap_or(false);
     let bash_timeout = config["bash_timeout_secs"].as_u64();
 
-    // Read sandbox mode from config.
-    let sandbox_mode = match config.get("sandbox_mode").and_then(|v| v.as_str()).unwrap_or("workspace_only") {
-        "off" => tools::builtin::SandboxMode::Off,
-        "strict" => tools::builtin::SandboxMode::Strict,
-        _ => tools::builtin::SandboxMode::WorkspaceOnly,
-    };
+    // Read sandbox policies from config.
+    // New style: write / read / network each independently configurable.
+    // Fall back to the old-style sandbox_mode string for backward compat.
+    let plan_mode = config.get("plan_mode")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let write_policy = parse_policy(config.get("write_policy").and_then(|v| v.as_str()))
+        .or_else(|| parse_legacy_sandbox_mode(config.get("sandbox_mode").and_then(|v| v.as_str())))
+        .unwrap_or(Policy::Restricted);
+    let read_policy = parse_policy(config.get("read_policy").and_then(|v| v.as_str()))
+        .unwrap_or(Policy::Unrestricted);
+    let network_policy = parse_policy(config.get("network_policy").and_then(|v| v.as_str()))
+        .map(|p| if p == Policy::Forbidden { Policy::Forbidden } else { Policy::Unrestricted })
+        .or_else(|| parse_legacy_network_mode(config.get("sandbox_mode").and_then(|v| v.as_str())))
+        .unwrap_or(Policy::Unrestricted);
 
     // Store the user message first so subsequent store.get() includes it.
     if image_paths.is_empty() {
@@ -87,19 +97,57 @@ pub(crate) fn run_turn(
     let workspace_dir = config.get("workspace_dir")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| workspace_dir_for_session(session_id));
+        .map(|s| s.to_string());
 
-    warn!("Turn sandbox: workspace_dir={}, mode={:?}",
-          workspace_dir, sandbox_mode);
-    let sandbox_cfg = tools::builtin::SandboxConfig::new(&workspace_dir, sandbox_mode);
-    let sandbox_rules = if sandbox_cfg.is_active() {
-        tools::builtin::SandboxRules::new(&sandbox_cfg.workspace_dir)
+    let sandbox_cfg = if plan_mode {
+        tools::builtin::SandboxConfig::read_only(workspace_dir)
     } else {
-        tools::builtin::SandboxRules::off()
+        tools::builtin::SandboxConfig {
+            write: write_policy,
+            read: read_policy,
+            network: network_policy,
+            workspace_dir,
+        }
     };
+
+    warn!("Turn sandbox: workspace_dir={:?}, write={:?}, read={:?}, net={:?}",
+          sandbox_cfg.workspace_dir, sandbox_cfg.effective_write(),
+          sandbox_cfg.effective_read(), sandbox_cfg.effective_network());
+    let sandbox_rules = tools::builtin::SandboxRules::with_policies(
+        sandbox_cfg.workspace_dir.as_deref(),
+        sandbox_cfg.effective_read(),
+        sandbox_cfg.effective_write(),
+        sandbox_cfg.effective_network(),
+    );
     let mut tool_registry = ToolRegistry::new();
+    // Snapshot effective policies and workspace_dir before sandbox_cfg is
+    // moved into register_all — used to filter the tool list sent to the LLM.
+    let ws_for_prompt = sandbox_cfg.workspace_dir.clone();
+    let effective_write = sandbox_cfg.effective_write();
+    let effective_read = sandbox_cfg.effective_read();
+    let effective_network = sandbox_cfg.effective_network();
     tools::builtin::register_all(&mut tool_registry, sandbox_cfg, bash_timeout);
+
+    // Hard-remove tools that violate policy from the registry too.
+    // The filter on `tools` (sent to the LLM) hides the schema, but if
+    // the LLM still knows "Edit" from training / prior turns it could try
+    // to call it — without unregistering, `tool_registry.get("Edit")`
+    // would still return a usable executor.  Removing it from the
+    // registry makes "Unknown tool: Edit" the deterministic error.
+    if effective_write == Policy::Forbidden {
+        tool_registry.unregister("Write");
+        tool_registry.unregister("Edit");
+    }
+    if effective_read == Policy::Forbidden {
+        tool_registry.unregister("Read");
+        tool_registry.unregister("Grep");
+        // Edit reads the file before writing, so it also needs read access.
+        tool_registry.unregister("Edit");
+    }
+    if effective_network == Policy::Forbidden {
+        tool_registry.unregister("WebFetch");
+        tool_registry.unregister("WebBrowser");
+    }
 
     let run_id = uuid::Uuid::new_v4().to_string();
 
@@ -121,7 +169,10 @@ pub(crate) fn run_turn(
     let ctx = TurnContext {
         session_id: session_id.to_string(),
         run_id,
-        system_prompt: crate::system_prompt::build(&tool_registry, sandbox_rules.active.then_some(workspace_dir.as_str())),
+        system_prompt: crate::system_prompt::build(
+            &tool_registry,
+            ws_for_prompt.as_deref(),
+        ),
         tools,
         user_images,
         sandbox_rules,
@@ -511,7 +562,27 @@ fn llm_step(
     ctx: &TurnContext,
     cancel: &Arc<AtomicBool>,
 ) -> Result<LlmResponse> {
-    let mut llm_msgs: Vec<LlmMessage> = messages.iter().map(|m| {
+    // Sanitize orphan tool_calls — ensures each tool_use has a matching
+    // tool_result in the next message, otherwise the API rejects the request.
+    // This matters after interruptions or partial turns where some tool
+    // results were never stored.
+    let mut llm_msgs: Vec<LlmMessage> = messages.iter().enumerate().map(|(i, m)| {
+        let mut tc = m.tool_calls.clone();
+        if let Some(ref calls) = tc {
+            let has_next_tool_result = messages.get(i + 1)
+                .map(|next| next.role == "tool")
+                .unwrap_or(false);
+            if !has_next_tool_result {
+                tc = None;
+            } else {
+                // Filter out individual tool_calls whose tool_call_id doesn't
+                // match any subsequent tool message.
+                let filtered: Vec<_> = calls.iter().filter(|c| {
+                    messages[i+1..].iter().any(|fm| fm.tool_call_id.as_deref() == Some(&c.id))
+                }).cloned().collect();
+                tc = if filtered.is_empty() { None } else { Some(filtered) };
+            }
+        }
         let (content, images) = if m.content.starts_with("[SCREENSHOT]\n") {
             let b64 = m.content.strip_prefix("[SCREENSHOT]\n").unwrap_or("");
             (
@@ -536,7 +607,7 @@ fn llm_step(
             role: m.role.clone(),
             content,
             images: imgs,
-            tool_calls: m.tool_calls.clone(),
+            tool_calls: tc,
             tool_call_id: m.tool_call_id.clone(),
             thinking: m.thinking.clone(),
         }
@@ -993,23 +1064,33 @@ fn extract_error_message(body: &str) -> Option<String> {
     None
 }
 
-/// Derive the default workspace directory for a session.
-///
-/// Uses `CLAWTAO_WORKSPACE_ROOT` env var if set, otherwise falls back to
-/// `{data_local_dir}/clawtao/workspaces/{session_id}`.
-fn workspace_dir_for_session(session_id: &str) -> String {
-    let root = std::env::var("CLAWTAO_WORKSPACE_ROOT").unwrap_or_else(|_| {
-        dirs::data_local_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join("clawtao")
-            .join("workspaces")
-            .to_string_lossy()
-            .to_string()
-    });
-    std::path::Path::new(&root)
-        .join(session_id)
-        .to_string_lossy()
-        .to_string()
+// ── Sandbox policy parsing ────────────────────────────────────────────
+
+/// Parse a policy string from config: "forbidden" | "restricted" | "unrestricted".
+fn parse_policy(s: Option<&str>) -> Option<Policy> {
+    match s {
+        Some("forbidden") => Some(Policy::Forbidden),
+        Some("restricted") => Some(Policy::Restricted),
+        Some("unrestricted") => Some(Policy::Unrestricted),
+        _ => None,
+    }
+}
+
+/// Backward-compat: map old `sandbox_mode` to write policy.
+fn parse_legacy_sandbox_mode(s: Option<&str>) -> Option<Policy> {
+    match s {
+        Some("off") => Some(Policy::Unrestricted),
+        Some("strict") | Some("workspace_only") => Some(Policy::Restricted),
+        _ => None,
+    }
+}
+
+/// Backward-compat: map old `sandbox_mode` to network policy.
+fn parse_legacy_network_mode(s: Option<&str>) -> Option<Policy> {
+    match s {
+        Some("strict") => Some(Policy::Restricted),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

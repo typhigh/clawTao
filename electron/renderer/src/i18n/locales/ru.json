@@ -147,5 +147,14 @@
     "prev": "Назад",
     "next": "Вперёд",
     "close": "Закрыть"
+  },
+  "sandbox": {
+    "write": "Write",
+    "read": "Read",
+    "network": "Network",
+    "forbidden": "Forbidden",
+    "restricted": "Restricted",
+    "unrestricted": "Unrestricted",
+    "requiresWorkspace": "Requires workspace"
   }
 }

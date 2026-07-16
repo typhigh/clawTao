@@ -21,6 +21,11 @@ impl ToolRegistry {
         self.tools.get(name)
     }
 
+    /// Remove a tool from the registry.  No-op if absent.
+    pub fn unregister(&mut self, name: &str) -> bool {
+        self.tools.remove(name).is_some()
+    }
+
     /// All tool specs for sending to LLM (stable order by name).
     pub fn list_specs(&self) -> Vec<ToolSpec> {
         self.tools.values().map(|t| t.spec()).collect()

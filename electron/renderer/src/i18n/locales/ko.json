@@ -147,5 +147,14 @@
     "prev": "이전",
     "next": "다음",
     "close": "닫기"
+  },
+  "sandbox": {
+    "write": "Write",
+    "read": "Read",
+    "network": "Network",
+    "forbidden": "Forbidden",
+    "restricted": "Restricted",
+    "unrestricted": "Unrestricted",
+    "requiresWorkspace": "Requires workspace"
   }
 }

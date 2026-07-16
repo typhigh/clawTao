@@ -44,13 +44,13 @@ function AgentTurnViewInner({
           {processSegments.map((seg) => <SegmentView key={seg.id} segment={seg} />)}
         </div>
       )}
-      {files && files.length > 0 && onFileClick && (
-        <FileChangesPanel files={files} onFileClick={onFileClick} />
-      )}
       {conclusion && (
         <div className="agent-turn-conclusion">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizeMd(conclusion)}</ReactMarkdown>
         </div>
+      )}
+      {files && files.length > 0 && onFileClick && (
+        <FileChangesPanel files={files} onFileClick={onFileClick} />
       )}
     </div>
   );

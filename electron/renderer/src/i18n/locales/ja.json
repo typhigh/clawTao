@@ -147,5 +147,14 @@
     "prev": "前へ",
     "next": "次へ",
     "close": "閉じる"
+  },
+  "sandbox": {
+    "write": "Write",
+    "read": "Read",
+    "network": "Network",
+    "forbidden": "Forbidden",
+    "restricted": "Restricted",
+    "unrestricted": "Unrestricted",
+    "requiresWorkspace": "Requires workspace"
   }
 }

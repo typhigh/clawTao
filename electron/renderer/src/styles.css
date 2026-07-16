@@ -976,17 +976,22 @@ html, body, #root {
   border: 1px solid #e0e0e0;
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  min-width: 260px;
+  min-width: 300px;
   z-index: 10;
 }
 
 .input-settings-row {
   display: grid;
-  grid-template-columns: 18px 88px minmax(100px, 1fr);
+  /* icon | label | option  —  label column sized for 4 Chinese chars at 12px
+     plus a safety min so longer labels don't truncate. */
+  grid-template-columns: 18px minmax(96px, auto) minmax(120px, 1fr);
   align-items: center;
-  gap: 8px;
+  column-gap: 12px;
+  row-gap: 4px;
   min-height: 22px;
   text-align: left;
+  /* The 3rd column's left edge is the alignment anchor.  Individual rows
+     set justify-self per widget type — see InputArea.tsx. */
 }
 
 .input-settings-icon {
@@ -1001,6 +1006,8 @@ html, body, #root {
 .input-settings-text {
   color: #555;
   font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+               'Microsoft YaHei', 'Noto Sans CJK SC', Roboto, sans-serif;
   white-space: nowrap;
 }
 

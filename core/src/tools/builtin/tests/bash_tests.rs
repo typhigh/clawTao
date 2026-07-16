@@ -2,7 +2,6 @@ use std::sync::atomic::AtomicBool;
 use super::*;
 use crate::tools::executor::ToolError;
 use crate::tools::builtin::sandbox::SandboxConfig;
-use crate::tools::builtin::SandboxMode;
 
 #[test]
 fn bash_echo() {
@@ -50,6 +49,11 @@ fn sandbox_off_runs_directly() {
 
 #[test]
 fn sandbox_active_config_is_active() {
-    let cfg = SandboxConfig::new("/tmp/test-sandbox", SandboxMode::WorkspaceOnly);
+    let cfg = SandboxConfig {
+        write: Policy::Restricted,
+        read: Policy::Unrestricted,
+        network: Policy::Unrestricted,
+        workspace_dir: Some("/tmp/test-sandbox".into()),
+    };
     assert!(cfg.is_active());
 }

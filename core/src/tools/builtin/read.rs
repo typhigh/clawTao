@@ -1,3 +1,4 @@
+use crate::tools::builtin::sandbox::SandboxRules;
 use crate::tools::executor::{ToolError, ToolExecutor};
 use crate::tools::spec::ToolSpec;
 use serde_json::json;
@@ -18,7 +19,7 @@ impl ToolExecutor for ReadTool {
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Absolute or relative path to the file to read"
+                        "description": "Absolute or relative path to the file to read. When read policy is Restricted, must be inside the configured workspace."
                     },
                     "offset": {
                         "type": "integer",
@@ -32,6 +33,11 @@ impl ToolExecutor for ReadTool {
                 "required": ["path"]
             }),
         )
+    }
+
+    fn check_sandbox(&self, input: &serde_json::Value, rules: &SandboxRules) -> Result<(), String> {
+        let path = input.get("path").and_then(|v| v.as_str()).unwrap_or("");
+        rules.read_path_is_allowed(path)
     }
 
     fn execute(&self, input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {

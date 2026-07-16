@@ -1,3 +1,4 @@
+use crate::tools::builtin::sandbox::SandboxRules;
 use crate::tools::executor::{ToolError, ToolExecutor};
 use crate::tools::spec::ToolSpec;
 use regex::Regex;
@@ -21,12 +22,17 @@ impl ToolExecutor for GrepTool {
                 "type": "object",
                 "properties": {
                     "pattern": {"type": "string", "description": "The regex pattern to search for"},
-                    "path":    {"type": "string", "description": "Directory or file to search. Defaults to current directory."},
+                    "path":    {"type": "string", "description": "Directory or file to search. When read policy is Restricted, must be inside the configured workspace. Defaults to current directory."},
                     "include": {"type": "string", "description": "File glob to limit search (e.g. \"*.rs\", \"*.ts\")"}
                 },
                 "required": ["pattern"]
             }),
         )
+    }
+
+    fn check_sandbox(&self, input: &serde_json::Value, rules: &SandboxRules) -> Result<(), String> {
+        let path = input.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+        rules.read_path_is_allowed(path)
     }
 
     fn execute(&self, input: serde_json::Value, _cancel: &std::sync::atomic::AtomicBool) -> Result<String, ToolError> {

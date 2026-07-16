@@ -17,6 +17,13 @@ interface Props {
   workspaceDir?: string;
   workspaceOptions?: WorkspaceEntry[];
   onSelectWorkspace?: (wsPath: string) => void;
+  /** Sandbox policy per-axis overrides. */
+  sandboxWrite?: 'forbidden' | 'restricted' | 'unrestricted';
+  sandboxRead?: 'forbidden' | 'restricted' | 'unrestricted';
+  sandboxNetwork?: 'forbidden' | 'unrestricted';
+  onSandboxWriteChange?: (v: 'forbidden' | 'restricted' | 'unrestricted') => void;
+  onSandboxReadChange?: (v: 'forbidden' | 'restricted' | 'unrestricted') => void;
+  onSandboxNetworkChange?: (v: 'forbidden' | 'restricted' | 'unrestricted') => void;
   onCompact?: () => void;
   compactDisabled?: boolean;
   compacting?: boolean;
@@ -31,6 +38,8 @@ function ChatInputPanelInner({
   sessionId, isStreaming, thinkingEnabled, onToggleThinking,
   modelOptions, selectedModelKey, onSelectModel,
   workspaceDir, workspaceOptions, onSelectWorkspace,
+  sandboxWrite, sandboxRead, sandboxNetwork,
+  onSandboxWriteChange, onSandboxReadChange, onSandboxNetworkChange,
   onCompact, compactDisabled, compacting, messageCount,
   imperativeRef,
 }: Props) {
@@ -101,6 +110,12 @@ function ChatInputPanelInner({
       workspaceOptions={workspaceOptions}
       selectedWorkspace={workspaceDir}
       onSelectWorkspace={onSelectWorkspace}
+      sandboxWrite={sandboxWrite}
+      sandboxRead={sandboxRead}
+      sandboxNetwork={sandboxNetwork}
+      onSandboxWriteChange={onSandboxWriteChange}
+      onSandboxReadChange={onSandboxReadChange}
+      onSandboxNetworkChange={onSandboxNetworkChange}
       contextGrid={
         <ContextGrid
           sessionId={sessionId}

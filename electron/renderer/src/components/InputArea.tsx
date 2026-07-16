@@ -29,6 +29,13 @@ interface Props {
   workspaceOptions?: import('../stores/settings').WorkspaceEntry[];
   selectedWorkspace?: string;
   onSelectWorkspace?: (wsPath: string) => void;
+  /** Sandbox policy per-axis config. */
+  sandboxWrite?: 'forbidden' | 'restricted' | 'unrestricted';
+  sandboxRead?: 'forbidden' | 'restricted' | 'unrestricted';
+  sandboxNetwork?: 'forbidden' | 'unrestricted';
+  onSandboxWriteChange?: (v: 'forbidden' | 'restricted' | 'unrestricted') => void;
+  onSandboxReadChange?: (v: 'forbidden' | 'restricted' | 'unrestricted') => void;
+  onSandboxNetworkChange?: (v: 'forbidden' | 'restricted' | 'unrestricted') => void;
   /** Optional context-grid element rendered in the bottom row.
    *  The compact button now lives inside the context grid popover. */
   contextGrid?: React.ReactNode;
@@ -49,6 +56,8 @@ export function InputArea({
   thinkingEnabled, onToggleThinking,
   images, onImagesChange,
   workspaceDir, workspaceOptions, selectedWorkspace, onSelectWorkspace,
+  sandboxWrite, sandboxRead, sandboxNetwork,
+  onSandboxWriteChange, onSandboxReadChange, onSandboxNetworkChange,
   contextGrid,
 }: Props) {
   const { t } = useTranslation();
@@ -111,6 +120,118 @@ export function InputArea({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [settingsOpen]);
+
+  // A workspace directory makes the "Restricted" level meaningful.  Without
+  // one, Restricted collapses to Unrestricted — we hint this in the UI by
+  // visually de-emphasising the option.
+  const hasWorkspace = !!workspaceDir;
+
+  // Three-dot segmented control for sandbox policies.  All three dots
+  // live inside a single pill-shaped control — clicking a dot selects
+  // that policy level; the label of the selected level is shown next to
+  // it.  Mirrors macOS-style segmented pickers.
+  //
+  // `axis` identifies which policy axis this row configures ('write' /
+  // 'read' / 'network').  It is used to pick the default value, not for
+  // translation — translation goes through i18n keys.
+  const renderPolicyRow = (
+    axis: 'write' | 'read' | 'network',
+    icon: string,
+    value: 'forbidden' | 'restricted' | 'unrestricted' | undefined,
+    onChange: (v: 'forbidden' | 'restricted' | 'unrestricted') => void,
+
+    isDisabled: boolean,
+    workspaceAvailable: boolean,
+  ) => {
+    const options: Array<'unrestricted' | 'restricted' | 'forbidden'> =
+      axis === 'network'
+        ? ['unrestricted', 'forbidden']
+        : ['unrestricted', 'restricted', 'forbidden'];
+    // "Write" defaults to restricted (sandboxed), others default to unrestricted.
+    const defaultValue: 'unrestricted' | 'restricted' =
+      axis === 'write' ? 'restricted' : 'unrestricted';
+    const current = value || defaultValue;
+    const axisLabel = t(`sandbox.${axis}`);
+    return (
+      <div className="input-settings-row">
+        <span className="input-settings-icon" style={{ fontSize: '11px' }}>{icon}</span>
+        <span className="input-settings-text">{axisLabel}</span>
+        {/* Option column: dot control + label, all rows left-aligned to
+            the same x position (the popup's option column). */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          justifySelf: 'start',
+        }}>
+          <div
+            role="group"
+            aria-label={axisLabel}
+            title={
+              workspaceAvailable
+                ? t(`sandbox.${current}`)
+                : `${t(`sandbox.${current}`)} (${t('sandbox.requiresWorkspace')})`
+            }
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '0 8px',
+              height: '22px',
+              background: isDisabled ? '#f5f5f5' : '#fff',
+              border: '1px solid #e0e0e0',
+              borderRadius: '11px',
+              opacity: isDisabled ? 0.5 : 1,
+            }}
+          >
+            {options.map((opt) => {
+              const isSelected = current === opt;
+              // "Restricted" with no workspace is a no-op — soften its dot.
+              const isDimmed = opt === 'restricted' && !workspaceAvailable && !isSelected;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={(e) => {
+                    if (isDisabled) return;
+                    onChange(opt);
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
+                  aria-label={t(`sandbox.${opt}`)}
+                  aria-pressed={isSelected}
+                  style={{
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: isSelected ? '#1c1c1e' : 'transparent',
+                    border: '1.5px solid ' + (isSelected
+                      ? '#1c1c1e'
+                      : isDimmed ? '#ddd' : '#aaa'),
+                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                    padding: 0,
+                    margin: 0,
+                    transition: 'background 0.15s, border-color 0.15s',
+                  }}
+                />
+              );
+            })}
+          </div>
+          <span style={{
+            fontSize: '11px',
+            color: isDisabled ? '#bbb' : '#555',
+            fontWeight: current === 'forbidden' ? 600 : 400,
+            minWidth: '40px',
+          }}>
+            {t(`sandbox.${current}`)}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   const addImages = async (files: FileList | File[]) => {
     const results: ImageAttachment[] = [];
@@ -200,7 +321,7 @@ export function InputArea({
                     title={t('chat.thinking')}
                     aria-pressed={thinkingEnabled}
                     disabled={disabled}
-                    style={{ appearance: 'none', WebkitAppearance: 'none', background: thinkingHover && !disabled ? '#f3f3f3' : 'transparent', color: thinkingEnabled ? '#1c1c1e' : '#999', border: '1px solid #e0e0e0', borderRadius: '4px', width: '40px', height: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontSize: '10px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer' }}
+                    style={{ appearance: 'none', WebkitAppearance: 'none', background: thinkingHover && !disabled ? '#f3f3f3' : 'transparent', color: thinkingEnabled ? '#1c1c1e' : '#999', border: '1px solid #e0e0e0', borderRadius: '4px', width: '40px', height: '20px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontSize: '10px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', justifySelf: 'start' }}
                   >{thinkingEnabled ? t('chat.on') : t('chat.off')}</button>
                 </div>
                 {(workspaceOptions?.length || 0) > 0 ? (
@@ -211,7 +332,8 @@ export function InputArea({
                       value={selectedWorkspace || ''}
                       onChange={(e) => onSelectWorkspace?.(e.target.value)}
                       title={t('chat.selectWorkspace')}
-                      disabled={disabled}>
+                      disabled={disabled}
+                      style={{ justifySelf: 'start' }}>
                       <option value="">{t('chat.noWorkspace')}</option>
                       {workspaceOptions!.map(ws => (
                         <option key={ws.path} value={ws.path}>{ws.label}</option>
@@ -222,9 +344,18 @@ export function InputArea({
                   <div className="input-settings-row">
                     <span className="input-settings-icon"><WorkspaceIcon /></span>
                     <span className="input-settings-text">{t('chat.workspace')}</span>
-                    <span className="input-workspace-badge" title={workspaceDir} style={{ fontSize: '11px', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace', display: 'block', width: '100%' }}>{workspaceDir.split('/').pop()}</span>
+                    <span className="input-workspace-badge" title={workspaceDir} style={{ fontSize: '11px', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace', display: 'block', width: '100%', justifySelf: 'start' }}>{workspaceDir.split('/').pop()}</span>
                   </div>
                 ) : null}
+                {onSandboxWriteChange && renderPolicyRow(
+                  'write', '✎', sandboxWrite, onSandboxWriteChange, disabled, hasWorkspace
+                )}
+                {onSandboxReadChange && renderPolicyRow(
+                  'read', '☰', sandboxRead, onSandboxReadChange, disabled, hasWorkspace
+                )}
+                {onSandboxNetworkChange && renderPolicyRow(
+                  'network', '🌐', sandboxNetwork, onSandboxNetworkChange, disabled, hasWorkspace
+                )}
               </div>
             )}
             <button
