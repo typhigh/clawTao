@@ -100,7 +100,7 @@ pub(crate) fn run_turn(
         .map(|s| s.to_string());
 
     let sandbox_cfg = if plan_mode {
-        tools::builtin::SandboxConfig::read_only(workspace_dir)
+        tools::builtin::SandboxConfig::read_only(workspace_dir.clone())
     } else {
         tools::builtin::SandboxConfig {
             write: write_policy,
@@ -149,6 +149,17 @@ pub(crate) fn run_turn(
         tool_registry.unregister("WebBrowser");
     }
 
+    // ── Skills ─────────────────────────────────────────────────────
+    let clawtao_home = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".clawtao");
+    let ws_path = ws_for_prompt.as_deref().map(std::path::Path::new);
+    let skills = crate::skills::scan_all(&clawtao_home, ws_path);
+
+    // Detect @skill-name mentions in the user message and inject
+    // matching skill bodies into the system prompt for this turn.
+    let injected_skills = inject_skill_bodies(message_text, &skills);
+
     let run_id = uuid::Uuid::new_v4().to_string();
 
     write_notification(&Notification::new("chat.stream", Some(json!({
@@ -172,6 +183,8 @@ pub(crate) fn run_turn(
         system_prompt: crate::system_prompt::build(
             &tool_registry,
             ws_for_prompt.as_deref(),
+            &skills,
+            &injected_skills,
         ),
         tools,
         user_images,
@@ -1091,6 +1104,29 @@ fn parse_legacy_network_mode(s: Option<&str>) -> Option<Policy> {
         Some("strict") => Some(Policy::Restricted),
         _ => None,
     }
+}
+
+/// Scan `message` for `@skill-name` mentions.  For each match found in
+/// the available skill list, read the SKILL.md body and return a tagged
+/// block that gets injected into the system prompt for this turn.
+fn inject_skill_bodies(message: &str, skills: &[crate::skills::Skill]) -> Vec<(String, String)> {
+    let mut injected: Vec<(String, String)> = Vec::new();
+    for word in message.split_whitespace() {
+        let name = word.strip_prefix('@').unwrap_or(word);
+        // Only match if the raw text starts with '@'.
+        if !word.starts_with('@') {
+            continue;
+        }
+        if let Some(skill) = skills.iter().find(|s| s.name == name) {
+            if injected.iter().any(|(n, _)| n == name) {
+                continue; // already injected
+            }
+            if let Ok(body) = std::fs::read_to_string(&skill.path) {
+                injected.push((name.to_string(), body));
+            }
+        }
+    }
+    injected
 }
 
 #[cfg(test)]

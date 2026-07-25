@@ -252,6 +252,11 @@ function setupIpc() {
     });
   });
 
+  // skills.list
+  ipcMain.handle('skills:list', (_e, p: { workspaceDir?: string }) =>
+    sendRpc('skills.list', { workspace_dir: p.workspaceDir || '' })
+  );
+
   // chat.interrupt
   ipcMain.handle('chat:interrupt', (_e, p: { sessionId: string }) =>
     sendRpc('chat.interrupt', p)

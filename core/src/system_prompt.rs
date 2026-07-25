@@ -1,8 +1,14 @@
 //! System prompt builder for the ClawTao agent.
 
 use crate::tools::registry::ToolRegistry;
+use crate::skills::{Skill, format_for_prompt};
 
-pub fn build(tool_registry: &ToolRegistry, workspace_dir: Option<&str>) -> String {
+pub fn build(
+    tool_registry: &ToolRegistry,
+    workspace_dir: Option<&str>,
+    skills: &[Skill],
+    injected_skills: &[(String, String)],
+) -> String {
     let cwd = std::env::current_dir()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|_| "(unknown)".to_string());
@@ -37,6 +43,17 @@ pub fn build(tool_registry: &ToolRegistry, workspace_dir: Option<&str>) -> Strin
     lines.push("WebFetch is for simple static pages (API responses, documentation, plain HTML). \
         For search engines, JS-heavy sites, or interactive browsing, use WebBrowser instead: \
         call search first, then snapshot to read the rendered page.".to_string());
+
+    // Skills catalog (name + description for all discovered skills)
+    lines.push(format_for_prompt(skills));
+
+    // Injected skill bodies (full content for @skill-name mentions)
+    for (name, body) in injected_skills {
+        lines.push(format!(
+            "\nThe user explicitly referenced the @{name} skill. \
+             Its full content is loaded below. Follow its instructions.\n\n{body}"
+        ));
+    }
 
     lines.join("\n")
 }

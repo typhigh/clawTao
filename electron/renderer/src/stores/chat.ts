@@ -44,6 +44,9 @@ declare global {
       dialog: {
         openDirectory: () => Promise<string | null>;
       };
+      skills: {
+        list: (workspaceDir?: string) => Promise<Array<{ name: string; description: string; path: string; source: string }>>;
+      };
     };
   }
 }

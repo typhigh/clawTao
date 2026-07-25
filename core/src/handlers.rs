@@ -18,6 +18,7 @@ pub fn route(
         "session.get" => session_get(request, &**store),
         "session.delete" => session_delete(request, &**store),
         "session.context_stats" => session_context_stats(request, &**store),
+        "skills.list" => skills_list(request),
         "ping" => ping(request),
         _ => not_found(request),
     }
@@ -244,7 +245,7 @@ pub(crate) fn session_context_stats(
     let workspace_dir = jsonrpc::get_param_opt(&request.params, "workspace_dir");
     let tool_registry = build_schema_registry();
     let system_prompt = crate::system_prompt::build(
-        &tool_registry, workspace_dir.filter(|s| !s.is_empty()),
+        &tool_registry, workspace_dir.filter(|s| !s.is_empty()), &[], &[],
     );
     let tool_defs: Vec<crate::llm::UnifiedTool> = tool_registry.list_specs().iter()
         .map(|spec| crate::llm::UnifiedTool {
@@ -294,6 +295,29 @@ pub fn not_found(request: &Request) -> Result<()> {
         -32601,
         format!("Method not found: {}", request.method),
     ))?;
+    Ok(())
+}
+
+// ── Skills ─────────────────────────────────────────────────────────────
+
+pub fn skills_list(request: &Request) -> Result<()> {
+    let clawtao_home = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".clawtao");
+    let ws = jsonrpc::get_param_opt(&request.params, "workspace_dir")
+        .map(std::path::PathBuf::from);
+    let skills = crate::skills::scan_all(&clawtao_home, ws.as_deref());
+    let result = skills.iter().map(|s| serde_json::json!({
+        "name": s.name,
+        "description": s.description,
+        "path": s.path.display().to_string(),
+        "source": match s.source {
+            crate::skills::SkillSource::Builtin => "builtin",
+            crate::skills::SkillSource::Installed => "installed",
+            crate::skills::SkillSource::Project => "project",
+        },
+    })).collect::<Vec<_>>();
+    jsonrpc::write_response(&Response::success(request.id.clone(), serde_json::Value::Array(result)))?;
     Ok(())
 }
 

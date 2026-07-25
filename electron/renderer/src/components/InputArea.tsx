@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SendIcon, ThinkingIcon, UploadIcon, GearIcon, WorkspaceIcon } from './icons';
 import { ModelSelect, ModelOption } from './ModelSelect';
+import { SkillsBadge } from './SkillsBadge';
 import type { ImageAttachment } from '../stores/chat';
 
 const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -258,10 +259,30 @@ export function InputArea({
 
   const btnDisabled = !value.trim() || disabled || sendDisabled;
 
+  // Split input text into segments for @mention highlighting.
+  const valueSegments = value.split(/(@[\w-]+)/g);
+
   return (
     <div className="input-area-wrapper">
       <form className="input-area" onSubmit={(e) => { e.preventDefault(); if (streaming) onCancel(); else onSend(); }}>
-        <div className="input-textarea-wrap">
+        <div className="input-textarea-wrap" style={{ position: 'relative' }}>
+          {/* Mirror div — renders highlighted text behind the transparent textarea */}
+          <pre
+            aria-hidden="true"
+            style={{
+              position: 'absolute', inset: 0,
+              padding: 0, margin: 0,
+              overflow: 'hidden',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              fontFamily: 'inherit', fontSize: '14px', lineHeight: '1.5',
+              color: '#000', pointerEvents: 'none',
+            }}
+          >
+            {value && valueSegments.map((seg, i) =>
+              seg.startsWith('/')
+                ? <span key={i} style={{ color: '#3b82f6' }}>{seg}</span>
+                : <span key={i}>{seg}</span>)}
+          </pre>
           <textarea
             ref={textareaRef}
             rows={3}
@@ -271,6 +292,12 @@ export function InputArea({
             onKeyDown={onKeyDown}
             onPaste={handlePaste}
             disabled={disabled}
+            style={{
+              position: 'relative',
+              color: 'transparent',
+              caretColor: '#000',
+              background: 'transparent',
+            }}
           />
           {/* Image thumbnails */}
           {(images?.length || 0) > 0 && (
@@ -304,6 +331,10 @@ export function InputArea({
             disabled={disabledModel}
             placeholder={t('chat.noModelsConfigured')}
             title={t('chat.selectModel')}
+          />
+          <SkillsBadge
+            workspaceDir={workspaceDir}
+            onSelectSkill={(s) => onChange(value ? `${value.trimEnd()} /${s.name} ` : `/${s.name} `)}
           />
           <span style={{ flex: 1 }} />
           <div className="input-settings-wrapper" ref={settingsRef}>
@@ -394,3 +425,4 @@ function StopIcon() {
     </svg>
   );
 }
+

@@ -65,9 +65,9 @@ fn system_prompt_includes_workspace_when_set() {
         crate::tools::builtin::SandboxConfig::off(),
         None,
     );
-    let with_ws = build(&reg, Some("/tmp/sandbox"));
+    let with_ws = build(&reg, Some("/tmp/sandbox"), &[], &[]);
     assert!(with_ws.contains("/tmp/sandbox"));
-    let without_ws = build(&reg, None);
+    let without_ws = build(&reg, None, &[], &[]);
     assert!(!without_ws.contains("Sandbox is active"));
 }
 
@@ -80,7 +80,7 @@ fn estimate_total_with_workspace_grows_vs_without() {
     fn build_with(workspace: Option<&str>) -> String {
         let mut reg = ToolRegistry::new();
         crate::tools::builtin::register_all(&mut reg, SandboxConfig::off(), None);
-        crate::system_prompt::build(&reg, workspace)
+        crate::system_prompt::build(&reg, workspace, &[], &[])
     }
 
     fn tools() -> Vec<crate::llm::UnifiedTool> {

@@ -28,6 +28,12 @@ const electronAPI = {
       ipcRenderer.invoke('session:context-stats', { sessionId, modelKey, workspaceDir }),
   },
 
+  // Skills
+  skills: {
+    list: (workspaceDir?: string) =>
+      ipcRenderer.invoke('skills:list', { workspaceDir }) as Promise<Array<{ name: string; description: string; path: string; source: string }>>,
+  },
+
   // Unified stream event listener (replaces chat:started / text_delta / tool_started / tool_result / done)
   onStreamEvent: (callback: (params: unknown) => void) => {
     ipcRenderer.removeAllListeners('chat:stream');

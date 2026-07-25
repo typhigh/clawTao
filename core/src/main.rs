@@ -14,6 +14,7 @@ mod handlers;
 mod jsonrpc;
 mod llm;
 mod session_actor;
+mod skills;
 mod store;
 mod sse;
 mod tools;
@@ -25,7 +26,7 @@ use store::json_store::JsonSessionStore;
 use store::sqlite_store::SqliteSessionStore;
 use std::io::{self, BufRead};
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::{reload, EnvFilter};
 use serde_json::json;
 
@@ -50,6 +51,14 @@ fn main() {
 
     let reload_handle = Arc::new(reload_handle);
     info!("ClawTao backend starting");
+
+    // Ensure built-in skills are on disk so scan_all finds them.
+    let clawtao_home = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".clawtao");
+    if let Err(e) = crate::skills::install_builtin_skills(&clawtao_home) {
+        warn!("Failed to install built-in skills: {e}");
+    }
 
     let storage_path = dirs::data_local_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
