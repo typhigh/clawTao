@@ -257,7 +257,9 @@ export function InputArea({
     onImagesChange?.((images || []).filter((_, idx) => idx !== i));
   };
 
-  const btnDisabled = !value.trim() || disabled || sendDisabled;
+  // Allow sending text alone, images alone, or both — matches the
+  // handleSend guard in ChatInputPanel.
+  const btnDisabled = (!value.trim() && !(images && images.length > 0)) || disabled || sendDisabled;
 
   // Split input text into segments for @mention highlighting.
   const valueSegments = value.split(/(@[\w-]+)/g);

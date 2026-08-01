@@ -595,6 +595,39 @@ html, body, #root {
   color: #333;
 }
 
+/* Tool name (e.g. "Read") and the short summary (basename / command) sit
+   inline on the collapsed header so the user can scan a long tool list
+   at a glance without expanding each card. */
+.tool-label-name {
+  font-weight: 500;
+}
+.tool-label-summary {
+  color: #888;
+  font-weight: 400;
+  font-size: 11px;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Success / failure indicator that sits inline between the tool summary
+   and the expand-arrow. Sized to match the rest of the header.
+
+   Selector specificity must beat the parent `.tool-label-btn { color: #6e6e73 }`
+   so the icon is unambiguously green for OK and red for failure. */
+.tool-label-btn .tool-label-status.ok   { color: #2ea043 !important; }  /* green ✓ */
+.tool-label-btn .tool-label-status.fail { color: #d1242f !important; }  /* red   ✗ */
+.tool-label-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-left: 2px;
+}
+.tool-label-status svg  { display: block; }
+
 .tool-label-link {
   display: inline-flex;
   align-items: center;
@@ -1191,6 +1224,15 @@ html, body, #root {
   z-index: 10;
   max-height: 240px;
   overflow-y: auto;
+  /* Width follows the longest option, but never narrower than the trigger
+     (which is sized to the *selected* label — could be much shorter than
+     the longest alternative). */
+  width: max-content;
+  min-width: 100%;
+  max-width: 90vw;
+  /* Safety net — long provider names + model IDs should never produce a
+     horizontal scrollbar inside the dropdown. */
+  overflow-x: hidden;
 }
 
 .model-select-option {

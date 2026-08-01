@@ -122,7 +122,7 @@ export function ModelSelect({ options, value, onChange, disabled, placeholder, t
       {open && !isDisabled && (
         <div
           className="model-select-dropdown"
-          style={{ width: triggerWidth ? `${triggerWidth}px` : 'auto', minWidth: '120px' }}
+          style={{ minWidth: triggerWidth ? `${triggerWidth}px` : '120px' }}
           role="listbox"
         >
           {options.map((opt, i) => {

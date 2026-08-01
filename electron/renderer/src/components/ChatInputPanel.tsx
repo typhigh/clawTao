@@ -57,7 +57,13 @@ function ChatInputPanelInner({
   }, [inputValue]);
 
   const handleSend = async () => {
-    if (!inputValue.trim() || isStreaming || !sessionId) return;
+    // Allow sending text alone, images alone, or both. The Rust side
+    // stores an empty text fine (image-only user messages) and the LLM
+    // adapters handle image-only content blocks.
+    const hasText = !!inputValue.trim();
+    const hasImages = images.length > 0;
+    if (!hasText && !hasImages) return;
+    if (isStreaming || !sessionId) return;
     const text = inputValue;
     setInputValue('');
     const imgs = images.length > 0 ? [...images] : undefined;
