@@ -35,6 +35,7 @@
     "noWorkspace": "샌드박스 없음",
     "scrollToTop": "맨 위로",
     "scrollToBottom": "맨 아래로",
+    "loadEarlier": "이전 메시지 불러오기 ({{count}})",
     "settingsTooltip": "설정",
     "on": "켜짐",
     "off": "꺼짐",

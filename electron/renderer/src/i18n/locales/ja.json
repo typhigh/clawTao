@@ -35,6 +35,7 @@
     "noWorkspace": "サンドボックスなし",
     "scrollToTop": "一番上へ",
     "scrollToBottom": "一番下へ",
+    "loadEarlier": "以前のメッセージを読み込む（{{count}}）",
     "settingsTooltip": "設定",
     "on": "オン",
     "off": "オフ",

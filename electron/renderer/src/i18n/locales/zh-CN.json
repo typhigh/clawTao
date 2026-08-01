@@ -27,6 +27,7 @@
     "noWorkspace": "无沙箱",
     "scrollToTop": "滚到顶部",
     "scrollToBottom": "滚到底部",
+    "loadEarlier": "加载更早的消息（{{count}}）",
     "settingsTooltip": "设置",
     "on": "开",
     "off": "关",

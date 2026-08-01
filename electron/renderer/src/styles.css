@@ -390,6 +390,29 @@ html, body, #root {
   min-width: 0;
 }
 
+/* "Load earlier messages" — appears at the top of the message list when
+   the timeline is paginated (only the last N turns are rendered). */
+.load-earlier {
+  appearance: none;
+  -webkit-appearance: none;
+  align-self: center;
+  margin: 0 0 14px;
+  padding: 6px 14px;
+  border: 1px solid #d0d0d0;
+  border-radius: 999px;
+  background: #fafafa;
+  color: #666;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.load-earlier:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
 .scroll-controls {
   display: flex;
   flex-direction: row;

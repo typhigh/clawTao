@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UserMessageView } from './UserMessageView';
 import { LiveTurnView } from './LiveTurn';
@@ -69,6 +69,42 @@ export function ChatView({ timeline, activeSessionId, error, onClearError, notic
   const userAtBottomRef = useRef(true);
   const STICK_THRESHOLD = 32; // px from bottom counted as "still at bottom"
 
+  // ── Pagination ──────────────────────────────────────────────────
+  // Long-history sessions can have hundreds of turns; rendering them all
+  // at once is the dominant cost of switching sessions. We render only the
+  // last PAGE_SIZE timeline groups (so the newest turn is visible), with a
+  // "load earlier" button that reveals PAGE_SIZE more each click.
+  const PAGE_SIZE = 10;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Absolute agent-turn prefix counts — O(n) once per timeline, replaces
+  // the O(n²) `slice().filter()` per rendered group.
+  const agentTurnPrefix = useMemo(() => {
+    const prefix = new Array<number>(timeline.length);
+    let count = 0;
+    for (let i = 0; i < timeline.length; i++) {
+      if (timeline[i].kind === 'agentTurn') count++;
+      prefix[i] = count;
+    }
+    return prefix;
+  }, [timeline]);
+  // Visible slice: last `visibleCount` groups, keeping their absolute index.
+  const visible = useMemo(() => {
+    const start = Math.max(0, timeline.length - visibleCount);
+    const out: { group: TimelineGroup; idx: number }[] = [];
+    for (let i = start; i < timeline.length; i++) out.push({ group: timeline[i], idx: i });
+    return out;
+  }, [timeline, visibleCount]);
+
+  // Scroll-preservation machinery.
+  // - prevScrollHeightRef: captured just before "load earlier" grows the
+  //   top of the list; after the re-render we add the delta so the view
+  //   doesn't jump.
+  // - pendingSwitchScrollRef: set when the active session changes; we
+  //   then scroll to bottom AFTER the pagination reset re-renders.
+  const prevScrollHeightRef = useRef<number | null>(null);
+  const lastSessionRef = useRef<string | null>(null);
+  const pendingSwitchScrollRef = useRef(false);
+
   const updateStickiness = () => {
     const el = messagesRef.current;
     if (!el) return;
@@ -76,13 +112,32 @@ export function ChatView({ timeline, activeSessionId, error, onClearError, notic
     userAtBottomRef.current = distFromBottom <= STICK_THRESHOLD;
   };
 
-  // Session switch — reset stickiness and always jump to bottom.
+  // Session switch — reset pagination to the newest PAGE_SIZE groups and
+  // remember to scroll to bottom once the reset has rendered.
   useEffect(() => {
+    if (lastSessionRef.current !== activeSessionId) {
+      lastSessionRef.current = activeSessionId;
+      userAtBottomRef.current = true;
+      setVisibleCount(PAGE_SIZE);
+      pendingSwitchScrollRef.current = true;
+    }
+  }, [activeSessionId]);
+
+  // After every commit, either finish a pending session-switch scroll or
+  // preserve the viewport position after "load earlier" grew the top.
+  useLayoutEffect(() => {
     const el = messagesRef.current;
     if (!el) return;
-    userAtBottomRef.current = true;
-    el.scrollTop = el.scrollHeight;
-  }, [activeSessionId]);
+    if (pendingSwitchScrollRef.current) {
+      pendingSwitchScrollRef.current = false;
+      el.scrollTop = el.scrollHeight;
+      return;
+    }
+    if (prevScrollHeightRef.current !== null) {
+      el.scrollTop += el.scrollHeight - prevScrollHeightRef.current;
+      prevScrollHeightRef.current = null;
+    }
+  });
 
   // Timeline update — only follow if user is already at the bottom.
   useEffect(() => {
@@ -92,6 +147,14 @@ export function ChatView({ timeline, activeSessionId, error, onClearError, notic
       el.scrollTop = el.scrollHeight;
     }
   }, [timeline]);
+
+  const loadEarlier = () => {
+    const el = messagesRef.current;
+    if (el) prevScrollHeightRef.current = el.scrollHeight;
+    setVisibleCount((c) => Math.min(timeline.length, c + PAGE_SIZE));
+  };
+  const hasEarlier = visibleCount < timeline.length;
+  const earlierCount = Math.min(PAGE_SIZE, timeline.length - visibleCount);
 
   return (
     <main className="chat-area">
@@ -134,11 +197,17 @@ export function ChatView({ timeline, activeSessionId, error, onClearError, notic
       {hasActiveSession ? (
         <>
           <div className="messages" ref={messagesRef} onScroll={updateStickiness}>
-            {timeline.map((group, idx) => {
+            {hasEarlier && (
+              <button type="button" className="load-earlier" onClick={loadEarlier}>
+                {t('chat.loadEarlier', { count: earlierCount })}
+              </button>
+            )}
+            {visible.map(({ group, idx }) => {
               if (group.kind === 'user') return <UserMessageView key={group.id} content={group.content} images={group.images} />;
               if (group.kind === 'liveTurn') return <LiveTurnView key="live-turn" segments={group.segments} isStreaming={group.isStreaming} files={liveFiles ?? undefined} onFileClick={onFileClick} />;
-              // Map agent turns: count agent turns up to idx to index historicalFiles
-              const agentTurnIdx = timeline.slice(0, idx).filter(g => g.kind === 'agentTurn').length;
+              // agent turn → its zero-based index among agent turns in the
+              // FULL timeline (historicalFiles is indexed the same way).
+              const agentTurnIdx = agentTurnPrefix[idx] - 1;
               const turnFiles = historicalFiles?.[agentTurnIdx];
               return <AgentTurnView key={`${group.id}-done`} segments={group.segments} conclusion={group.conclusion} files={turnFiles} onFileClick={onFileClick} />;
             })}

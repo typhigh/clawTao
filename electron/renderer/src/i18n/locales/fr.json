@@ -35,6 +35,7 @@
     "noWorkspace": "Pas de sandbox",
     "scrollToTop": "Haut de page",
     "scrollToBottom": "Bas de page",
+    "loadEarlier": "Charger les messages précédents ({{count}})",
     "settingsTooltip": "Paramètres",
     "on": "Activé",
     "off": "Désactivé",

@@ -35,6 +35,7 @@
     "noWorkspace": "No sandbox",
     "scrollToTop": "Scroll to top",
     "scrollToBottom": "Scroll to bottom",
+    "loadEarlier": "Load earlier messages ({{count}})",
     "settingsTooltip": "Settings",
     "on": "ON",
     "off": "OFF",

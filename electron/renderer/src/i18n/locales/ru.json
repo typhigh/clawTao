@@ -35,6 +35,7 @@
     "noWorkspace": "Без sandbox",
     "scrollToTop": "Наверх",
     "scrollToBottom": "Вниз",
+    "loadEarlier": "Загрузить более ранние сообщения ({{count}})",
     "settingsTooltip": "Настройки",
     "on": "Вкл",
     "off": "Выкл",
