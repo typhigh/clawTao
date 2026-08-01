@@ -107,13 +107,18 @@ export function ChatScreen() {
     try {
       const result = await compactSession(activeSessionId);
       if (result.compacted) {
-        useChatStore.setState({
+        useChatStore.setState((s) => ({
           compactResult: {
             kind: 'success',
             beforeTokens: result.beforeTokens,
             afterTokens: result.afterTokens,
           },
-        });
+          // Manual compaction does NOT emit a `compacted` stream event
+          // (only auto-compaction in chat.rs does), so the ContextGrid
+          // would otherwise stay stale. Bump statsVersion to force a
+          // re-fetch of session.contextStats.
+          statsVersion: s.statsVersion + 1,
+        }));
       } else {
         useChatStore.setState({
           compactResult: {

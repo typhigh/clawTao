@@ -173,6 +173,9 @@ interface ChatState {
   /** Persistent compaction result banner — stays until the user dismisses it
    *  or sends a new message. */
   compactResult: CompactResult | null;
+  /** Bump counter — ContextGrid watches this to know when to re-fetch stats.
+   *  Incremented after `compacted` and `done` events (when session data changes). */
+  statsVersion: number;
 
   // Actions
   loadSessions: () => Promise<void>;
@@ -275,6 +278,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   error: null,
   notice: null,
   compactResult: null,
+  statsVersion: 0,
 
   loadSessions: async () => {
     try {
@@ -456,6 +460,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               model_key: s2.sessions.find(x => x.id === sid)?.model_key,
               workspace_dir: s2.sessions.find(x => x.id === sid)?.workspace_dir,
             })),
+            statsVersion: s2.statsVersion + 1,
           }));
         }).catch(() => {
           set((s2) => ({
@@ -464,15 +469,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
               isStreaming: false,
               currentTurn: [],
             })),
+            statsVersion: s2.statsVersion + 1,
           }));
         });
         return;
       case 'compacted':
         // Flush pending, then apply compacted banner immediately.
         flushStreamBuffer(set);
-        set({
+        set((s) => ({
           compactResult: { kind: 'success', beforeTokens: undefined, afterTokens: undefined },
-        });
+          statsVersion: s.statsVersion + 1,
+        }));
         enqueueStreamEvent(ev, set);
         return;
       case 'text':

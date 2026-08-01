@@ -13,6 +13,7 @@
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useChatStore } from '../stores/chat';
 import { CompressIcon } from './icons';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -108,6 +109,11 @@ export function ContextGrid({
 
   // Refresh on mount + when session / model / workspace changes.
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Also refresh when chat store signals session data changed
+  // (e.g. after a `compacted` event finishes, or `done` reloads the session).
+  const statsVersion = useChatStore((s) => s.statsVersion);
+  useEffect(() => { refresh(); }, [refresh, statsVersion]);
 
   // Close on outside click.
   useEffect(() => {
