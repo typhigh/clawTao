@@ -70,6 +70,25 @@ export function DiffModal() {
                 {stats.removed > 0 && <span className="file-change-card__removed">-{stats.removed}</span>}
               </span>
             )}
+            <button
+              className="diff-modal-btn"
+              onClick={async () => {
+                const r = await window.electronAPI?.shell.openPath(focusedFile.filePath);
+                if (r && !r.ok && r.error) {
+                  // No associated app on the OS — show inline rather than
+                  // a modal toast so the diff stays in context.
+                  window.alert(t('workspaceChanges.openFailed', { error: r.error }));
+                }
+              }}
+              title={focusedFile.filePath}
+            >
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true" style={{ marginRight: 4 }}>
+                <path d="M5 2H10V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M10 2L5.5 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <path d="M9 8V9.5C9 9.78 8.78 10 8.5 10H2.5C2.22 10 2 9.78 2 9.5V3.5C2 3.22 2.22 3 2.5 3H4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {t('workspaceChanges.openExternal')}
+            </button>
             {hasNav && (
               <>
                 <button className="diff-modal-btn" onClick={prevFile} title={t('workspaceChanges.prev')}>

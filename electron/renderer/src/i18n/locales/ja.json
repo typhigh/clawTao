@@ -153,7 +153,9 @@
     "diffTitle": "変更: {{filename}}",
     "prev": "前へ",
     "next": "次へ",
-    "close": "閉じる"
+    "close": "閉じる",
+    "openExternal": "既定のアプリで開く",
+    "openFailed": "ファイルを開けません: {{error}}"
   },
   "sandbox": {
     "write": "Write",

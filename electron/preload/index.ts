@@ -57,9 +57,11 @@ const electronAPI = {
     get: (p: { path: string }) => ipcRenderer.invoke('image:get', p) as Promise<{ ok: boolean; base64?: string; mediaType?: string }>,
   },
 
-  // Shell helpers (open URL in system default browser)
+  // Shell helpers — open URL in system default browser, or open a
+  // local file in its OS-associated default application.
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
+    openPath: (filePath: string) => ipcRenderer.invoke('shell:open-path', filePath) as Promise<{ ok: boolean; error?: string }>,
   },
 
 };

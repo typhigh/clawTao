@@ -40,6 +40,8 @@ declare global {
       /** Open URL in system default browser (not Electron's built-in one). */
       shell: {
         openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>;
+        /** Open a local file in its OS-associated default app (e.g. `.py` → VSCode/IDLE). */
+        openPath: (filePath: string) => Promise<{ ok: boolean; error?: string }>;
       };
       dialog: {
         openDirectory: () => Promise<string | null>;

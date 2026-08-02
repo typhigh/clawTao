@@ -415,6 +415,18 @@ function setupIpc() {
     await shell.openExternal(url);
     return { ok: true };
   });
+
+  // Open a local file in the OS's default associated application
+  // (e.g. `.py` → VS Code / TextEdit / IDLE depending on user prefs).
+  // Returns an error string from Electron if no app is associated.
+  ipcMain.handle('shell:open-path', async (_e, filePath: string) => {
+    if (typeof filePath !== 'string' || filePath.length === 0) {
+      return { ok: false, error: 'invalid path' };
+    }
+    const errMsg = await shell.openPath(filePath);
+    if (errMsg) return { ok: false, error: errMsg };
+    return { ok: true };
+  });
 }
 
 async function createWindow() {

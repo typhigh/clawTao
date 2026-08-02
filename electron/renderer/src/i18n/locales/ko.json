@@ -153,7 +153,9 @@
     "diffTitle": "변경: {{filename}}",
     "prev": "이전",
     "next": "다음",
-    "close": "닫기"
+    "close": "닫기",
+    "openExternal": "기본 앱으로 열기",
+    "openFailed": "파일을 열 수 없습니다: {{error}}"
   },
   "sandbox": {
     "write": "Write",

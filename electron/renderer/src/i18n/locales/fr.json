@@ -153,7 +153,9 @@
     "diffTitle": "Modifications : {{filename}}",
     "prev": "Précédent",
     "next": "Suivant",
-    "close": "Fermer"
+    "close": "Fermer",
+    "openExternal": "Ouvrir avec l'application par défaut",
+    "openFailed": "Impossible d'ouvrir le fichier : {{error}}"
   },
   "sandbox": {
     "write": "Write",
