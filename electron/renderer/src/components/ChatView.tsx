@@ -71,11 +71,13 @@ export function ChatView({ timeline, activeSessionId, error, onClearError, notic
 
   // ── Pagination ──────────────────────────────────────────────────
   // Long-history sessions can have hundreds of turns; rendering them all
-  // at once is the dominant cost of switching sessions. We render only the
-  // last PAGE_SIZE timeline groups (so the newest turn is visible), with a
-  // "load earlier" button that reveals PAGE_SIZE more each click.
+  // at once is the dominant cost of switching sessions. We render only
+  // the last PAGE_SIZE *conversational turns* (a turn = one user message
+  // + the matching agent response), with a "load earlier" button that
+  // reveals PAGE_SIZE more each click. One turn ≈ one "I asked, you
+  // answered" exchange from the user's perspective.
   const PAGE_SIZE = 10;
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [visibleTurns, setVisibleTurns] = useState(PAGE_SIZE);
   // Absolute agent-turn prefix counts — O(n) once per timeline, replaces
   // the O(n²) `slice().filter()` per rendered group.
   const agentTurnPrefix = useMemo(() => {
@@ -87,13 +89,40 @@ export function ChatView({ timeline, activeSessionId, error, onClearError, notic
     }
     return prefix;
   }, [timeline]);
-  // Visible slice: last `visibleCount` groups, keeping their absolute index.
+  // Map "visible turns from the tail" to a group slice. A turn is
+  // anchored at the agent turn; we include the user message that
+  // immediately precedes it (if any) so the response never appears
+  // without its question. The liveTurn at the tail is always included.
+  const visibleStartIdx = useMemo(() => {
+    if (timeline.length === 0) return 0;
+    const totalAgentTurns = agentTurnPrefix[timeline.length - 1] || 0;
+    if (visibleTurns >= totalAgentTurns && timeline[timeline.length - 1]?.kind !== 'liveTurn') {
+      return 0; // everything fits
+    }
+    // Walk from the tail, counting agent turns, until we hit `visibleTurns`.
+    // Then walk one step back to include the matching user message (if any).
+    let turnsSeen = 0;
+    for (let i = timeline.length - 1; i >= 0; i--) {
+      if (timeline[i].kind === 'agentTurn' || timeline[i].kind === 'liveTurn') {
+        turnsSeen++;
+        if (turnsSeen > visibleTurns) {
+          // i is the first group *past* the window; include the preceding
+          // user message (if present) so the turn isn't orphaned.
+          let start = i + 1;
+          if (start < timeline.length && timeline[start].kind === 'liveTurn') start++;
+          if (start > 0 && timeline[start - 1].kind === 'user') start--;
+          return start;
+        }
+      }
+    }
+    return 0;
+  }, [timeline, visibleTurns, agentTurnPrefix]);
+  // Visible slice, keeping absolute index.
   const visible = useMemo(() => {
-    const start = Math.max(0, timeline.length - visibleCount);
     const out: { group: TimelineGroup; idx: number }[] = [];
-    for (let i = start; i < timeline.length; i++) out.push({ group: timeline[i], idx: i });
+    for (let i = visibleStartIdx; i < timeline.length; i++) out.push({ group: timeline[i], idx: i });
     return out;
-  }, [timeline, visibleCount]);
+  }, [timeline, visibleStartIdx]);
 
   // Scroll-preservation machinery.
   // - prevScrollHeightRef: captured just before "load earlier" grows the
@@ -112,13 +141,13 @@ export function ChatView({ timeline, activeSessionId, error, onClearError, notic
     userAtBottomRef.current = distFromBottom <= STICK_THRESHOLD;
   };
 
-  // Session switch — reset pagination to the newest PAGE_SIZE groups and
+  // Session switch — reset pagination to the newest PAGE_SIZE turns and
   // remember to scroll to bottom once the reset has rendered.
   useEffect(() => {
     if (lastSessionRef.current !== activeSessionId) {
       lastSessionRef.current = activeSessionId;
       userAtBottomRef.current = true;
-      setVisibleCount(PAGE_SIZE);
+      setVisibleTurns(PAGE_SIZE);
       pendingSwitchScrollRef.current = true;
     }
   }, [activeSessionId]);
@@ -151,10 +180,12 @@ export function ChatView({ timeline, activeSessionId, error, onClearError, notic
   const loadEarlier = () => {
     const el = messagesRef.current;
     if (el) prevScrollHeightRef.current = el.scrollHeight;
-    setVisibleCount((c) => Math.min(timeline.length, c + PAGE_SIZE));
+    const totalTurns = agentTurnPrefix[timeline.length - 1] || 0;
+    setVisibleTurns((c) => Math.min(totalTurns, c + PAGE_SIZE));
   };
-  const hasEarlier = visibleCount < timeline.length;
-  const earlierCount = Math.min(PAGE_SIZE, timeline.length - visibleCount);
+  const totalTurns = agentTurnPrefix[timeline.length - 1] || 0;
+  const hasEarlier = visibleTurns < totalTurns;
+  const earlierCount = Math.min(PAGE_SIZE, totalTurns - visibleTurns);
 
   return (
     <main className="chat-area">

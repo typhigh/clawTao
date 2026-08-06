@@ -430,17 +430,19 @@ fn run_state_machine(
                         }
                     } else if name == "Edit" {
                         if let Some(path) = args_val.get("path").and_then(|v| v.as_str()) {
-                            let old_str = args_val.get("old_string")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-                            let new_str = args_val.get("new_string")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
+                            // Read the actual file content NOW (before any tool
+                            // executes) so the frontend gets a real baseline for
+                            // the diff, not just the old_string/new_string snippets.
+                            let old_content = std::fs::read_to_string(path).ok();
                             file_changes.insert(tc.id.clone(), json!({
                                 "path": path,
                                 "action": "modified",
-                                "oldContent": old_str,
-                                "newContent": new_str,
+                                "oldContent": old_content,
+                                // newContent is set to null for Edit: we don't
+                                // know the full post-edit content at this point,
+                                // and the frontend already builds the diff from
+                                // the tool_call.input edits array.
+                                "newContent": Value::Null,
                             }));
                         }
                     }
